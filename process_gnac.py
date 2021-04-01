@@ -9,7 +9,7 @@ from fnmatch import fnmatch
 from tqdm import tqdm
 import pandas as pd
 
-import nwfiles.pipeline.nwdata as nw
+import nwdata as nw
 
 
 def process_gnac(study_dir, file_patterns=['*'], nonwear_csv=None, convert_edf=True,

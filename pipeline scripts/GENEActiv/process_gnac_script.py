@@ -1,15 +1,15 @@
 import sys
 sys.path.append(r'/Users/kbeyer/repos')
 
-import nwfiles.pipeline.process_gnac as gnac
+import nwpipeline.process_gnac as gnac
 
-file_patterns = ['*']
+file_patterns = ['*1027*LA*']
 
-study_dir = '/Volumes/KIT_DATA/PD_DANCE_TWH'
+study_dir = '/Volumes/KIT_DATA/ReMiNDD'
 
-convert_edf = False
+convert_edf = True
 separate_sensors = False
-crop_nonwear = True
+crop_nonwear = False
 
 nonwear_csv = ('/Volumes/KIT_DATA/PD_DANCE_TWH/processed_data/GNAC/standard_nonwear_times/' +
                'GNAC_standard_nonwear_times.csv')
