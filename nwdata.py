@@ -1,13 +1,8 @@
-import sys
-sys.path.append(r'/Users/kbeyer/repos')
-
 import datetime as dt
 import copy
 
 import pyedflib
-
-import nwfiles.file.GENEActiv as ga
-
+import nwfiles.GENEActiv as ga
 
 class nwdata:
 
