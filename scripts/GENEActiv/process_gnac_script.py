@@ -1,7 +1,7 @@
 import sys
 sys.path.append(r'/Users/kbeyer/repos')
 
-import nwpipeline.process_gnac as gnac
+import nwpipeline.nwpipeline as gnac
 
 file_patterns = ['*1027*LA*']
 
