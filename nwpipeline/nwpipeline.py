@@ -1,5 +1,3 @@
-import sys
-sys.path.append(r'/Users/kbeyer/repos')
 
 import os
 import datetime as dt
@@ -10,6 +8,8 @@ from tqdm import tqdm
 import pandas as pd
 
 from nwpipeline import nwdata as nw
+
+
 
 
 def process_gnac(study_dir, file_patterns=['*'], nonwear_csv=None, convert_edf=True,
@@ -125,12 +125,12 @@ def process_single_gnac(bin_path, standard_device_dir, standard_sensor_dir, crop
         nonwear_duration = dt.timedelta(minutes=0)
         nonwear_time_to_eof = dt.timedelta(minutes=21)
 
-        # # get last device nonwear period
-        # last_nonwear = nonwear_df.loc[(nonwear_df['subject_id'] == int(subject_id)) &
-        #                               (nonwear_df['device_location'] == device_location)][-1:]
+        # get last device nonwear period
+        last_nonwear = nonwear_df.loc[(nonwear_df['subject_id'] == int(subject_id)) &
+                                      (nonwear_df['device_location'] == device_location)][-1:]
 
         # get last device nonwear period
-        last_nonwear = nonwear_df.loc[(nonwear_df['file_name'] == file_base)][-1:]
+        #last_nonwear = nonwear_df.loc[(nonwear_df['file_name'] == file_base)][-1:]
 
         if not last_nonwear.empty:
             # get duration and time to end of file of last nonwear

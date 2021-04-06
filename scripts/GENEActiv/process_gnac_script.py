@@ -1,5 +1,3 @@
-#import sys
-#sys.path.append(r'/Users/kbeyer/repos')
 
 import nwpipeline.nwpipeline as gnac
 
@@ -7,8 +5,8 @@ file_patterns = ['*1027*LA*']
 
 study_dir = '/Volumes/KIT_DATA/test_study'
 
-convert_edf = True
-separate_sensors = True
+convert_edf = False
+separate_sensors = False
 crop_nonwear = True
 
 nonwear_csv = ('/Volumes/KIT_DATA/test_study/analyzed_data/nonwear/standard_nonwear_times/' +
