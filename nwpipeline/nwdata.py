@@ -1,8 +1,9 @@
 import datetime as dt
 import copy
 
-import pyedflib
-import nwfiles.GENEActiv as ga
+from nwfiles import GENEActiv as gnac
+from nwfiles import EDF as edf
+
 
 class nwdata:
 
@@ -32,8 +33,10 @@ class nwdata:
         for sig_num in range(len(self.signal_headers)):
 
             # calculate start and duration samples
-            crop_start = int((new_start_time - start_time).total_seconds() * self.signal_headers[sig_num]['sample_rate'])
-            crop_duration = int((new_end_time - new_start_time).total_seconds() * self.signal_headers[sig_num]['sample_rate'])
+            crop_start = int((new_start_time - start_time).total_seconds()
+                             * self.signal_headers[sig_num]['sample_rate'])
+            crop_duration = int((new_end_time - new_start_time).total_seconds()
+                                * self.signal_headers[sig_num]['sample_rate'])
             crop_end = crop_start + crop_duration
 
             self.signals[sig_num] = self.signals[sig_num][crop_start:crop_end]
@@ -51,40 +54,16 @@ class nwdata:
             signals = [signals[sig_num] for sig_num in sig_nums_out]
             signal_headers = [signal_headers[sig_num] for sig_num in sig_nums_out]
 
-        datarecord_duration = 100000
-        sample_rates = [float(signal_header['sample_rate']) for signal_header in signal_headers]
-
-        if any(sample_rate < 1 for sample_rate in sample_rates):
-
-            lowest_sample_rate = min(sample_rates)
-            datarecord_duration = int(100000 / lowest_sample_rate)
-
-            # loop through signals
-            for sig in range(len(signal_headers)):
-                # adjust sample rate to samples per datarecord
-                # (problem with pyedflib interpretation of 'sample_rate')
-                old_sample_rate = signal_headers[sig]['sample_rate']
-                signal_headers[sig]['sample_rate'] = old_sample_rate / lowest_sample_rate
-
-        edf_writer = pyedflib.EdfWriter(file_path, len(signals))
-        edf_writer.setDatarecordDuration(datarecord_duration)
-        edf_writer.setHeader(self.header)
-        edf_writer.setSignalHeaders(signal_headers)
-        edf_writer.writeSamples(signals)
-        edf_writer.close()
+        edf.write(self.header, signal_headers, signals, file_path)
 
     def import_edf(self, file_path):
 
-        edf_reader = pyedflib.EdfReader(file_path)
-        self.header = edf_reader.getHeader()
-        self.signal_headers = edf_reader.getSignalHeaders()
-        self.signals = [edf_reader.readSignal(sig_num) for sig_num in range(edf_reader.signals_in_file)]
-        edf_reader.close()
+        self.header, self.signal_headers, self.signals = edf.read(file_path)
 
     def import_gnac(self, file_path, parse_data=True, start=1, end=-1, downsample=1,
                     calibrate=True, correct_drift=False, update=True, quiet=False):
 
-        ga_file = ga.GENEActivFile(file_path)
+        ga_file = gnac.GENEActivFile(file_path)
         ga_file.read(parse_data=parse_data, start=start, end=end, downsample=downsample,
                      calibrate=calibrate, correct_drift=correct_drift, update=update, quiet=quiet)
 
