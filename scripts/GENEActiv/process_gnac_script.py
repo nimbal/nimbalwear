@@ -1,17 +1,17 @@
-import sys
-sys.path.append(r'/Users/kbeyer/repos')
+#import sys
+#sys.path.append(r'/Users/kbeyer/repos')
 
 import nwpipeline.nwpipeline as gnac
 
 file_patterns = ['*1027*LA*']
 
-study_dir = '/Volumes/KIT_DATA/ReMiNDD'
+study_dir = '/Volumes/KIT_DATA/test_study'
 
 convert_edf = True
-separate_sensors = False
-crop_nonwear = False
+separate_sensors = True
+crop_nonwear = True
 
-nonwear_csv = ('/Volumes/KIT_DATA/PD_DANCE_TWH/processed_data/GNAC/standard_nonwear_times/' +
+nonwear_csv = ('/Volumes/KIT_DATA/test_study/analyzed_data/nonwear/standard_nonwear_times/' +
                'GNAC_standard_nonwear_times.csv')
 
 gnac.process_gnac(study_dir, file_patterns=file_patterns, nonwear_csv=nonwear_csv, convert_edf=convert_edf,
