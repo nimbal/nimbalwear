@@ -9,7 +9,17 @@ class nwdata:
 
     def __init__(self):
 
-        self.header = {}
+        self.header = {'patientcode': '',
+                       'gender': 2,
+                       'birthdate': '',
+                       'patientname': '',
+                       'patient_additional': '',
+                       'startdate': '',
+                       'admincode': '',
+                       'technician': '',
+                       'equipment': '',
+                       'recording_additional': ''}
+
         self.signal_headers = []
         self.signals = []
 
