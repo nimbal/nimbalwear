@@ -3,7 +3,7 @@ import copy
 
 from nwfiles import GENEActiv as gnac
 from nwfiles import EDF as edf
-
+from nwfiles import Nonin as nonw
 
 class nwdata:
 
@@ -155,3 +155,49 @@ class nwdata:
                         ga_file.data['temperature'],
                         ga_file.data['light'][trim_samples:],
                         ga_file.data['button'][trim_samples:]]
+
+    def import_nonw(self, file_path, quiet=False):
+
+        nonw_file = nonw.NoninFile(file_path)
+        nonw_file.read(quiet=quiet)
+
+        self.header = {'patientcode': nonw_file.header['id'],
+                       'gender': nonw_file.header['gender'],
+                       'birthdate': nonw_file.header['dob'],
+                       'patientname': nonw_file.header['first_name'] + '_' + nonw_file.header['last_name'],
+                       'patient_additional': '',
+                       'startdate': dt.datetime.combine(nonw_file.header['start_date'], nonw_file.header['start_time']),
+                       'admincode': '',
+                       'technician': nonw_file.header['physician'],
+                       'equipment': 'Nonin',
+                       'recording_additional': ''}
+
+        self.signal_headers = [{'label': "Pulse",
+                                'transducer': "Pulse oximeter",
+                                'dimension': "bpm",
+                                'sample_rate': nonw_file.header['sample_rate'],
+                                'physical_max': max(nonw_file.data['pulse']),
+                                'physical_min': (min(nonw_file.data['pulse'])
+                                                 if max(nonw_file.data['pulse']) > min(nonw_file.data['pulse'])
+                                                 else max(nonw_file.data['pulse']) - 1),
+                                'digital_max': max(nonw_file.data['pulse']),
+                                'digital_min': (min(nonw_file.data['pulse'])
+                                                if max(nonw_file.data['pulse']) > min(nonw_file.data['pulse'])
+                                                else max(nonw_file.data['pulse']) - 1),
+                                'prefilter': ''},
+                               {'label': "SpO2",
+                                'transducer': "Pulse oximeter",
+                                'dimension': '%',
+                                'sample_rate': nonw_file.header['sample_rate'],
+                                'physical_max': max(nonw_file.data['spo2']),
+                                'physical_min': (min(nonw_file.data['spo2'])
+                                                if max(nonw_file.data['spo2']) > min(nonw_file.data['spo2'])
+                                                else max(nonw_file.data['spo2']) - 1),
+                                'digital_max': max(nonw_file.data['spo2']),
+                                'digital_min': (min(nonw_file.data['spo2'])
+                                               if max(nonw_file.data['spo2']) > min(nonw_file.data['spo2'])
+                                               else max(nonw_file.data['spo2']) - 1),
+                                'prefilter': ''}]
+
+        self.signals = [nonw_file.data['pulse'],
+                        nonw_file.data['spo2']]
