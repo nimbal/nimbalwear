@@ -1,11 +1,12 @@
 import datetime as dt
 import copy
 
-from nwfiles import GENEActiv as gnac
-from nwfiles import EDF as edf
-from nwfiles import Nonin as nonw
+from nwfiles import GENEActiv
+from nwfiles import EDF
+from nwfiles import Nonin
 
-class nwdata:
+
+class NWData:
 
     def __init__(self):
 
@@ -64,16 +65,16 @@ class nwdata:
             signals = [signals[sig_num] for sig_num in sig_nums_out]
             signal_headers = [signal_headers[sig_num] for sig_num in sig_nums_out]
 
-        edf.write(self.header, signal_headers, signals, file_path)
+        EDF.write(self.header, signal_headers, signals, file_path)
 
     def import_edf(self, file_path):
 
-        self.header, self.signal_headers, self.signals = edf.read(file_path)
+        self.header, self.signal_headers, self.signals = EDF.read(file_path)
 
     def import_gnac(self, file_path, parse_data=True, start=1, end=-1, downsample=1,
                     calibrate=True, correct_drift=False, update=True, quiet=False):
 
-        ga_file = gnac.GENEActivFile(file_path)
+        ga_file = GENEActiv.GENEActivFile(file_path)
         ga_file.read(parse_data=parse_data, start=start, end=end, downsample=downsample,
                      calibrate=calibrate, correct_drift=correct_drift, update=update, quiet=quiet)
 
@@ -158,7 +159,7 @@ class nwdata:
 
     def import_nonw(self, file_path, quiet=False):
 
-        nonw_file = nonw.NoninFile(file_path)
+        nonw_file = Nonin.NoninFile(file_path)
         nonw_file.read(quiet=quiet)
 
         self.header = {'patientcode': nonw_file.header['id'],
@@ -191,12 +192,12 @@ class nwdata:
                                 'sample_rate': nonw_file.header['sample_rate'],
                                 'physical_max': max(nonw_file.data['spo2']),
                                 'physical_min': (min(nonw_file.data['spo2'])
-                                                if max(nonw_file.data['spo2']) > min(nonw_file.data['spo2'])
-                                                else max(nonw_file.data['spo2']) - 1),
+                                                 if max(nonw_file.data['spo2']) > min(nonw_file.data['spo2'])
+                                                 else max(nonw_file.data['spo2']) - 1),
                                 'digital_max': max(nonw_file.data['spo2']),
                                 'digital_min': (min(nonw_file.data['spo2'])
-                                               if max(nonw_file.data['spo2']) > min(nonw_file.data['spo2'])
-                                               else max(nonw_file.data['spo2']) - 1),
+                                                if max(nonw_file.data['spo2']) > min(nonw_file.data['spo2'])
+                                                else max(nonw_file.data['spo2']) - 1),
                                 'prefilter': ''}]
 
         self.signals = [nonw_file.data['pulse'],
