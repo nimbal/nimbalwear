@@ -10,6 +10,23 @@ import pandas as pd
 from nwpipeline import nwdata as nw
 
 
+# class nwpipeline:
+#
+#     def __init__(self, study_dir):
+#
+#         self.study_dir = os.path.abspath(study_dir)
+#
+#         self.gnac_dir = 'GNAC'
+#         self.bitf_dir = 'BITF'
+#         self.nonw_dir = 'NONW'
+#
+#         self.raw_data_dir = 'raw_data'
+#         self.processed_data_dir = 'processed_data'
+#
+#         self.standard_device_dir = os.path.join(self.study_dir, self.processed_data_dir, 'standard_device_edf')
+#         self.standard_sensor_dir = os.path.join(self.study_dir, self.processed_data_dir, 'standard_sensor_edf')
+#         self.cropped_device_dir = study_dir + '/processed_data/cropped_device_edf'
+#         self.cropped_sensor_dir = study_dir + '/processed_data/cropped_sensor_edf'
 
 
 def process_gnac(study_dir, file_patterns=['*'], nonwear_csv=None, convert_edf=True,
@@ -33,7 +50,6 @@ def process_gnac(study_dir, file_patterns=['*'], nonwear_csv=None, convert_edf=T
                             standard_sensor_dir=standard_sensor_dir, cropped_sensor_dir=cropped_sensor_dir,
                             nonwear_csv=nonwear_csv, convert_edf=convert_edf, separate_sensors=separate_sensors,
                             crop_nonwear=crop_nonwear, quiet=quiet)
-
 
 def process_single_gnac(bin_path, standard_device_dir, standard_sensor_dir, cropped_sensor_dir, nonwear_csv,
                         convert_edf=True, separate_sensors=True, crop_nonwear=True, quiet=False):
@@ -156,3 +172,25 @@ def process_single_gnac(bin_path, standard_device_dir, standard_sensor_dir, crop
             sen_channels = sensor_channels[sen]
 
             device_data.export_edf(file_path=cropped_sensor_path, sig_nums_out=sen_channels)
+
+def process_subject(study_dir, subject_id):
+
+    nonw_raw_dir = study_dir + '/raw_data/NONW/'
+
+    bitf_raw_dir = study_dir + '/raw_data/BITF/'
+
+    gnac_raw_dir = study_dir + '/raw_data/GNAC/'
+    gnac_standard_device_dir = study_dir + '/processed_data/GNAC/standard_device_edf'
+    gnac_cropped_sensor_dir = study_dir + '/processed_data/GNAC/cropped_sensor_edf'
+
+    file_pattern = "*" + subject_id + "*"
+
+
+    #process NONW
+
+    file_list = [f for f in os.listdir(nonw_raw_dir)
+                 if f.endswith('.asc') and not f.startswith('.')
+                 and fnmatch(f, file_pattern)]
+    file_list.sort()
+
+    print(file_list)
