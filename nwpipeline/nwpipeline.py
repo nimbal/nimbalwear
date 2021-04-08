@@ -5,8 +5,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 import pandas as pd
-
-from nwpipeline import nwdata
+import nwdata
 
 
 class NWPipeline:
