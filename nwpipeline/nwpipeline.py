@@ -5,7 +5,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 import pandas as pd
-import nwdata
+from nwdata import NWData
 
 
 class NWPipeline:
@@ -63,7 +63,7 @@ class NWPipeline:
             import_func = import_switch.get(device_type, lambda: 'Invalid')
 
             # import data to device data object
-            device_data = nwdata.NWData()
+            device_data = NWData.NWData()
             import_func()
             device_data.deidentify()
 

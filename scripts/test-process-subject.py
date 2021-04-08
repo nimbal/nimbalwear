@@ -1,4 +1,4 @@
-from nwpipeline import nwpipeline as nwpl
+import nwpipeline.nwpipeline as nwpl
 
 study_dir = '/Volumes/KIT_DATA/test_study'
 
