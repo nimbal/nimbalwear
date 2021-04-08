@@ -1,8 +1,8 @@
-import nwpipeline.nwpipeline as nwpl
+import nwpipeline as nwpl
 
 study_dir = '/Volumes/KIT_DATA/test_study'
 
-subject_id = '8600'
+subject_id = '1027'
 coll_id = '01'
 
 test_nwpl = nwpl.NWPipeline(study_dir)
