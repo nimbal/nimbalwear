@@ -26,21 +26,24 @@ class NWPipeline:
         # read device list
         self.device_list = pd.read_csv(os.path.join(self.study_dir, self.device_list_path), dtype=str, )
 
-    def process_coll(self, subject_id, coll_id, quiet=False):
+    def coll_proc(self, subject_id, coll_id, quiet=False):
+
+        # read data from all devices in collection
+        devices = self.coll_read(subject_id, coll_id, save=True, quiet=quiet)
+
+        # crop final nonwear
+        devices = self.coll_crop(subject_id, coll_id, devices, save=True, quiet=quiet)
+
+        # save sensor edf files
+        self.coll_sens(subject_id, coll_id, devices)
+
+    def coll_read(self, subject_id, coll_id, save=False, quiet=False):
 
         import_switch = {'GNAC': lambda: device_data.import_gnac(device_raw_path, correct_drift=True, quiet=quiet),
                          'BITF': lambda: device_data.import_edf(device_raw_path),
                          'NONW': lambda: device_data.import_nonw(device_raw_path, quiet=quiet)}
 
-        sensors_switch = {'GNAC': ['ACCELEROMETER', 'TEMPERATURE', 'LIGHT', 'BUTTON'],
-                          'BITF': ['ACCELEROMETER', 'ECG'],
-                          'NONW': ['PLSOX']}
-
-        sensor_channels_switch = {'GNAC': [[0, 1, 2], [3], [4], [5]],
-                                  'BITF': [[1, 2, 3], [0]],
-                                  'NONW': [[0, 1]]}
-
-        # search for files from subject visit
+        # get devices for subject visit from device_list
         subject_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
                                                       (self.device_list['coll_id'] == coll_id)]
 
@@ -71,28 +74,29 @@ class NWPipeline:
 
             devices[index] = device_data
 
-        # save device edf files
-        for index, row in tqdm(subject_device_list_df.iterrows(), desc='Saving device edf files'):
+            if save:
 
-            device_type = row['device_type']
-            device_file_name = row['file_name']
+                if not quiet:
+                    print("Saving device .edf file ...")
 
-            # create all file path variables
-            device_file_base = os.path.splitext(device_file_name)[0]
-            device_edf_name = '.'.join([device_file_base, 'edf'])
-            standard_device_path = os.path.join(self.standard_device_dir, device_type, device_edf_name)
+                # create all file path variables
+                device_file_base = os.path.splitext(device_file_name)[0]
+                device_edf_name = '.'.join([device_file_base, 'edf'])
+                standard_device_path = os.path.join(self.standard_device_dir, device_type, device_edf_name)
 
-            # check file and folder structure
-            if not quiet:
-                print("Checking file and folder structure ...")
+                # check that all folders exist for data output files
+                Path(os.path.dirname(standard_device_path)).mkdir(parents=True, exist_ok=True)
 
-            # check that all folders exist for data output files
-            Path(os.path.dirname(standard_device_path)).mkdir(parents=True, exist_ok=True)
+                # write device data as edf
+                devices[index].export_edf(file_path=standard_device_path)
 
-            # write device data as edf
-            if not quiet:
-                print("Saving device .edf file ...")
-            devices[index].export_edf(file_path=standard_device_path)
+        return devices
+
+    def coll_crop(self, subject_id, coll_id, devices, save=False, quiet=False):
+
+        # get devices for subject visit from device_list - REMOVE LATER
+        subject_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
+                                                      (self.device_list['coll_id'] == coll_id)]
 
         # crop final nonwear from all device data
         for index, row in tqdm(subject_device_list_df.iterrows(), desc='Cropping final nonwear'):
@@ -101,23 +105,6 @@ class NWPipeline:
             device_type = row['device_type']
             device_location = row['device_location']
             device_file_name = row['file_name']
-
-            # create all file path variables
-            device_file_base = os.path.splitext(device_file_name)[0]
-            device_edf_name = '.'.join([device_file_base, 'edf'])
-
-            cropped_device_path = os.path.join(self.cropped_device_dir, device_type, device_edf_name)
-
-            # check file and folder structure
-            if not quiet:
-                print("Checking file and folder structure ...")
-
-            # check that all folders exist for data output files
-            Path(os.path.dirname(cropped_device_path)).mkdir(parents=True, exist_ok=True)
-
-            # crop final nonwear from device
-            if not quiet:
-                print("Cropping final nonwear...")
 
             # read nonwear csv file
             nonwear_df = pd.read_csv(self.nonwear_csv, dtype=str)
@@ -154,13 +141,40 @@ class NWPipeline:
 
             devices[index].crop(new_start_time, new_end_time)
 
-            # write cropped device data as edf
-            if not quiet:
-                print("Saving cropped device .edf file ...")
-            devices[index].export_edf(file_path=cropped_device_path)
+            if save:
 
-        # save sensor edf files
-        for index, row in tqdm(subject_device_list_df.iterrows(), desc='Processing devices'):
+                if not quiet:
+                    print("Saving cropped device .edf file ...")
+
+                # create all file path variables
+                device_file_base = os.path.splitext(device_file_name)[0]
+                device_edf_name = '.'.join([device_file_base, 'edf'])
+
+                cropped_device_path = os.path.join(self.cropped_device_dir, device_type, device_edf_name)
+
+                # check that all folders exist for data output files
+                Path(os.path.dirname(cropped_device_path)).mkdir(parents=True, exist_ok=True)
+
+                # write cropped device data as edf
+                devices[index].export_edf(file_path=cropped_device_path)
+
+            return devices
+
+    def coll_sens(self, subject_id, coll_id, devices):
+
+        sensors_switch = {'GNAC': ['ACCELEROMETER', 'TEMPERATURE', 'LIGHT', 'BUTTON'],
+                          'BITF': ['ACCELEROMETER', 'ECG'],
+                          'NONW': ['PLSOX']}
+
+        sensor_channels_switch = {'GNAC': [[0, 1, 2], [3], [4], [5]],
+                                  'BITF': [[1, 2, 3], [0]],
+                                  'NONW': [[0, 1]]}
+
+        # get devices for subject visit from device_list - REMOVE LATER
+        subject_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
+                                                      (self.device_list['coll_id'] == coll_id)]
+
+        for index, row in tqdm(subject_device_list_df.iterrows(), desc='Saving sensor edfs'):
 
             # get info from device list
             device_type = row['device_type']
@@ -177,17 +191,9 @@ class NWPipeline:
             sensor_paths = [os.path.join(self.sensor_dir, device_type, sensors[sen], sensor_edf_names[sen])
                             for sen in range(len(sensors))]
 
-            # check file and folder structure
-            if not quiet:
-                print("Checking file and folder structure ...")
-
             # check that all folders exist for data output files
             for sensor_path in sensor_paths:
                 Path(os.path.dirname(sensor_path)).mkdir(parents=True, exist_ok=True)
-
-            # Save sensor edf files
-            if not quiet:
-                print("Saving sensor .edf files...")
 
             for sen in tqdm(range(len(sensor_paths)), desc="Separating sensors"):
 
