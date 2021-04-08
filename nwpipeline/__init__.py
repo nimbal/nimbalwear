@@ -1,1 +1,1 @@
-name = "nwpipeline"
+from .nwpipeline import *
