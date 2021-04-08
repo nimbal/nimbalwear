@@ -8,6 +8,7 @@ import pandas as pd
 
 from nwpipeline import nwdata
 
+
 class NWPipeline:
 
     def __init__(self, study_dir):
@@ -28,8 +29,6 @@ class NWPipeline:
 
     def process_coll(self, subject_id, coll_id, quiet=False):
 
-        # read all data files
-
         import_switch = {'GNAC': lambda: device_data.import_gnac(device_raw_path, correct_drift=True, quiet=quiet),
                          'BITF': lambda: device_data.import_edf(device_raw_path),
                          'NONW': lambda: device_data.import_nonw(device_raw_path, quiet=quiet)}
@@ -44,70 +43,82 @@ class NWPipeline:
 
         # search for files from subject visit
         subject_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
-                                                    (self.device_list['coll_id'] == coll_id)]
+                                                      (self.device_list['coll_id'] == coll_id)]
+
+        devices = {}
 
         # read in all data files for one subject
-        for index, row in tqdm(subject_device_list_df.iterrows(), desc='Processing devices'):
+        for index, row in tqdm(subject_device_list_df.iterrows(), desc='Reading all device data'):
 
-            # get info from device list
             device_type = row['device_type']
-            device_location = row['device_location']
             device_file_name = row['file_name']
 
-            # evaluate device type cases
-            import_func = import_switch.get(device_type, lambda: 'Invalid')
-            sensors = sensors_switch.get(device_type, lambda: 'Invalid')
-            sensor_channels = sensor_channels_switch.get(device_type, lambda: 'Invalid')
-
-            # create all file path variables
-            device_file_base = os.path.splitext(device_file_name)[0]
-
             device_raw_path = os.path.join(self.raw_data_dir, device_type, device_file_name)
-
-            device_edf_name = '.'.join([device_file_base, 'edf'])
-
-            sensor_edf_names = ['.'.join(['_'.join([device_file_base, sensor]), 'edf']) for sensor in sensors]
-
-            standard_device_path = os.path.join(self.standard_device_dir, device_type, device_edf_name)
-            cropped_device_path = os.path.join(self.cropped_device_dir, device_type, device_edf_name)
-            sensor_paths = [os.path.join(self.sensor_dir, device_type, sensors[sen], sensor_edf_names[sen])
-                            for sen in range(len(sensors))]
-
-            # check file and folder structure
-            if not quiet:
-                print("Checking file and folder structure ...")
 
             # check that raw data file exists
             if not os.path.isfile(device_raw_path):
                 print(f"WARNING: {device_raw_path} does not exist.\n")
+                devices[index] = None
                 return
 
-            # check that all folders exist for data output files
-            Path(os.path.dirname(standard_device_path)).mkdir(parents=True, exist_ok=True)
-            Path(os.path.dirname(cropped_device_path)).mkdir(parents=True, exist_ok=True)
-            for sensor_path in sensor_paths:
-                Path(os.path.dirname(sensor_path)).mkdir(parents=True, exist_ok=True)
-
-            # READ DEVICE DATA
-            if not quiet:
-                print("Reading device data...")
+            import_func = import_switch.get(device_type, lambda: 'Invalid')
 
             # import data to device data object
-
             device_data = nwdata.NWData()
             import_func()
             device_data.deidentify()
 
             # TODO: check header against device list info
 
+            devices[index] = device_data
+
+        # save device edf files
+        for index, row in tqdm(subject_device_list_df.iterrows(), desc='Saving device edf files'):
+
+            device_type = row['device_type']
+            device_file_name = row['file_name']
+
+            # create all file path variables
+            device_file_base = os.path.splitext(device_file_name)[0]
+            device_edf_name = '.'.join([device_file_base, 'edf'])
+            standard_device_path = os.path.join(self.standard_device_dir, device_type, device_edf_name)
+
+            # check file and folder structure
+            if not quiet:
+                print("Checking file and folder structure ...")
+
+            # check that all folders exist for data output files
+            Path(os.path.dirname(standard_device_path)).mkdir(parents=True, exist_ok=True)
+
             # write device data as edf
             if not quiet:
-                print("Writing device .edf file ...")
-            device_data.export_edf(file_path=standard_device_path)
+                print("Saving device .edf file ...")
+            devices[index].export_edf(file_path=standard_device_path)
 
-            # CROP FINAL NONWEAR FROM DEVICE
+        # crop final nonwear from all device data
+        for index, row in tqdm(subject_device_list_df.iterrows(), desc='Cropping final nonwear'):
+
+            # get info from device list
+            device_type = row['device_type']
+            device_location = row['device_location']
+            device_file_name = row['file_name']
+
+            # create all file path variables
+            device_file_base = os.path.splitext(device_file_name)[0]
+            device_edf_name = '.'.join([device_file_base, 'edf'])
+
+            cropped_device_path = os.path.join(self.cropped_device_dir, device_type, device_edf_name)
+
+            # check file and folder structure
             if not quiet:
-                print("Cropping device .edf file ...")
+                print("Checking file and folder structure ...")
+
+            # check that all folders exist for data output files
+            Path(os.path.dirname(cropped_device_path)).mkdir(parents=True, exist_ok=True)
+
+            # crop final nonwear from device
+            if not quiet:
+                print("Cropping final nonwear...")
 
             # read nonwear csv file
             nonwear_df = pd.read_csv(self.nonwear_csv, dtype=str)
@@ -121,8 +132,9 @@ class NWPipeline:
                                           (nonwear_df['device_location'] == device_location)][-1:]
 
             # get time info from device data
-            start_time = device_data.header['startdate']
-            duration = dt.timedelta(seconds=len(device_data.signals[0]) / device_data.signal_headers[0]['sample_rate'])
+            start_time = devices[index].header['startdate']
+            duration = dt.timedelta(
+                seconds=len(devices[index].signals[0]) / devices[index].signal_headers[0]['sample_rate'])
             end_time = start_time + duration
 
             nonwear_duration = dt.timedelta(minutes=0)
@@ -141,19 +153,46 @@ class NWPipeline:
             new_start_time = start_time
             new_end_time = last_nonwear['start_time'].item() if is_cropped else end_time
 
-            device_data.crop(new_start_time, new_end_time)
+            devices[index].crop(new_start_time, new_end_time)
 
-            # write as cropped device data as edf
-            device_data.export_edf(file_path=cropped_device_path)
-
-            # SEPARATE DEVICE EDF TO SENSOR EDFS
+            # write cropped device data as edf
             if not quiet:
-                print("Writing sensor .edf files...")
+                print("Saving cropped device .edf file ...")
+            devices[index].export_edf(file_path=cropped_device_path)
+
+        # save sensor edf files
+        for index, row in tqdm(subject_device_list_df.iterrows(), desc='Processing devices'):
+
+            # get info from device list
+            device_type = row['device_type']
+            device_file_name = row['file_name']
+
+            # evaluate device type cases
+            sensors = sensors_switch.get(device_type, lambda: 'Invalid')
+            sensor_channels = sensor_channels_switch.get(device_type, lambda: 'Invalid')
+
+            # create all file path variables
+            device_file_base = os.path.splitext(device_file_name)[0]
+            sensor_edf_names = ['.'.join(['_'.join([device_file_base, sensor]), 'edf']) for sensor in sensors]
+
+            sensor_paths = [os.path.join(self.sensor_dir, device_type, sensors[sen], sensor_edf_names[sen])
+                            for sen in range(len(sensors))]
+
+            # check file and folder structure
+            if not quiet:
+                print("Checking file and folder structure ...")
+
+            # check that all folders exist for data output files
+            for sensor_path in sensor_paths:
+                Path(os.path.dirname(sensor_path)).mkdir(parents=True, exist_ok=True)
+
+            # Save sensor edf files
+            if not quiet:
+                print("Saving sensor .edf files...")
 
             for sen in tqdm(range(len(sensor_paths)), desc="Separating sensors"):
 
                 sen_path = sensor_paths[sen]
                 sen_channels = sensor_channels[sen]
 
-                device_data.export_edf(file_path=sen_path, sig_nums_out=sen_channels)
-
+                devices[index].export_edf(file_path=sen_path, sig_nums_out=sen_channels)
