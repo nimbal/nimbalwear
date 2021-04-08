@@ -12,6 +12,8 @@ class NWPipeline:
 
     def __init__(self, study_dir):
 
+        # TODO: more dynamic structure (dict?, list?)
+
         # folder constants
         self.study_dir = os.path.abspath(study_dir)
         self.raw_data_dir = os.path.join(self.study_dir, 'raw_data')
@@ -35,13 +37,15 @@ class NWPipeline:
         # nonwear files
         self.nonwear_csv = os.path.join(self.nonwear_dir, 'standard_nonwear_times.csv')
 
-        # read device list
-        self.device_list = pd.read_csv(self.device_list_path, dtype=str)
+        # TODO: initialize folder structure
 
-    def coll_proc(self, subject_id, coll_id, quiet=False):
+        # read device list
+        self.device_list = pd.read_csv(self.device_list_path, dtype=str).fillna('')
+
+    def coll_proc(self, subject_id, coll_id, overwrite_header=False, quiet=False):
 
         # read data from all devices in collection
-        devices = self.coll_read(subject_id, coll_id, save=True, quiet=quiet)
+        devices = self.coll_read(subject_id, coll_id, overwrite_header=overwrite_header, save=True, quiet=quiet)
 
         # process nonwear for all devices
 
@@ -60,7 +64,7 @@ class NWPipeline:
         #process sleep
 
 
-    def coll_read(self, subject_id, coll_id, save=False, quiet=False):
+    def coll_read(self, subject_id, coll_id, overwrite_header=False, save=False, rename_file=False, quiet=False):
 
         import_switch = {'GNAC': lambda: device_data.import_gnac(device_raw_path, correct_drift=True, quiet=quiet),
                          'BITF': lambda: device_data.import_edf(device_raw_path),
@@ -76,6 +80,8 @@ class NWPipeline:
         for index, row in tqdm(subject_device_list_df.iterrows(), desc='Reading all device data'):
 
             device_type = row['device_type']
+            device_id = row['device_id']
+            device_location = row['device_location']
             device_file_name = row['file_name']
 
             device_raw_path = os.path.join(self.raw_data_dir, device_type, device_file_name)
@@ -93,14 +99,30 @@ class NWPipeline:
             import_func()
             device_data.deidentify()
 
-            # TODO: check header against device list info
+            # TODO: change device codes in nwdata import functions to match pipeline by default?
 
-            devices[index] = device_data
+            # check header against device list info
+            header_comp = {'subject_id': (device_data.header['patientcode'] == subject_id),
+                           'coll_id': (device_data.header['patient_additional'] == coll_id),
+                           'device_type': (device_data.header['equipment'].split('_')[0] == device_type),
+                           'device_id': (device_data.header['equipment'].split('_')[1] == device_id
+                                         if len(device_data.header['equipment'].split('_')) > 1 else False),
+                           'device_location': (device_data.header['recording_additional'] == device_location)}
+
+            # TODO: provide feedback (table?, log?) of these checks and what was overwritten
+
+            if overwrite_header:
+                device_data.header['patientcode'] = subject_id
+                device_data.header['patient_additional'] = coll_id
+                device_data.header['equipment'] = '_'.join([device_type, device_id])
+                device_data.header['recording_additional'] = device_location
 
             if save:
 
                 if not quiet:
                     print("Saving device .edf file ...")
+
+                # TODO: option to rename files
 
                 # create all file path variables
                 device_file_base = os.path.splitext(device_file_name)[0]
@@ -111,7 +133,9 @@ class NWPipeline:
                 Path(os.path.dirname(standard_device_path)).mkdir(parents=True, exist_ok=True)
 
                 # write device data as edf
-                devices[index].export_edf(file_path=standard_device_path)
+                device_data.export_edf(file_path=standard_device_path)
+
+            devices[index] = device_data
 
         return devices
 
