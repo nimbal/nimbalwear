@@ -15,27 +15,50 @@ class NWPipeline:
         # folder constants
         self.study_dir = os.path.abspath(study_dir)
         self.raw_data_dir = os.path.join(self.study_dir, 'raw_data')
-        self.standard_device_dir = os.path.join(self.study_dir, 'processed_data/standard_device_edf')
-        self.cropped_device_dir = os.path.join(self.study_dir, 'processed_data/cropped_device_edf')
-        self.sensor_dir = os.path.join(self.study_dir, 'processed_data/sensor_edf')
+        self.processed_data_dir = os.path.join(self.study_dir, 'processed_data')
+        self.analyzed_dir = os.path.join(self.study_dir, 'analyzed_data')
 
-        # file path constants
+        # processed data subdirs
+        self.standard_device_dir = os.path.join(self.processed_data_dir, 'standard_device_edf')
+        self.cropped_device_dir = os.path.join(self.processed_data_dir, 'cropped_device_edf')
+        self.sensor_dir = os.path.join(self.processed_data_dir, 'sensor_edf')
+
+        # analyzed data subdirs
+        self.nonwear_dir = os.path.join(self.analyzed_dir, 'nonwear')
+        self.activity_dir = os.path.join(self.analyzed_dir, 'activity')
+        self.gait_dir = os.path.join(self.analyzed_dir, 'gait')
+        self.sleep_dir = os.path.join(self.analyzed_dir, 'sleep')
+
+        # pipeline data files
         self.device_list_path = os.path.join(self.study_dir, 'device_list.csv')
-        self.nonwear_csv = os.path.join(self.study_dir, 'analyzed_data/nonwear/standard_nonwear_times.csv')
+
+        # nonwear files
+        self.nonwear_csv = os.path.join(self.nonwear_dir, 'standard_nonwear_times.csv')
 
         # read device list
-        self.device_list = pd.read_csv(os.path.join(self.study_dir, self.device_list_path), dtype=str, )
+        self.device_list = pd.read_csv(self.device_list_path, dtype=str)
 
     def coll_proc(self, subject_id, coll_id, quiet=False):
 
         # read data from all devices in collection
         devices = self.coll_read(subject_id, coll_id, save=True, quiet=quiet)
 
+        # process nonwear for all devices
+
         # crop final nonwear
         devices = self.coll_crop(subject_id, coll_id, devices, save=True, quiet=quiet)
 
         # save sensor edf files
         self.coll_sens(subject_id, coll_id, devices)
+
+        # process activity
+
+
+        #process gait
+
+
+        #process sleep
+
 
     def coll_read(self, subject_id, coll_id, save=False, quiet=False):
 
