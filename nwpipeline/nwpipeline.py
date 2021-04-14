@@ -67,7 +67,7 @@ class NWPipeline:
     def coll_read(self, subject_id, coll_id, overwrite_header=False, save=False, rename_file=False, quiet=False):
 
         import_switch = {'GNAC': lambda: device_data.import_gnac(device_raw_path, correct_drift=True, quiet=quiet),
-                         'BITF': lambda: device_data.import_edf(device_raw_path),
+                         'BITF': lambda: device_data.import_bitf(device_raw_path),
                          'NONW': lambda: device_data.import_nonw(device_raw_path, quiet=quiet)}
 
         # get devices for subject visit from device_list
@@ -112,10 +112,13 @@ class NWPipeline:
             # TODO: provide feedback (table?, log?) of these checks and what was overwritten
 
             if overwrite_header:
+
                 device_data.header['patientcode'] = subject_id
                 device_data.header['patient_additional'] = coll_id
                 device_data.header['equipment'] = '_'.join([device_type, device_id])
                 device_data.header['recording_additional'] = device_location
+
+
 
             if save:
 
