@@ -1,1 +1,1 @@
-from .nwpipeline import *
+from .NWPipeline import *

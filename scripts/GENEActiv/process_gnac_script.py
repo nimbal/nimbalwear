@@ -1,5 +1,5 @@
 
-import nwpipeline.nwpipeline as gnac
+import nwpipeline.NWPipeline as gnac
 
 file_patterns = ['*1027*LA*']
 
