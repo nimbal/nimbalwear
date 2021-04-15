@@ -1,4 +1,3 @@
-
 import os
 import datetime as dt
 from pathlib import Path
@@ -47,6 +46,8 @@ class NWPipeline:
         # read data from all devices in collection
         devices = self.coll_read(subject_id, coll_id, overwrite_header=overwrite_header, save=True, quiet=quiet)
 
+        # synchronize devices
+
         # process nonwear for all devices
 
         # crop final nonwear
@@ -55,13 +56,11 @@ class NWPipeline:
         # save sensor edf files
         self.coll_sens(subject_id, coll_id, devices)
 
-        # process activity
+        # process activity levels
 
+        # process gait
 
-        #process gait
-
-
-        #process sleep
+        # process sleep
 
 
     def coll_read(self, subject_id, coll_id, overwrite_header=False, save=False, rename_file=False, quiet=False):
@@ -117,8 +116,6 @@ class NWPipeline:
                 device_data.header['patient_additional'] = coll_id
                 device_data.header['equipment'] = '_'.join([device_type, device_id])
                 device_data.header['recording_additional'] = device_location
-
-
 
             if save:
 
