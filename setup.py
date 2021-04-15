@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="nwpipeline",
-    version="0.0.1",
+    version="0.0.0",
     author="Kit Beyer",
     author_email="kitbeyer@gmail.com",
     description="NiMBaLWear wearable data processing pipeline.",
