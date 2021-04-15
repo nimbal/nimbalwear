@@ -20,5 +20,5 @@ setuptools.setup(
     python_requires=">=3.6",
     install_requires=['tqdm', 'pandas',
                       'pyedflib@git+https://github.com/holgern/pyedflib#egg=pyedflib',
-                      'nwfiles@git+https://github.com/nimbal/nwfiles#egg=nwfiles'],
+                      'nwdata@git+https://github.com/nimbal/nwdata@nwdata-v0.1.0#egg=nwdata'],
 )
