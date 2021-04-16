@@ -43,9 +43,9 @@ class NWPipeline:
 
     def run(self, subject_ids = None, coll_ids = None, overwrite_header=False, quiet=False):
 
-        for subject_id in subject_ids:
+        for subject_id in tqdm(subject_ids, desc="Processing subjects"):
 
-            for coll_id in coll_ids:
+            for coll_id in tqdm(coll_ids, desc="Processing collections"):
 
                 self.coll_proc(subject_id=subject_id, coll_id=coll_id, overwrite_header=overwrite_header, quiet=quiet)
 
