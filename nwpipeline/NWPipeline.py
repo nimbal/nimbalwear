@@ -49,20 +49,39 @@ class NWPipeline:
 
                 self.coll_proc(subject_id=subject_id, coll_id=coll_id, overwrite_header=overwrite_header, quiet=quiet)
 
+    def get_subject_ids(self):
+
+        subject_ids = self.device_list['subject_id'].unique()
+        subject_ids.sort()
+
+        return subject_ids
+
+    def get_coll_ids(self):
+
+        coll_ids = self.device_list['coll_id'].unique()
+        coll_ids.sort()
+
+        return coll_ids
+
     def coll_proc(self, subject_id, coll_id, overwrite_header=False, quiet=False):
 
+        # get devices for this collection from device_list
+        coll_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
+                                                   (self.device_list['coll_id'] == coll_id)]
+        coll_device_list_df.reset_index(inplace=True, drop=True)
+
         # read data from all devices in collection
-        devices = self.coll_read(subject_id, coll_id, overwrite_header=overwrite_header, save=True, quiet=quiet)
+        devices = self.coll_read(coll_device_list_df, overwrite_header=overwrite_header, save=True, quiet=quiet)
 
         # synchronize devices
 
         # process nonwear for all devices
 
         # crop final nonwear
-        devices = self.coll_crop(subject_id, coll_id, devices, save=True, quiet=quiet)
+        devices = self.coll_crop(coll_device_list_df, devices, save=True, quiet=quiet)
 
         # save sensor edf files
-        self.coll_sens(subject_id, coll_id, devices)
+        self.coll_sens(coll_device_list_df, devices)
 
         # process activity levels
 
@@ -70,21 +89,19 @@ class NWPipeline:
 
         # process sleep
 
-    def coll_read(self, subject_id, coll_id, overwrite_header=False, save=False, rename_file=False, quiet=False):
+    def coll_read(self, coll_device_list_df, overwrite_header=False, save=False, rename_file=False, quiet=False):
 
         import_switch = {'GNAC': lambda: device_data.import_gnac(device_raw_path, correct_drift=True, quiet=quiet),
                          'BITF': lambda: device_data.import_bitf(device_raw_path),
                          'NONW': lambda: device_data.import_nonw(device_raw_path, quiet=quiet)}
 
-        # get devices for subject visit from device_list
-        subject_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
-                                                      (self.device_list['coll_id'] == coll_id)]
-
-        devices = {}
+        devices = []
 
         # read in all data files for one subject
-        for index, row in tqdm(subject_device_list_df.iterrows(), desc='Reading all device data'):
+        for index, row in tqdm(coll_device_list_df.iterrows(), desc='Reading all device data'):
 
+            subject_id = row['subject_id']
+            coll_id = row['coll_id']
             device_type = row['device_type']
             device_id = row['device_id']
             device_location = row['device_location']
@@ -95,7 +112,7 @@ class NWPipeline:
             # check that raw data file exists
             if not os.path.isfile(device_raw_path):
                 print(f"WARNING: {device_raw_path} does not exist.\n")
-                devices[index] = None
+                devices.append(None)
                 continue
 
             # TODO: log entry if file doesn't exist
@@ -142,20 +159,21 @@ class NWPipeline:
                 # write device data as edf
                 device_data.export_edf(file_path=standard_device_path)
 
-            devices[index] = device_data
+            devices.append(device_data)
 
         return devices
 
-    def coll_crop(self, subject_id, coll_id, devices, save=False, quiet=False):
-
-        # get devices for subject visit from device_list - REMOVE LATER
-        subject_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
-                                                      (self.device_list['coll_id'] == coll_id)]
+    def coll_crop(self, coll_device_list_df, devices, save=False, quiet=False):
 
         # crop final nonwear from all device data
-        for index, row in tqdm(subject_device_list_df.iterrows(), desc='Cropping final nonwear'):
+        for index, row in tqdm(coll_device_list_df.iterrows(), desc='Cropping final nonwear'):
+
+            if devices[index] == None:
+                continue
 
             # get info from device list
+            subject_id = row['subject_id']
+            coll_id = row['coll_id']
             device_type = row['device_type']
             device_location = row['device_location']
             device_file_name = row['file_name']
@@ -212,9 +230,9 @@ class NWPipeline:
                 # write cropped device data as edf
                 devices[index].export_edf(file_path=cropped_device_path)
 
-            return devices
+        return devices
 
-    def coll_sens(self, subject_id, coll_id, devices):
+    def coll_sens(self, coll_device_list_df, devices):
 
         sensors_switch = {'GNAC': ['ACCELEROMETER', 'TEMPERATURE', 'LIGHT', 'BUTTON'],
                           'BITF': ['ACCELEROMETER', 'ECG'],
@@ -224,11 +242,10 @@ class NWPipeline:
                                   'BITF': [[1, 2, 3], [0]],
                                   'NONW': [[0, 1]]}
 
-        # get devices for subject visit from device_list - REMOVE LATER
-        subject_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
-                                                      (self.device_list['coll_id'] == coll_id)]
+        for index, row in tqdm(coll_device_list_df.iterrows(), desc='Saving sensor edfs'):
 
-        for index, row in tqdm(subject_device_list_df.iterrows(), desc='Saving sensor edfs'):
+            if devices[index] == None:
+                continue
 
             # get info from device list
             device_type = row['device_type']
@@ -256,16 +273,3 @@ class NWPipeline:
 
                 devices[index].export_edf(file_path=sen_path, sig_nums_out=sen_channels)
 
-    def get_subject_ids(self):
-
-        subject_ids = self.device_list['subject_id'].unique()
-        subject_ids.sort()
-
-        return subject_ids
-
-    def get_coll_ids(self):
-
-        coll_ids = self.device_list['coll_id'].unique()
-        coll_ids.sort()
-
-        return coll_ids
