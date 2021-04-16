@@ -96,7 +96,7 @@ class NWPipeline:
             if not os.path.isfile(device_raw_path):
                 print(f"WARNING: {device_raw_path} does not exist.\n")
                 devices[index] = None
-                return
+                continue
 
             import_func = import_switch.get(device_type, lambda: 'Invalid')
 
