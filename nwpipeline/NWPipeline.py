@@ -1,6 +1,7 @@
 import os
 import datetime as dt
 from pathlib import Path
+import logging
 
 from tqdm import tqdm
 import pandas as pd
@@ -44,28 +45,43 @@ class NWPipeline:
         for key, value in self.dirs.items():
             Path(value).mkdir(parents=True, exist_ok=True)
 
-    def run(self, subject_ids=None, coll_ids=None, overwrite_header=False, quiet=False):
+    def run(self, subject_ids=None, coll_ids=None, overwrite_header=False, quiet=False, log=True):
 
         # TODO: if no subject_ids or coll_ids, then do all
+
+        if log:
+
+            log_file_path = os.path.join(self.dirs['logs'], "processing.log")
+            logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', filename=log_file_path, level=logging.DEBUG)
+
+            message("", level='info', quiet=quiet, log=log)
+            message("", level='info', quiet=quiet, log=log)
+            message("", level='info', quiet=quiet, log=log)
+            message("---- Starting processing pipeline ----------------------------------------------", level='info', quiet=quiet, log=log)
+            message("", level='info', quiet=quiet, log=log)
 
         for subject_id in tqdm(subject_ids, desc="Processing subjects", leave=True):
 
             for coll_id in tqdm(coll_ids, desc="Processing collections", leave=False):
 
-                self.coll_proc(subject_id=subject_id, coll_id=coll_id, overwrite_header=overwrite_header, quiet=quiet)
+                self.coll_proc(subject_id=subject_id, coll_id=coll_id, overwrite_header=overwrite_header,
+                               quiet=quiet, log=log)
 
-    def coll_proc(self, subject_id, coll_id, overwrite_header=False, quiet=False):
+    def coll_proc(self, subject_id, coll_id, overwrite_header=False, quiet=False, log=True):
 
-        # TODO: create collection class with device, device_list, nonwear, attributes
+        message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', quiet=quiet, log=log)
+        message("", level='info', quiet=quiet, log=log)
 
         # get devices for this collection from device_list
         coll_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
                                                    (self.device_list['coll_id'] == coll_id)]
         coll_device_list_df.reset_index(inplace=True, drop=True)
 
-        # create collection class and process
-        coll = NWCollection(subject_id=subject_id, coll_id=coll_id, device_list=coll_device_list_df, dirs=self.dirs)
-        coll.process(overwrite_header=overwrite_header, min_crop_duration=3, max_crop_time_to_eof=20, quiet=quiet)
+        # construct collection class and process
+        coll = NWCollection(subject_id=subject_id, coll_id=coll_id, device_list=coll_device_list_df,
+                            dirs=self.dirs)
+        coll.process(overwrite_header=overwrite_header, min_crop_duration=3, max_crop_time_to_eof=20,
+                     quiet=quiet, log=log)
 
     def get_subject_ids(self):
 
@@ -102,10 +118,10 @@ class NWCollection:
         self.device_list = device_list
         self.dirs = dirs
 
-    def process(self, overwrite_header=False, min_crop_duration=1, max_crop_time_to_eof=20, quiet=False):
+    def process(self, overwrite_header=False, min_crop_duration=1, max_crop_time_to_eof=20, quiet=False, log=True):
 
         # read data from all devices in collection
-        self.read(overwrite_header=overwrite_header, save=True, quiet=quiet)
+        self.read(overwrite_header=overwrite_header, save=True, quiet=quiet, log=log)
 
         # synchronize devices
 
@@ -113,10 +129,10 @@ class NWCollection:
         self.nonwear()
 
         # crop final nonwear
-        self.crop(save=True, quiet=quiet, min_duration=min_crop_duration, max_time_to_eof=max_crop_time_to_eof)
+        self.crop(save=True, min_duration=min_crop_duration, max_time_to_eof=max_crop_time_to_eof, quiet=quiet, log=log)
 
         # save sensor edf files
-        self.save_sensors()
+        self.save_sensors(quiet=quiet, log=log)
 
         # process activity levels
 
@@ -124,7 +140,10 @@ class NWCollection:
 
         # process sleep
 
-    def read(self, overwrite_header=False, save=False, rename_file=False, quiet=False):
+    def read(self, overwrite_header=False, save=False, rename_file=False, quiet=False, log=True):
+
+        message("Reading device data from files...", level='info', quiet=quiet, log=log)
+        message("", level='info', quiet=quiet, log=log)
 
         import_switch = {'GNAC': lambda: device_data.import_gnac(device_raw_path, correct_drift=True, quiet=quiet),
                          'BITF': lambda: device_data.import_bitf(device_raw_path),
@@ -145,13 +164,14 @@ class NWCollection:
 
             device_raw_path = os.path.join(self.dirs['raw'], device_type, device_file_name)
 
+            message(f"Reading {device_raw_path}", level='info', quiet=quiet, log=log)
+
             # check that raw data file exists
             if not os.path.isfile(device_raw_path):
-                print(f"WARNING: {device_raw_path} does not exist.\n")
+
+                message(f"Device file does not exist: {device_raw_path}", level='warning', quiet=quiet, log=log)
                 self.devices.append(None)
                 continue
-
-            # TODO: log entry if file doesn't exist
 
             import_func = import_switch.get(device_type, lambda: 'Invalid')
 
@@ -161,16 +181,34 @@ class NWCollection:
             device_data.deidentify()
 
             # check header against device list info
-            header_comp = {'subject_id': (device_data.header['patientcode'] == subject_id),
-                           'coll_id': (device_data.header['patient_additional'] == coll_id),
-                           'device_type': (device_data.header['equipment'].split('_')[0] == device_type),
-                           'device_id': (device_data.header['equipment'].split('_')[1] == device_id
-                                         if len(device_data.header['equipment'].split('_')) > 1 else False),
-                           'device_location': (device_data.header['recording_additional'] == device_location)}
+            header_comp = {'subject_id': [(device_data.header['patientcode'] == subject_id),
+                                          device_data.header['patientcode'],
+                                          subject_id],
+                           'coll_id': [(device_data.header['patient_additional'] == coll_id),
+                                       device_data.header['patient_additional'],
+                                       coll_id],
+                           'device_type': [(device_data.header['equipment'].split('_')[0] == device_type),
+                                           device_data.header['equipment'].split('_')[0],
+                                           device_type],
+                           'device_id': ([(device_data.header['equipment'].split('_')[1] == device_id),
+                                         device_data.header['equipment'].split('_')[1],
+                                         device_id]
+                                         if len(device_data.header['equipment'].split('_')) > 1
+                                         else [False, '', device_id]),
 
-            # TODO: log entry if checks fail and what was overwritten
+                           'device_location': [(device_data.header['recording_additional'] == device_location),
+                                               device_data.header['recording_additional'],
+                                               device_location]}
+
+            # generate message if any mismatches
+            for key, value in header_comp.items():
+                if not value[0]:
+                    message(f"Subject {subject_id}, Collection {coll_id}, {key} mismatch: {value[1]} (header) != {value[2]} (device list)",
+                            level='warning', quiet=quiet, log=log)
 
             if overwrite_header:
+
+                message("Overwriting header from device list", level='info', quiet=quiet, log=log)
 
                 device_data.header['patientcode'] = subject_id
                 device_data.header['patient_additional'] = coll_id
@@ -178,9 +216,6 @@ class NWCollection:
                 device_data.header['recording_additional'] = device_location
 
             if save:
-
-                if not quiet:
-                    print("Saving device .edf file ...")
 
                 # TODO: option to rename files
 
@@ -192,8 +227,12 @@ class NWCollection:
                 # check that all folders exist for data output files
                 Path(os.path.dirname(standard_device_path)).mkdir(parents=True, exist_ok=True)
 
+                message(f"Saving {standard_device_path}", level='info', quiet=quiet, log=log)
+
                 # write device data as edf
                 device_data.export_edf(file_path=standard_device_path)
+
+            message("", level='info', quiet=quiet, log=log)
 
             self.devices.append(device_data)
 
@@ -211,7 +250,10 @@ class NWCollection:
 
         return True
 
-    def crop(self, save=False, quiet=False, min_duration=1, max_time_to_eof=20):
+    def crop(self, save=False, quiet=False, min_duration=1, max_time_to_eof=20, log=True):
+
+        message("Cropping final nonwear...", level='info', quiet=quiet, log=log)
+        message("", level='info', quiet=quiet, log=log)
 
         # crop final nonwear from all device data
         for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
@@ -246,6 +288,10 @@ class NWCollection:
                 # get duration and time to end of file of last nonwear
                 nonwear_duration = last_nonwear['end_time'].item() - last_nonwear['start_time'].item()
                 nonwear_time_to_eof = end_time - last_nonwear['end_time'].item()
+            else:
+                message(f"No nonwear data for Subject {subject_id}, Collection {coll_id}, Device {device_type}, " +
+                        f"Location {device_location}",
+                        level='warning', quiet=quiet, log=log)
 
             # only crop if last nonwear ends within 20 minutes of end of file
             is_cropped = ((nonwear_duration >= dt.timedelta(minutes=min_duration)) &
@@ -255,12 +301,13 @@ class NWCollection:
             new_start_time = start_time
             new_end_time = last_nonwear['start_time'].item() if is_cropped else end_time
 
+            crop_duration = end_time - new_end_time
+
+            message(f"Cropping {crop_duration} from {device_type} {device_location}", level='info', quiet=quiet, log=log)
+
             self.devices[index].crop(new_start_time, new_end_time)
 
             if save:
-
-                if not quiet:
-                    print("Saving cropped device .edf file ...")
 
                 # create all file path variables
                 device_file_base = os.path.splitext(device_file_name)[0]
@@ -271,12 +318,19 @@ class NWCollection:
                 # check that all folders exist for data output files
                 Path(os.path.dirname(cropped_device_path)).mkdir(parents=True, exist_ok=True)
 
+                message(f"Saving {cropped_device_path}", level='info', quiet=quiet, log=log)
+
                 # write cropped device data as edf
                 self.devices[index].export_edf(file_path=cropped_device_path)
 
+            message("", level='info', quiet=quiet, log=log)
+
         return True
 
-    def save_sensors(self):
+    def save_sensors(self, quiet=False, log=True):
+
+        message("Separating sensors from devices...", level='info', quiet=quiet, log=log)
+        message("", level='info', quiet=quiet, log=log)
 
         for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
                                desc='Saving sensor edfs'):
@@ -310,6 +364,25 @@ class NWCollection:
                 sen_path = sensor_paths[sen]
                 sen_channels = sensor_channels[sen]
 
+                message(f"Saving {sen_path}", level='info', quiet=quiet, log=log)
+
                 self.devices[index].export_edf(file_path=sen_path, sig_nums_out=sen_channels)
 
+            message("", level='info', quiet=quiet, log=log)
+
         return True
+
+def message(message, level='info', quiet=False, log=True):
+
+    level_switch = {'debug': lambda: logging.debug(message),
+                    'info': lambda: logging.info(message),
+                    'warning': lambda: logging.warning(message),
+                    'error': lambda: logging.error(message),
+                    'critical': lambda: logging.critical(message)}
+
+    if not quiet:
+        print(message + "\n")
+
+    if log:
+        func = level_switch.get(level, lambda: 'Invalid')
+        func()
