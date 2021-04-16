@@ -7,7 +7,6 @@ from tqdm import tqdm
 import pandas as pd
 import nwdata
 
-# TODO: Can we generate a device_list from raw data headers if none exists? would need to accept blank subj annd coll?
 
 class NWPipeline:
 
@@ -45,20 +44,25 @@ class NWPipeline:
         for key, value in self.dirs.items():
             Path(value).mkdir(parents=True, exist_ok=True)
 
+        log_file_path = os.path.join(self.dirs['logs'], "processing.log")
+        logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', filename=log_file_path,
+                            level=logging.DEBUG)
+
     def run(self, subject_ids=None, coll_ids=None, overwrite_header=False, quiet=False, log=True):
 
         # TODO: if no subject_ids or coll_ids, then do all
 
-        if log:
+        message("\n\n", level='info', quiet=quiet, log=log)
+        message("---- Start processing pipeline ----------------------------------------------", level='info', quiet=quiet, log=log)
+        message("", level='info', quiet=quiet, log=log)
 
-            log_file_path = os.path.join(self.dirs['logs'], "processing.log")
-            logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', filename=log_file_path, level=logging.DEBUG)
+        # if no subject_ids passed then do all
+        if subject_ids is None:
+            subject_ids = self.get_subject_ids()
 
-            message("", level='info', quiet=quiet, log=log)
-            message("", level='info', quiet=quiet, log=log)
-            message("", level='info', quiet=quiet, log=log)
-            message("---- Starting processing pipeline ----------------------------------------------", level='info', quiet=quiet, log=log)
-            message("", level='info', quiet=quiet, log=log)
+        # if no coll_ids passed then do all
+        if coll_ids is None:
+            coll_ids = self.get_coll_ids()
 
         for subject_id in tqdm(subject_ids, desc="Processing subjects", leave=True):
 
@@ -66,6 +70,8 @@ class NWPipeline:
 
                 self.coll_proc(subject_id=subject_id, coll_id=coll_id, overwrite_header=overwrite_header,
                                quiet=quiet, log=log)
+
+        message("---- End ----------------------------------------------\n", level='info', quiet=quiet, log=log)
 
     def coll_proc(self, subject_id, coll_id, overwrite_header=False, quiet=False, log=True):
 
