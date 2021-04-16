@@ -98,14 +98,14 @@ class NWPipeline:
                 devices[index] = None
                 continue
 
+            # TODO: log entry if file doesn't exist
+
             import_func = import_switch.get(device_type, lambda: 'Invalid')
 
             # import data to device data object
             device_data = nwdata.NWData()
             import_func()
             device_data.deidentify()
-
-            # TODO: change device codes in nwdata import functions to match pipeline by default?
 
             # check header against device list info
             header_comp = {'subject_id': (device_data.header['patientcode'] == subject_id),
@@ -115,7 +115,7 @@ class NWPipeline:
                                          if len(device_data.header['equipment'].split('_')) > 1 else False),
                            'device_location': (device_data.header['recording_additional'] == device_location)}
 
-            # TODO: provide feedback (table?, log?) of these checks and what was overwritten
+            # TODO: log entry if checks fail and what was overwritten
 
             if overwrite_header:
 
