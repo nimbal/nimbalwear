@@ -41,13 +41,6 @@ class NWPipeline:
         # read device list
         self.device_list = pd.read_csv(self.device_list_path, dtype=str).fillna('')
 
-    def get_subject_ids(self):
-
-        subject_ids = self.device_list['subject_id'].unique()
-        subject_ids.sort()
-
-        return subject_ids
-
     def run(self, subject_ids = None, coll_ids = None, overwrite_header=False, quiet=False):
 
         for subject_id in subject_ids:
@@ -262,3 +255,17 @@ class NWPipeline:
                 sen_channels = sensor_channels[sen]
 
                 devices[index].export_edf(file_path=sen_path, sig_nums_out=sen_channels)
+
+    def get_subject_ids(self):
+
+        subject_ids = self.device_list['subject_id'].unique()
+        subject_ids.sort()
+
+        return subject_ids
+
+    def get_coll_ids(self):
+
+        coll_ids = self.device_list['coll_id'].unique()
+        coll_ids.sort()
+
+        return coll_ids
