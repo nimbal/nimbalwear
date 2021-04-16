@@ -17,11 +17,13 @@ class NWPipeline:
 
         self.dirs = {
             'study': '',
+            'meta': 'meta',
+            'logs': 'meta/logs',
             'raw': 'raw',
             'processed': 'processed',
-            'standard_device_edf': 'processed_data/standard_device_edf',
-            'cropped_device_edf': 'processed_data/cropped_device_edf',
-            'sensor_edf': 'processed_data/sensor_edf',
+            'standard_device_edf': 'processed/standard_device_edf',
+            'cropped_device_edf': 'processed/cropped_device_edf',
+            'sensor_edf': 'processed/sensor_edf',
             'analyzed': 'analyzed',
             'nonwear': 'analyzed/nonwear',
             'activity': 'analyzed/activity',
@@ -31,14 +33,16 @@ class NWPipeline:
         self.dirs = {key: os.path.join(self.study_dir, value) for key, value in self.dirs.items()}
 
         # pipeline data files
-        self.device_list_path = os.path.join(self.dirs['study'], 'device_list.csv')
-
-        # TODO: initialize folder structure
+        self.device_list_path = os.path.join(self.dirs['meta'], 'device_list.csv')
 
         # TODO: check for required files (raw data, device_list)
 
         # read device list
         self.device_list = pd.read_csv(self.device_list_path, dtype=str).fillna('')
+
+        # TODO: initialize folder structure
+        for key, value in self.dirs.items():
+            Path(value).mkdir(parents=True, exist_ok=True)
 
     def run(self, subject_ids=None, coll_ids=None, overwrite_header=False, quiet=False):
 
