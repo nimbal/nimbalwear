@@ -6,13 +6,13 @@ from tqdm import tqdm
 import pandas as pd
 import nwdata
 
+# TODO: fix tqdm progress bar locations
 
 class NWPipeline:
 
     def __init__(self, study_dir):
 
-        # TODO: more dynamic structure (dict?, list?) - rename folders in test studies
-
+        # initialize folder structure
         self.study_dir = os.path.abspath(study_dir)
 
         self.dirs = {
@@ -44,9 +44,9 @@ class NWPipeline:
 
         # TODO: if no subject_ids or coll_ids, then do all
 
-        for subject_id in tqdm(subject_ids, desc="Processing subjects"):
+        for subject_id in tqdm(subject_ids, desc="Processing subjects", leave=True):
 
-            for coll_id in tqdm(coll_ids, desc="Processing collections"):
+            for coll_id in tqdm(coll_ids, desc="Processing collections", leave=False):
 
                 self.coll_proc(subject_id=subject_id, coll_id=coll_id, overwrite_header=overwrite_header, quiet=quiet)
 
@@ -61,7 +61,7 @@ class NWPipeline:
 
         # create collection class and process
         coll = NWCollection(subject_id=subject_id, coll_id=coll_id, device_list=coll_device_list_df, dirs=self.dirs)
-        coll.process(overwrite_header=overwrite_header, min_crop_duration=3, max_crop_time_to_eof=20, quiet=False)
+        coll.process(overwrite_header=overwrite_header, min_crop_duration=3, max_crop_time_to_eof=20, quiet=quiet)
 
     def get_subject_ids(self):
 
@@ -129,7 +129,8 @@ class NWCollection:
         self.devices = []
 
         # read in all data files for one subject
-        for index, row in tqdm(self.device_list.iterrows(), desc='Reading all device data'):
+        for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
+                               desc='Reading all device data'):
 
             subject_id = row['subject_id']
             coll_id = row['coll_id']
@@ -209,7 +210,8 @@ class NWCollection:
     def crop(self, save=False, quiet=False, min_duration=1, max_time_to_eof=20):
 
         # crop final nonwear from all device data
-        for index, row in tqdm(self.device_list.iterrows(), desc='Cropping final nonwear'):
+        for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
+                               desc='Cropping final nonwear'):
 
             if self.devices[index] is None:
                 continue
@@ -272,7 +274,8 @@ class NWCollection:
 
     def save_sensors(self):
 
-        for index, row in tqdm(self.device_list.iterrows(), desc='Saving sensor edfs'):
+        for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
+                               desc='Saving sensor edfs'):
 
             if self.devices[index] is None:
                 continue
@@ -298,7 +301,7 @@ class NWCollection:
             for sensor_path in sensor_paths:
                 Path(os.path.dirname(sensor_path)).mkdir(parents=True, exist_ok=True)
 
-            for sen in tqdm(range(len(sensor_paths)), desc="Separating sensors"):
+            for sen in tqdm(range(len(sensor_paths)), leave=False, desc="Separating sensors"):
 
                 sen_path = sensor_paths[sen]
                 sen_channels = sensor_channels[sen]
