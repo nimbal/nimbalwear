@@ -6,7 +6,7 @@ from tqdm import tqdm
 import pandas as pd
 import nwdata
 
-# TODO: fix tqdm progress bar locations
+# TODO: Can we generate a device_list from raw data headers if none exists? would need to accept blank subj annd coll?
 
 class NWPipeline:
 
@@ -40,7 +40,7 @@ class NWPipeline:
         # read device list
         self.device_list = pd.read_csv(self.device_list_path, dtype=str).fillna('')
 
-        # TODO: initialize folder structure
+        # initialize folder structure
         for key, value in self.dirs.items():
             Path(value).mkdir(parents=True, exist_ok=True)
 
