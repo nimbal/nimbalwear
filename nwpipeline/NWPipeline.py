@@ -41,6 +41,21 @@ class NWPipeline:
         # read device list
         self.device_list = pd.read_csv(self.device_list_path, dtype=str).fillna('')
 
+    def get_subject_ids(self):
+
+        subject_ids = self.device_list['subject_id'].unique()
+        subject_ids.sort()
+
+        return subject_ids
+
+    def run(self, subject_ids = None, coll_ids = None, overwrite_header=False, quiet=False):
+
+        for subject_id in subject_ids:
+
+            for coll_id in coll_ids:
+
+                self.coll_proc(subject_id=subject_id, coll_id=coll_id, overwrite_header=overwrite_header, quiet=quiet)
+
     def coll_proc(self, subject_id, coll_id, overwrite_header=False, quiet=False):
 
         # read data from all devices in collection
@@ -61,7 +76,6 @@ class NWPipeline:
         # process gait
 
         # process sleep
-
 
     def coll_read(self, subject_id, coll_id, overwrite_header=False, save=False, rename_file=False, quiet=False):
 
