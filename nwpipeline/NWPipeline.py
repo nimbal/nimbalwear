@@ -11,43 +11,57 @@ class NWPipeline:
 
     def __init__(self, study_dir):
 
-        # TODO: more dynamic structure (dict?, list?)
+        # TODO: more dynamic structure (dict?, list?) - rename folders in test studies
 
-        # folder constants
         self.study_dir = os.path.abspath(study_dir)
-        self.raw_data_dir = os.path.join(self.study_dir, 'raw_data')
-        self.processed_data_dir = os.path.join(self.study_dir, 'processed_data')
-        self.analyzed_dir = os.path.join(self.study_dir, 'analyzed_data')
 
-        # processed data subdirs
-        self.standard_device_dir = os.path.join(self.processed_data_dir, 'standard_device_edf')
-        self.cropped_device_dir = os.path.join(self.processed_data_dir, 'cropped_device_edf')
-        self.sensor_dir = os.path.join(self.processed_data_dir, 'sensor_edf')
+        self.dirs = {
+            'study': '',
+            'raw': 'raw',
+            'processed': 'processed',
+            'standard_device_edf': 'processed_data/standard_device_edf',
+            'cropped_device_edf': 'processed_data/cropped_device_edf',
+            'sensor_edf': 'processed_data/sensor_edf',
+            'analyzed': 'analyzed',
+            'nonwear': 'analyzed/nonwear',
+            'activity': 'analyzed/activity',
+            'gait': 'analyzed/gait',
+            'sleep': 'analyzed/sleep'}
 
-        # analyzed data subdirs
-        self.nonwear_dir = os.path.join(self.analyzed_dir, 'nonwear')
-        self.activity_dir = os.path.join(self.analyzed_dir, 'activity')
-        self.gait_dir = os.path.join(self.analyzed_dir, 'gait')
-        self.sleep_dir = os.path.join(self.analyzed_dir, 'sleep')
+        self.dirs = {key: os.path.join(self.study_dir, value) for key, value in self.dirs.items()}
 
         # pipeline data files
-        self.device_list_path = os.path.join(self.study_dir, 'device_list.csv')
-
-        # nonwear files
-        self.nonwear_csv = os.path.join(self.nonwear_dir, 'standard_nonwear_times.csv')
+        self.device_list_path = os.path.join(self.dirs['study'], 'device_list.csv')
 
         # TODO: initialize folder structure
+
+        # TODO: check for required files (raw data, device_list)
 
         # read device list
         self.device_list = pd.read_csv(self.device_list_path, dtype=str).fillna('')
 
-    def run(self, subject_ids = None, coll_ids = None, overwrite_header=False, quiet=False):
+    def run(self, subject_ids=None, coll_ids=None, overwrite_header=False, quiet=False):
+
+        # TODO: if no subject_ids or coll_ids, then do all
 
         for subject_id in tqdm(subject_ids, desc="Processing subjects"):
 
             for coll_id in tqdm(coll_ids, desc="Processing collections"):
 
                 self.coll_proc(subject_id=subject_id, coll_id=coll_id, overwrite_header=overwrite_header, quiet=quiet)
+
+    def coll_proc(self, subject_id, coll_id, overwrite_header=False, quiet=False):
+
+        # TODO: create collection class with device, device_list, nonwear, attributes
+
+        # get devices for this collection from device_list
+        coll_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
+                                                   (self.device_list['coll_id'] == coll_id)]
+        coll_device_list_df.reset_index(inplace=True, drop=True)
+
+        # create collection class and process
+        coll = NWCollection(subject_id=subject_id, coll_id=coll_id, device_list=coll_device_list_df, dirs=self.dirs)
+        coll.process(overwrite_header=overwrite_header, min_crop_duration=3, max_crop_time_to_eof=20, quiet=False)
 
     def get_subject_ids(self):
 
@@ -63,25 +77,42 @@ class NWPipeline:
 
         return coll_ids
 
-    def coll_proc(self, subject_id, coll_id, overwrite_header=False, quiet=False):
 
-        # get devices for this collection from device_list
-        coll_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
-                                                   (self.device_list['coll_id'] == coll_id)]
-        coll_device_list_df.reset_index(inplace=True, drop=True)
+class NWCollection:
+
+    sensors_switch = {'GNAC': ['ACCELEROMETER', 'TEMPERATURE', 'LIGHT', 'BUTTON'],
+                      'BITF': ['ACCELEROMETER', 'ECG'],
+                      'NONW': ['PLSOX']}
+
+    sensor_channels_switch = {'GNAC': [[0, 1, 2], [3], [4], [5]],
+                              'BITF': [[1, 2, 3], [0]],
+                              'NONW': [[0, 1]]}
+
+    devices = []
+    nonwear_times = None
+
+    def __init__(self, subject_id, coll_id, device_list, dirs):
+
+        self.subject_id = subject_id
+        self.coll_id = coll_id
+        self.device_list = device_list
+        self.dirs = dirs
+
+    def process(self, overwrite_header=False, min_crop_duration=1, max_crop_time_to_eof=20, quiet=False):
 
         # read data from all devices in collection
-        devices = self.coll_read(coll_device_list_df, overwrite_header=overwrite_header, save=True, quiet=quiet)
+        self.read(overwrite_header=overwrite_header, save=True, quiet=quiet)
 
         # synchronize devices
 
         # process nonwear for all devices
+        self.nonwear()
 
         # crop final nonwear
-        devices = self.coll_crop(coll_device_list_df, devices, save=True, quiet=quiet)
+        self.crop(save=True, quiet=quiet, min_duration=min_crop_duration, max_time_to_eof=max_crop_time_to_eof)
 
         # save sensor edf files
-        self.coll_sens(coll_device_list_df, devices)
+        self.save_sensors()
 
         # process activity levels
 
@@ -89,16 +120,16 @@ class NWPipeline:
 
         # process sleep
 
-    def coll_read(self, coll_device_list_df, overwrite_header=False, save=False, rename_file=False, quiet=False):
+    def read(self, overwrite_header=False, save=False, rename_file=False, quiet=False):
 
         import_switch = {'GNAC': lambda: device_data.import_gnac(device_raw_path, correct_drift=True, quiet=quiet),
                          'BITF': lambda: device_data.import_bitf(device_raw_path),
                          'NONW': lambda: device_data.import_nonw(device_raw_path, quiet=quiet)}
 
-        devices = []
+        self.devices = []
 
         # read in all data files for one subject
-        for index, row in tqdm(coll_device_list_df.iterrows(), desc='Reading all device data'):
+        for index, row in tqdm(self.device_list.iterrows(), desc='Reading all device data'):
 
             subject_id = row['subject_id']
             coll_id = row['coll_id']
@@ -107,12 +138,12 @@ class NWPipeline:
             device_location = row['device_location']
             device_file_name = row['file_name']
 
-            device_raw_path = os.path.join(self.raw_data_dir, device_type, device_file_name)
+            device_raw_path = os.path.join(self.dirs['raw'], device_type, device_file_name)
 
             # check that raw data file exists
             if not os.path.isfile(device_raw_path):
                 print(f"WARNING: {device_raw_path} does not exist.\n")
-                devices.append(None)
+                self.devices.append(None)
                 continue
 
             # TODO: log entry if file doesn't exist
@@ -151,7 +182,7 @@ class NWPipeline:
                 # create all file path variables
                 device_file_base = os.path.splitext(device_file_name)[0]
                 device_edf_name = '.'.join([device_file_base, 'edf'])
-                standard_device_path = os.path.join(self.standard_device_dir, device_type, device_edf_name)
+                standard_device_path = os.path.join(self.dirs['standard_device_edf'], device_type, device_edf_name)
 
                 # check that all folders exist for data output files
                 Path(os.path.dirname(standard_device_path)).mkdir(parents=True, exist_ok=True)
@@ -159,16 +190,28 @@ class NWPipeline:
                 # write device data as edf
                 device_data.export_edf(file_path=standard_device_path)
 
-            devices.append(device_data)
+            self.devices.append(device_data)
 
-        return devices
+        return True
 
-    def coll_crop(self, coll_device_list_df, devices, save=False, quiet=False):
+    def nonwear(self):
+
+        # process nonwear for all devices
+        nonwear_csv = os.path.join(self.dirs['nonwear'], 'standard_nonwear_times.csv')
+
+        # read nonwear csv file
+        self.nonwear_times = pd.read_csv(nonwear_csv, dtype=str)
+        self.nonwear_times['start_time'] = pd.to_datetime(self.nonwear_times['start_time'], format='%Y-%m-%d %H:%M')
+        self.nonwear_times['end_time'] = pd.to_datetime(self.nonwear_times['end_time'], format='%Y-%m-%d %H:%M')
+
+        return True
+
+    def crop(self, save=False, quiet=False, min_duration=1, max_time_to_eof=20):
 
         # crop final nonwear from all device data
-        for index, row in tqdm(coll_device_list_df.iterrows(), desc='Cropping final nonwear'):
+        for index, row in tqdm(self.device_list.iterrows(), desc='Cropping final nonwear'):
 
-            if devices[index] == None:
+            if self.devices[index] is None:
                 continue
 
             # get info from device list
@@ -178,25 +221,20 @@ class NWPipeline:
             device_location = row['device_location']
             device_file_name = row['file_name']
 
-            # read nonwear csv file
-            nonwear_df = pd.read_csv(self.nonwear_csv, dtype=str)
-            nonwear_df['start_time'] = pd.to_datetime(nonwear_df['start_time'], format='%Y-%m-%d %H:%M')
-            nonwear_df['end_time'] = pd.to_datetime(nonwear_df['end_time'], format='%Y-%m-%d %H:%M')
-
             # get last device nonwear period
-            last_nonwear = nonwear_df.loc[(nonwear_df['subject_id'] == subject_id) &
-                                          (nonwear_df['coll_id'] == coll_id) &
-                                          (nonwear_df['device_type'] == device_type) &
-                                          (nonwear_df['device_location'] == device_location)][-1:]
+            last_nonwear = self.nonwear_times.loc[(self.nonwear_times['subject_id'] == subject_id) &
+                                                  (self.nonwear_times['coll_id'] == coll_id) &
+                                                  (self.nonwear_times['device_type'] == device_type) &
+                                                  (self.nonwear_times['device_location'] == device_location)][-1:]
 
             # get time info from device data
-            start_time = devices[index].header['startdate']
+            start_time = self.devices[index].header['startdate']
             duration = dt.timedelta(
-                seconds=len(devices[index].signals[0]) / devices[index].signal_headers[0]['sample_rate'])
+                seconds=len(self.devices[index].signals[0]) / self.devices[index].signal_headers[0]['sample_rate'])
             end_time = start_time + duration
 
             nonwear_duration = dt.timedelta(minutes=0)
-            nonwear_time_to_eof = dt.timedelta(minutes=21)
+            nonwear_time_to_eof = dt.timedelta(minutes=max_time_to_eof + 1)
 
             if not last_nonwear.empty:
                 # get duration and time to end of file of last nonwear
@@ -204,14 +242,14 @@ class NWPipeline:
                 nonwear_time_to_eof = end_time - last_nonwear['end_time'].item()
 
             # only crop if last nonwear ends within 20 minutes of end of file
-            is_cropped = ((nonwear_duration >= dt.timedelta(minutes=3)) &
-                          (nonwear_time_to_eof < dt.timedelta(minutes=20)))
+            is_cropped = ((nonwear_duration >= dt.timedelta(minutes=min_duration)) &
+                          (nonwear_time_to_eof <= dt.timedelta(minutes=max_time_to_eof)))
 
             # set new file end time to which to crop
             new_start_time = start_time
             new_end_time = last_nonwear['start_time'].item() if is_cropped else end_time
 
-            devices[index].crop(new_start_time, new_end_time)
+            self.devices[index].crop(new_start_time, new_end_time)
 
             if save:
 
@@ -222,44 +260,38 @@ class NWPipeline:
                 device_file_base = os.path.splitext(device_file_name)[0]
                 device_edf_name = '.'.join([device_file_base, 'edf'])
 
-                cropped_device_path = os.path.join(self.cropped_device_dir, device_type, device_edf_name)
+                cropped_device_path = os.path.join(self.dirs['cropped_device_edf'], device_type, device_edf_name)
 
                 # check that all folders exist for data output files
                 Path(os.path.dirname(cropped_device_path)).mkdir(parents=True, exist_ok=True)
 
                 # write cropped device data as edf
-                devices[index].export_edf(file_path=cropped_device_path)
+                self.devices[index].export_edf(file_path=cropped_device_path)
 
-        return devices
+        return True
 
-    def coll_sens(self, coll_device_list_df, devices):
+    def save_sensors(self):
 
-        sensors_switch = {'GNAC': ['ACCELEROMETER', 'TEMPERATURE', 'LIGHT', 'BUTTON'],
-                          'BITF': ['ACCELEROMETER', 'ECG'],
-                          'NONW': ['PLSOX']}
+        for index, row in tqdm(self.device_list.iterrows(), desc='Saving sensor edfs'):
 
-        sensor_channels_switch = {'GNAC': [[0, 1, 2], [3], [4], [5]],
-                                  'BITF': [[1, 2, 3], [0]],
-                                  'NONW': [[0, 1]]}
-
-        for index, row in tqdm(coll_device_list_df.iterrows(), desc='Saving sensor edfs'):
-
-            if devices[index] == None:
+            if self.devices[index] is None:
                 continue
 
             # get info from device list
             device_type = row['device_type']
             device_file_name = row['file_name']
 
+            # TODO: check that all device types in list are valid before running
+
             # evaluate device type cases
-            sensors = sensors_switch.get(device_type, lambda: 'Invalid')
-            sensor_channels = sensor_channels_switch.get(device_type, lambda: 'Invalid')
+            sensors = self.sensors_switch.get(device_type, lambda: 'Invalid')
+            sensor_channels = self.sensor_channels_switch.get(device_type, lambda: 'Invalid')
 
             # create all file path variables
             device_file_base = os.path.splitext(device_file_name)[0]
             sensor_edf_names = ['.'.join(['_'.join([device_file_base, sensor]), 'edf']) for sensor in sensors]
 
-            sensor_paths = [os.path.join(self.sensor_dir, device_type, sensors[sen], sensor_edf_names[sen])
+            sensor_paths = [os.path.join(self.dirs['sensor_edf'], device_type, sensors[sen], sensor_edf_names[sen])
                             for sen in range(len(sensors))]
 
             # check that all folders exist for data output files
@@ -271,5 +303,6 @@ class NWPipeline:
                 sen_path = sensor_paths[sen]
                 sen_channels = sensor_channels[sen]
 
-                devices[index].export_edf(file_path=sen_path, sig_nums_out=sen_channels)
+                self.devices[index].export_edf(file_path=sen_path, sig_nums_out=sen_channels)
 
+        return True
