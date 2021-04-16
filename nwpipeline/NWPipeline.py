@@ -50,11 +50,10 @@ class NWPipeline:
 
     def run(self, subject_ids=None, coll_ids=None, overwrite_header=False, quiet=False, log=True):
 
-        # TODO: if no subject_ids or coll_ids, then do all
-
-        message("\n\n", level='info', quiet=quiet, log=log)
-        message("---- Start processing pipeline ----------------------------------------------", level='info', quiet=quiet, log=log)
-        message("", level='info', quiet=quiet, log=log)
+        message("\n\n", level='info', display=(not quiet), log=log)
+        message("---- Start processing pipeline ----------------------------------------------",
+                level='info', display=(not quiet), log=log)
+        message("", level='info', display=(not quiet), log=log)
 
         # if no subject_ids passed then do all
         if subject_ids is None:
@@ -64,6 +63,10 @@ class NWPipeline:
         if coll_ids is None:
             coll_ids = self.get_coll_ids()
 
+        message(f"Subjects: {subject_ids}", level='info', display=(not quiet), log=log)
+        message(f"Collections: {coll_ids}", level='info', display=(not quiet), log=log)
+        message("", level='info', display=(not quiet), log=log)
+
         for subject_id in tqdm(subject_ids, desc="Processing subjects", leave=True):
 
             for coll_id in tqdm(coll_ids, desc="Processing collections", leave=False):
@@ -71,12 +74,12 @@ class NWPipeline:
                 self.coll_proc(subject_id=subject_id, coll_id=coll_id, overwrite_header=overwrite_header,
                                quiet=quiet, log=log)
 
-        message("---- End ----------------------------------------------\n", level='info', quiet=quiet, log=log)
+        message("---- End ----------------------------------------------\n", level='info', display=(not quiet), log=log)
 
     def coll_proc(self, subject_id, coll_id, overwrite_header=False, quiet=False, log=True):
 
-        message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', quiet=quiet, log=log)
-        message("", level='info', quiet=quiet, log=log)
+        message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not quiet), log=log)
+        message("", level='info', display=(not quiet), log=log)
 
         # get devices for this collection from device_list
         coll_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
@@ -148,8 +151,8 @@ class NWCollection:
 
     def read(self, overwrite_header=False, save=False, rename_file=False, quiet=False, log=True):
 
-        message("Reading device data from files...", level='info', quiet=quiet, log=log)
-        message("", level='info', quiet=quiet, log=log)
+        message("Reading device data from files...", level='info', display=(not quiet), log=log)
+        message("", level='info', display=(not quiet), log=log)
 
         import_switch = {'GNAC': lambda: device_data.import_gnac(device_raw_path, correct_drift=True, quiet=quiet),
                          'BITF': lambda: device_data.import_bitf(device_raw_path),
@@ -170,12 +173,12 @@ class NWCollection:
 
             device_raw_path = os.path.join(self.dirs['raw'], device_type, device_file_name)
 
-            message(f"Reading {device_raw_path}", level='info', quiet=quiet, log=log)
+            message(f"Reading {device_raw_path}", level='info', display=(not quiet), log=log)
 
             # check that raw data file exists
             if not os.path.isfile(device_raw_path):
 
-                message(f"Device file does not exist: {device_raw_path}", level='warning', quiet=quiet, log=log)
+                message(f"Device file does not exist: {device_raw_path}", level='warning', display=(not quiet), log=log)
                 self.devices.append(None)
                 continue
 
@@ -209,12 +212,13 @@ class NWCollection:
             # generate message if any mismatches
             for key, value in header_comp.items():
                 if not value[0]:
-                    message(f"Subject {subject_id}, Collection {coll_id}, {key} mismatch: {value[1]} (header) != {value[2]} (device list)",
-                            level='warning', quiet=quiet, log=log)
+                    message(f"Subject {subject_id}, Collection {coll_id}, {key} mismatch: " +
+                            f"{value[1]} (header) != {value[2]} (device list)",
+                            level='warning', display=(not quiet), log=log)
 
             if overwrite_header:
 
-                message("Overwriting header from device list", level='info', quiet=quiet, log=log)
+                message("Overwriting header from device list", level='info', display=(not quiet), log=log)
 
                 device_data.header['patientcode'] = subject_id
                 device_data.header['patient_additional'] = coll_id
@@ -233,12 +237,12 @@ class NWCollection:
                 # check that all folders exist for data output files
                 Path(os.path.dirname(standard_device_path)).mkdir(parents=True, exist_ok=True)
 
-                message(f"Saving {standard_device_path}", level='info', quiet=quiet, log=log)
+                message(f"Saving {standard_device_path}", level='info', display=(not quiet), log=log)
 
                 # write device data as edf
                 device_data.export_edf(file_path=standard_device_path)
 
-            message("", level='info', quiet=quiet, log=log)
+            message("", level='info', display=(not quiet), log=log)
 
             self.devices.append(device_data)
 
@@ -258,8 +262,8 @@ class NWCollection:
 
     def crop(self, save=False, quiet=False, min_duration=1, max_time_to_eof=20, log=True):
 
-        message("Cropping final nonwear...", level='info', quiet=quiet, log=log)
-        message("", level='info', quiet=quiet, log=log)
+        message("Cropping final nonwear...", level='info', display=(not quiet), log=log)
+        message("", level='info', display=(not quiet), log=log)
 
         # crop final nonwear from all device data
         for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
@@ -297,7 +301,7 @@ class NWCollection:
             else:
                 message(f"No nonwear data for Subject {subject_id}, Collection {coll_id}, Device {device_type}, " +
                         f"Location {device_location}",
-                        level='warning', quiet=quiet, log=log)
+                        level='warning', display=(not quiet), log=log)
 
             # only crop if last nonwear ends within 20 minutes of end of file
             is_cropped = ((nonwear_duration >= dt.timedelta(minutes=min_duration)) &
@@ -309,7 +313,8 @@ class NWCollection:
 
             crop_duration = end_time - new_end_time
 
-            message(f"Cropping {crop_duration} from {device_type} {device_location}", level='info', quiet=quiet, log=log)
+            message(f"Cropping {crop_duration} from {device_type} {device_location}",
+                    level='info', display=(not quiet), log=log)
 
             self.devices[index].crop(new_start_time, new_end_time)
 
@@ -324,19 +329,19 @@ class NWCollection:
                 # check that all folders exist for data output files
                 Path(os.path.dirname(cropped_device_path)).mkdir(parents=True, exist_ok=True)
 
-                message(f"Saving {cropped_device_path}", level='info', quiet=quiet, log=log)
+                message(f"Saving {cropped_device_path}", level='info', display=(not quiet), log=log)
 
                 # write cropped device data as edf
                 self.devices[index].export_edf(file_path=cropped_device_path)
 
-            message("", level='info', quiet=quiet, log=log)
+            message("", level='info', display=(not quiet), log=log)
 
         return True
 
     def save_sensors(self, quiet=False, log=True):
 
-        message("Separating sensors from devices...", level='info', quiet=quiet, log=log)
-        message("", level='info', quiet=quiet, log=log)
+        message("Separating sensors from devices...", level='info', display=(not quiet), log=log)
+        message("", level='info', display=(not quiet), log=log)
 
         for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
                                desc='Saving sensor edfs'):
@@ -370,24 +375,25 @@ class NWCollection:
                 sen_path = sensor_paths[sen]
                 sen_channels = sensor_channels[sen]
 
-                message(f"Saving {sen_path}", level='info', quiet=quiet, log=log)
+                message(f"Saving {sen_path}", level='info', display=(not quiet), log=log)
 
                 self.devices[index].export_edf(file_path=sen_path, sig_nums_out=sen_channels)
 
-            message("", level='info', quiet=quiet, log=log)
+            message("", level='info', display=(not quiet), log=log)
 
         return True
 
-def message(message, level='info', quiet=False, log=True):
 
-    level_switch = {'debug': lambda: logging.debug(message),
-                    'info': lambda: logging.info(message),
-                    'warning': lambda: logging.warning(message),
-                    'error': lambda: logging.error(message),
-                    'critical': lambda: logging.critical(message)}
+def message(msg, level='info', display=True, log=True):
 
-    if not quiet:
-        print(message + "\n")
+    level_switch = {'debug': lambda: logging.debug(msg),
+                    'info': lambda: logging.info(msg),
+                    'warning': lambda: logging.warning(msg),
+                    'error': lambda: logging.error(msg),
+                    'critical': lambda: logging.critical(msg)}
+
+    if display:
+        print(msg + "\n")
 
     if log:
         func = level_switch.get(level, lambda: 'Invalid')
