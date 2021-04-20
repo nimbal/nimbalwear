@@ -132,6 +132,8 @@ class NWCollection:
         # read data from all devices in collection
         self.read(overwrite_header=overwrite_header, save=True, quiet=quiet, log=log)
 
+        # data integrity ??
+
         # synchronize devices
 
         # process nonwear for all devices
@@ -143,11 +145,15 @@ class NWCollection:
         # save sensor edf files
         self.save_sensors(quiet=quiet, log=log)
 
+        # process posture
+
         # process activity levels
 
         # process gait
 
         # process sleep
+
+
 
     def read(self, overwrite_header=False, save=False, rename_file=False, quiet=False, log=True):
 
