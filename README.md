@@ -23,3 +23,7 @@ To include the latest release of nwpipeline as a dependency in your Python packa
 `install_requires=['nwpipeline@git+https://github.com/nimbal/nwpipeline@latest#egg=nwpipeline']`
 
 To include a specific release, replace `@latest` with the tag associated with that release.
+
+# Changes by version
+
+- update `nwdata` to require v0.1.2
