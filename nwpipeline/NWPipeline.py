@@ -6,6 +6,7 @@ import logging
 from tqdm import tqdm
 import pandas as pd
 import nwdata
+import nwnonwear
 
 
 class NWPipeline:
@@ -26,6 +27,7 @@ class NWPipeline:
             'sensor_edf': 'processed/sensor_edf',
             'analyzed': 'analyzed',
             'nonwear': 'analyzed/nonwear',
+            'standard_nonwear_times': 'analyzed/nonwear/standard_nonwear_times',
             'activity': 'analyzed/activity',
             'gait': 'analyzed/gait',
             'sleep': 'analyzed/sleep'}
@@ -43,6 +45,9 @@ class NWPipeline:
         # initialize folder structure
         for key, value in self.dirs.items():
             Path(value).mkdir(parents=True, exist_ok=True)
+
+        # TODO: remove further folder checks in methods?? Can't remove where device folder is required because
+        # created ad hoc for now
 
         log_file_path = os.path.join(self.dirs['logs'], "processing.log")
         logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', filename=log_file_path,
@@ -118,7 +123,7 @@ class NWCollection:
                               'NONW': [[0, 1]]}
 
     devices = []
-    nonwear_times = None
+    nonwear_times = pd.DataFrame()
 
     def __init__(self, subject_id, coll_id, device_list, dirs):
 
@@ -137,7 +142,7 @@ class NWCollection:
         # synchronize devices
 
         # process nonwear for all devices
-        self.nonwear()
+        self.nonwear(save=True, quiet=quiet, log=log)
 
         # crop final nonwear
         self.crop(save=True, min_duration=min_crop_duration, max_time_to_eof=max_crop_time_to_eof, quiet=quiet, log=log)
@@ -152,8 +157,6 @@ class NWCollection:
         # process gait
 
         # process sleep
-
-
 
     def read(self, overwrite_header=False, save=False, rename_file=False, quiet=False, log=True):
 
@@ -184,7 +187,7 @@ class NWCollection:
             # check that raw data file exists
             if not os.path.isfile(device_raw_path):
 
-                message(f"Device file does not exist: {device_raw_path}", level='warning', display=(not quiet), log=log)
+                message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: {device_raw_path} does not exist", level='warning', display=(not quiet), log=log)
                 self.devices.append(None)
                 continue
 
@@ -218,7 +221,7 @@ class NWCollection:
             # generate message if any mismatches
             for key, value in header_comp.items():
                 if not value[0]:
-                    message(f"Subject {subject_id}, Collection {coll_id}, {key} mismatch: " +
+                    message(f"{subject_id}_{coll_id}_{device_type}_{device_location}:  {key} mismatch: " +
                             f"{value[1]} (header) != {value[2]} (device list)",
                             level='warning', display=(not quiet), log=log)
 
@@ -254,15 +257,90 @@ class NWCollection:
 
         return True
 
-    def nonwear(self):
+    def nonwear(self, save=False, quiet=False, log=True):
 
         # process nonwear for all devices
-        nonwear_csv = os.path.join(self.dirs['nonwear'], 'standard_nonwear_times.csv')
+        message("Processing nonwear...", level='info', display=(not quiet), log=log)
+        message("", level='info', display=(not quiet), log=log)
 
-        # read nonwear csv file
-        self.nonwear_times = pd.read_csv(nonwear_csv, dtype=str)
-        self.nonwear_times['start_time'] = pd.to_datetime(self.nonwear_times['start_time'], format='%Y-%m-%d %H:%M')
-        self.nonwear_times['end_time'] = pd.to_datetime(self.nonwear_times['end_time'], format='%Y-%m-%d %H:%M')
+        self.nonwear_times = pd.DataFrame()
+
+        # crop final nonwear from all device data
+        for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
+                               desc='Processing nonwear'):
+
+            if self.devices[index] is None:
+                # TODO: ADD MESSAGE ?? ALSO IN OTHER MODULES
+                continue
+
+            # get info from device list
+            subject_id = row['subject_id']
+            coll_id = row['coll_id']
+            device_type = row['device_type']
+            device_location = row['device_location']
+            device_file_name = row['file_name']
+
+            # TODO: search signal headers for signal labels
+            accel_x_sig = 0
+            accel_y_sig = 1
+            accel_z_sig = 2
+            temperature_sig = 3
+
+            # TODO: call different algorithm based on device_type or signals available??
+            # TODO: log algorithm used
+
+            nonwear_times, nonwear_array = nwnonwear.vert_nonwear(
+                                                        x_values=self.devices[index].signals[accel_x_sig],
+                                                        y_values=self.devices[index].signals[accel_y_sig],
+                                                        z_values=self.devices[index].signals[accel_z_sig],
+                                                        temperature_values=self.devices[index].signals[temperature_sig],
+                                                        quiet=quiet)
+
+            bout_count = nonwear_times.shape[0]
+
+            message(f"Detected {bout_count} nonwear bouts for {device_type} {device_location}",
+                    level='info', display=(not quiet), log=log)
+
+            # convert datapoints to times
+            start_date = self.devices[index].header['startdate']
+            sample_rate = self.devices[index].signal_headers[accel_x_sig]['sample_rate']
+
+            start_times = []
+            end_times = []
+
+            for nw_index, nw_row in nonwear_times.iterrows():
+                start_times.append(start_date + dt.timedelta(seconds=(nw_row['start_datapoint'] / sample_rate)))
+                end_times.append(start_date + dt.timedelta(seconds=(nw_row['end_datapoint'] / sample_rate)))
+
+            nonwear_times['start_time'] = start_times
+            nonwear_times['end_time'] = end_times
+
+            nonwear_times['subject_id'] = subject_id
+            nonwear_times['coll_id'] = coll_id
+            nonwear_times['device_type'] = device_type
+            nonwear_times['device_location'] = device_location
+
+            # reorder columns
+            nonwear_times = nonwear_times[['subject_id', 'coll_id', 'device_type', 'device_location',
+                                          'start_time', 'end_time']]
+
+            # append to collection attribute
+            self.nonwear_times = self.nonwear_times.append(nonwear_times, ignore_index=True)
+
+            if save:
+
+                # create all file path variables
+                device_file_base = os.path.splitext(device_file_name)[0]
+                nonwear_csv_name = '.'.join(['_'.join([device_file_base, "NONWEAR"]), "csv"])
+                nonwear_csv_path = os.path.join(self.dirs['standard_nonwear_times'], device_type, nonwear_csv_name)
+
+                Path(os.path.dirname(nonwear_csv_path)).mkdir(parents=True, exist_ok=True)
+
+                message(f"Saving {nonwear_csv_path}", level='info', display=(not quiet), log=log)
+
+                nonwear_times.to_csv(nonwear_csv_path, index=False)
+
+            message("", level='info', display=(not quiet), log=log)
 
         return True
 
@@ -305,8 +383,7 @@ class NWCollection:
                 nonwear_duration = last_nonwear['end_time'].item() - last_nonwear['start_time'].item()
                 nonwear_time_to_eof = end_time - last_nonwear['end_time'].item()
             else:
-                message(f"No nonwear data for Subject {subject_id}, Collection {coll_id}, Device {device_type}, " +
-                        f"Location {device_location}",
+                message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data",
                         level='warning', display=(not quiet), log=log)
 
             # only crop if last nonwear ends within 20 minutes of end of file
