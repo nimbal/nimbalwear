@@ -26,4 +26,8 @@ To include a specific release, replace `@latest` with the tag associated with th
 
 # Changes by version
 
+v0.2.0
+- add nonwear processing (nwnonwear v0.1.0)
+
+v0.1.1
 - update `nwdata` to require v0.1.2

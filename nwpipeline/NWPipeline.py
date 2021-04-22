@@ -260,18 +260,14 @@ class NWCollection:
     def nonwear(self, save=False, quiet=False, log=True):
 
         # process nonwear for all devices
-        message("Processing nonwear...", level='info', display=(not quiet), log=log)
+        message("Detecting non-wear...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
         self.nonwear_times = pd.DataFrame()
 
-        # crop final nonwear from all device data
+        # detect nonwear for each device
         for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
-                               desc='Processing nonwear'):
-
-            if self.devices[index] is None:
-                # TODO: ADD MESSAGE ?? ALSO IN OTHER MODULES
-                continue
+                               desc='Detecting non-wear'):
 
             # get info from device list
             subject_id = row['subject_id']
@@ -280,11 +276,26 @@ class NWCollection:
             device_location = row['device_location']
             device_file_name = row['file_name']
 
+            # TODO: Add nonwear detection for other devices
+
+            if not device_type == 'GNAC':
+                message(f"Cannot detect non-wear for {device_type}_{device_location}",
+                        level='info', display=(not quiet), log=log)
+                message("", level='info', display=(not quiet), log=log)
+                continue
+
+            # check for data loaded
+            if self.devices[index] is None:
+                message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No device data",
+                        level='warning', display=(not quiet), log=log)
+                message("", level='info', display=(not quiet), log=log)
+                continue
+
             # TODO: search signal headers for signal labels
-            accel_x_sig = 0
-            accel_y_sig = 1
-            accel_z_sig = 2
-            temperature_sig = 3
+            accel_x_sig = self.devices[index].get_signal_index('Accelerometer x')
+            accel_y_sig = self.devices[index].get_signal_index('Accelerometer y')
+            accel_z_sig = self.devices[index].get_signal_index('Accelerometer z')
+            temperature_sig = self.devices[index].get_signal_index('Temperature')
 
             # TODO: call different algorithm based on device_type or signals available??
             # TODO: log algorithm used
@@ -295,10 +306,11 @@ class NWCollection:
                                                         z_values=self.devices[index].signals[accel_z_sig],
                                                         temperature_values=self.devices[index].signals[temperature_sig],
                                                         quiet=quiet)
+            algorithm_name = 'Vert algorithm'
 
             bout_count = nonwear_times.shape[0]
 
-            message(f"Detected {bout_count} nonwear bouts for {device_type} {device_location}",
+            message(f"Detected {bout_count} nonwear bouts for {device_type} {device_location} ({algorithm_name})",
                     level='info', display=(not quiet), log=log)
 
             # convert datapoints to times
@@ -353,9 +365,6 @@ class NWCollection:
         for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
                                desc='Cropping final nonwear'):
 
-            if self.devices[index] is None:
-                continue
-
             # get info from device list
             subject_id = row['subject_id']
             coll_id = row['coll_id']
@@ -363,11 +372,20 @@ class NWCollection:
             device_location = row['device_location']
             device_file_name = row['file_name']
 
-            # get last device nonwear period
-            last_nonwear = self.nonwear_times.loc[(self.nonwear_times['subject_id'] == subject_id) &
-                                                  (self.nonwear_times['coll_id'] == coll_id) &
-                                                  (self.nonwear_times['device_type'] == device_type) &
-                                                  (self.nonwear_times['device_location'] == device_location)][-1:]
+            if self.devices[index] is None:
+                message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No device data",
+                        level='warning', display=(not quiet), log=log)
+                continue
+
+            last_nonwear = pd.DataFrame()
+
+            if not self.nonwear_times.empty:
+
+                # get last device nonwear period
+                last_nonwear = self.nonwear_times.loc[(self.nonwear_times['subject_id'] == subject_id) &
+                                                      (self.nonwear_times['coll_id'] == coll_id) &
+                                                      (self.nonwear_times['device_type'] == device_type) &
+                                                      (self.nonwear_times['device_location'] == device_location)][-1:]
 
             # get time info from device data
             start_time = self.devices[index].header['startdate']
