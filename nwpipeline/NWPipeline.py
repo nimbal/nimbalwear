@@ -46,14 +46,11 @@ class NWPipeline:
         for key, value in self.dirs.items():
             Path(value).mkdir(parents=True, exist_ok=True)
 
-        # TODO: remove further folder checks in methods?? Can't remove where device folder is required because
-        # created ad hoc for now
-
         log_file_path = os.path.join(self.dirs['logs'], "processing.log")
         logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', filename=log_file_path,
                             level=logging.DEBUG)
 
-    def run(self, subject_ids=None, coll_ids=None, overwrite_header=False, quiet=False, log=True):
+    def run(self, subject_ids=None, coll_ids=None, single_stage=None, overwrite_header=False, quiet=False, log=True):
 
         message("\n\n", level='info', display=(not quiet), log=log)
         message("---- Start processing pipeline ----------------------------------------------",
@@ -70,32 +67,30 @@ class NWPipeline:
 
         message(f"Subjects: {subject_ids}", level='info', display=(not quiet), log=log)
         message(f"Collections: {coll_ids}", level='info', display=(not quiet), log=log)
+        if single_stage is not None:
+            message(f"Single stage: {single_stage}", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
         for subject_id in tqdm(subject_ids, desc="Processing subjects", leave=True):
 
             for coll_id in tqdm(coll_ids, desc="Processing collections", leave=False):
 
-                self.coll_proc(subject_id=subject_id, coll_id=coll_id, overwrite_header=overwrite_header,
-                               quiet=quiet, log=log)
+                message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not quiet),
+                        log=log)
+                message("", level='info', display=(not quiet), log=log)
+
+                # get devices for this collection from device_list
+                coll_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
+                                                           (self.device_list['coll_id'] == coll_id)]
+                coll_device_list_df.reset_index(inplace=True, drop=True)
+
+                # construct collection class and process
+                coll = NWCollection(subject_id=subject_id, coll_id=coll_id, device_list=coll_device_list_df,
+                                    dirs=self.dirs)
+                coll.process(single_stage=single_stage, overwrite_header=overwrite_header, min_crop_duration=3,
+                             max_crop_time_to_eof=20, quiet=quiet, log=log)
 
         message("---- End ----------------------------------------------\n", level='info', display=(not quiet), log=log)
-
-    def coll_proc(self, subject_id, coll_id, overwrite_header=False, quiet=False, log=True):
-
-        message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not quiet), log=log)
-        message("", level='info', display=(not quiet), log=log)
-
-        # get devices for this collection from device_list
-        coll_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
-                                                   (self.device_list['coll_id'] == coll_id)]
-        coll_device_list_df.reset_index(inplace=True, drop=True)
-
-        # construct collection class and process
-        coll = NWCollection(subject_id=subject_id, coll_id=coll_id, device_list=coll_device_list_df,
-                            dirs=self.dirs)
-        coll.process(overwrite_header=overwrite_header, min_crop_duration=3, max_crop_time_to_eof=20,
-                     quiet=quiet, log=log)
 
     def get_subject_ids(self):
 
@@ -132,23 +127,37 @@ class NWCollection:
         self.device_list = device_list
         self.dirs = dirs
 
-    def process(self, overwrite_header=False, min_crop_duration=1, max_crop_time_to_eof=20, quiet=False, log=True):
+    def process(self, single_stage=None, overwrite_header=False, min_crop_duration=1, max_crop_time_to_eof=20, quiet=False, log=True):
+        """Processes the collection
+
+        Args:
+            single_stage (str): None, 'read', 'nonwear', 'crop', 'save_sensors'
+            ...
+        Returns:
+            True if successful, False otherwise.
+        """
 
         # read data from all devices in collection
-        self.read(overwrite_header=overwrite_header, save=True, quiet=quiet, log=log)
+        self.read(single_stage=single_stage, overwrite_header=overwrite_header, save=True, quiet=quiet, log=log)
 
         # data integrity ??
 
         # synchronize devices
 
         # process nonwear for all devices
-        self.nonwear(save=True, quiet=quiet, log=log)
+        if single_stage in [None, 'nonwear']:
+            self.nonwear(save=True, quiet=quiet, log=log)
+
+        if single_stage == 'crop':
+            self.read_nonwear(quiet=quiet, log=log)
 
         # crop final nonwear
-        self.crop(save=True, min_duration=min_crop_duration, max_time_to_eof=max_crop_time_to_eof, quiet=quiet, log=log)
+        if single_stage in [None, 'crop']:
+            self.crop(save=True, min_duration=min_crop_duration, max_time_to_eof=max_crop_time_to_eof, quiet=quiet, log=log)
 
         # save sensor edf files
-        self.save_sensors(quiet=quiet, log=log)
+        if single_stage in [None, 'save_sensors']:
+            self.save_sensors(quiet=quiet, log=log)
 
         # process posture
 
@@ -158,14 +167,17 @@ class NWCollection:
 
         # process sleep
 
-    def read(self, overwrite_header=False, save=False, rename_file=False, quiet=False, log=True):
+        return True
+
+    def read(self, single_stage=None, overwrite_header=False, save=False, rename_file=False, quiet=False, log=True):
 
         message("Reading device data from files...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
-        import_switch = {'GNAC': lambda: device_data.import_gnac(device_raw_path, correct_drift=True, quiet=quiet),
-                         'BITF': lambda: device_data.import_bitf(device_raw_path),
-                         'NONW': lambda: device_data.import_nonw(device_raw_path, quiet=quiet)}
+        import_switch = {'EDF': lambda: device_data.import_edf(device_file_path, quiet=quiet),
+                         'GNAC': lambda: device_data.import_gnac(device_file_path, correct_drift=True, quiet=quiet),
+                         'BITF': lambda: device_data.import_bitf(device_file_path),
+                         'NONW': lambda: device_data.import_nonw(device_file_path, quiet=quiet)}
 
         self.devices = []
 
@@ -179,24 +191,39 @@ class NWCollection:
             device_id = row['device_id']
             device_location = row['device_location']
             device_file_name = row['file_name']
+            device_file_base = os.path.splitext(device_file_name)[0]
+            device_edf_name = '.'.join([device_file_base, 'edf'])
 
-            device_raw_path = os.path.join(self.dirs['raw'], device_type, device_file_name)
+            if single_stage in [None, 'read']:
 
-            message(f"Reading {device_raw_path}", level='info', display=(not quiet), log=log)
+                device_file_path = os.path.join(self.dirs['raw'], device_type, device_file_name)
+                import_func = import_switch.get(device_type, lambda: 'Invalid')
 
-            # check that raw data file exists
-            if not os.path.isfile(device_raw_path):
+            elif single_stage in ['nonwear', 'crop']:
 
-                message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: {device_raw_path} does not exist", level='warning', display=(not quiet), log=log)
+                device_file_path = os.path.join(self.dirs['standard_device_edf'], device_type, device_edf_name)
+                import_func = import_switch.get('EDF', lambda: 'Invalid')
+
+            else:
+
+                device_file_path = os.path.join(self.dirs['cropped_device_edf'], device_type, device_edf_name)
+                import_func = import_switch.get('EDF', lambda: 'Invalid')
+
+            # check that data file exists
+            if not os.path.isfile(device_file_path):
+                message(
+                    f"{subject_id}_{coll_id}_{device_type}_{device_location}: {device_file_path} does not exist",
+                    level='warning', display=(not quiet), log=log)
                 self.devices.append(None)
                 continue
 
-            import_func = import_switch.get(device_type, lambda: 'Invalid')
-
             # import data to device data object
+            message(f"Reading {device_file_path}", level='info', display=(not quiet), log=log)
+
             device_data = nwdata.NWData()
             import_func()
             device_data.deidentify()
+
 
             # check header against device list info
             header_comp = {'subject_id': [(device_data.header['patientcode'] == subject_id),
@@ -234,13 +261,11 @@ class NWCollection:
                 device_data.header['equipment'] = '_'.join([device_type, device_id])
                 device_data.header['recording_additional'] = device_location
 
-            if save:
+            if single_stage in [None, 'read'] and save:
 
                 # TODO: option to rename files
 
                 # create all file path variables
-                device_file_base = os.path.splitext(device_file_name)[0]
-                device_edf_name = '.'.join([device_file_base, 'edf'])
                 standard_device_path = os.path.join(self.dirs['standard_device_edf'], device_type, device_edf_name)
 
                 # check that all folders exist for data output files
@@ -356,6 +381,50 @@ class NWCollection:
 
         return True
 
+    def read_nonwear(self, quiet=False, log=True):
+
+        # read nonwear data for all devices
+        message("Reading non-wear data from files...", level='info', display=(not quiet), log=log)
+        message("", level='info', display=(not quiet), log=log)
+
+        self.nonwear_times = pd.DataFrame()
+
+        # detect nonwear for each device
+        for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
+                               desc='Reading all non-wear data'):
+
+            # get info from device list
+            subject_id = row['subject_id']
+            coll_id = row['coll_id']
+            device_type = row['device_type']
+            device_location = row['device_location']
+            device_file_name = row['file_name']
+
+            device_file_base = os.path.splitext(device_file_name)[0]
+            nonwear_csv_name = '.'.join(['_'.join([device_file_base, "NONWEAR"]), "csv"])
+            nonwear_csv_path = os.path.join(self.dirs['standard_nonwear_times'], device_type, nonwear_csv_name)
+
+            if not os.path.isfile(nonwear_csv_path):
+                message(
+                    f"{subject_id}_{coll_id}_{device_type}_{device_location}: {nonwear_csv_path} does not exist",
+                    level='warning', display=(not quiet), log=log)
+                self.devices.append(None)
+                continue
+
+            message(f"Reading {nonwear_csv_path}", level='info', display=(not quiet), log=log)
+
+            # read nonwear csv file
+            nonwear_times = pd.read_csv(nonwear_csv_path, dtype=str)
+            nonwear_times['start_time'] = pd.to_datetime(nonwear_times['start_time'], format='%Y-%m-%d %H:%M:%S')
+            nonwear_times['end_time'] = pd.to_datetime(nonwear_times['end_time'], format='%Y-%m-%d %H:%M:%S')
+
+            # append to collection attribute
+            self.nonwear_times = self.nonwear_times.append(nonwear_times, ignore_index=True)
+
+            message("", level='info', display=(not quiet), log=log)
+
+        return True
+
     def crop(self, save=False, quiet=False, min_duration=1, max_time_to_eof=20, log=True):
 
         message("Cropping final nonwear...", level='info', display=(not quiet), log=log)
@@ -371,6 +440,8 @@ class NWCollection:
             device_type = row['device_type']
             device_location = row['device_location']
             device_file_name = row['file_name']
+
+
 
             if self.devices[index] is None:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No device data",
