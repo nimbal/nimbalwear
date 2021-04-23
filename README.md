@@ -28,6 +28,7 @@ To include a specific release, replace `@latest` with the tag associated with th
 
 v0.2.0
 - add nonwear processing (nwnonwear v0.1.0)
+- add option to process only a single stage of the pipeline
 
 v0.1.1
 - update `nwdata` to require v0.1.2
