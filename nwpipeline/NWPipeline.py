@@ -7,7 +7,7 @@ from tqdm import tqdm
 import pandas as pd
 import nwdata
 import nwnonwear
-
+from nwpipeline import __version__
 
 class NWPipeline:
 
@@ -53,7 +53,7 @@ class NWPipeline:
     def run(self, subject_ids=None, coll_ids=None, single_stage=None, overwrite_header=False, quiet=False, log=True):
 
         message("\n\n", level='info', display=(not quiet), log=log)
-        message("---- Start processing pipeline ----------------------------------------------",
+        message(f"---- Start processing pipeline ----------------------------------------------",
                 level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
@@ -65,6 +65,7 @@ class NWPipeline:
         if coll_ids is None:
             coll_ids = self.get_coll_ids()
 
+        message(f"Version: {__version__}", level='info', display=(not quiet), log=log)
         message(f"Subjects: {subject_ids}", level='info', display=(not quiet), log=log)
         message(f"Collections: {coll_ids}", level='info', display=(not quiet), log=log)
         if single_stage is not None:
@@ -405,9 +406,9 @@ class NWCollection:
             nonwear_csv_path = os.path.join(self.dirs['standard_nonwear_times'], device_type, nonwear_csv_name)
 
             if not os.path.isfile(nonwear_csv_path):
-                message(
-                    f"{subject_id}_{coll_id}_{device_type}_{device_location}: {nonwear_csv_path} does not exist",
-                    level='warning', display=(not quiet), log=log)
+                message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: {nonwear_csv_path} does not exist",
+                        level='warning', display=(not quiet), log=log)
+                message("", level='info', display=(not quiet), log=log)
                 self.devices.append(None)
                 continue
 
