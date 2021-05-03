@@ -8,6 +8,7 @@ import pandas as pd
 import nwdata
 import nwnonwear
 from nwpipeline import __version__
+from macro_gait.WalkingBouts import WalkingBouts
 
 class NWPipeline:
 
@@ -120,6 +121,7 @@ class NWCollection:
 
     devices = []
     nonwear_times = pd.DataFrame()
+    gait_times = pd.DataFrame()
 
     def __init__(self, subject_id, coll_id, device_list, dirs):
 
@@ -165,6 +167,8 @@ class NWCollection:
         # process activity levels
 
         # process gait
+        if single_stage in [None, 'gait']:
+            self.gait(save=True, quiet=quiet, log=log)
 
         # process sleep
 
@@ -283,6 +287,53 @@ class NWCollection:
 
         return True
 
+    def gait(self, save=False, quiet=False, log=True):
+        message("Reading gait data from files...", level='info', display=(not quiet), log=log)
+        message("", level='info', display=(not quiet), log=log)
+        print(self.device_list)
+        l_file_index = self.device_list.loc[self.device_list['device_location'] == 'LA'].index.values
+        r_file_index = self.device_list.loc[self.device_list['device_location'] == 'RA'].index.values
+        
+        if not (l_file_index or r_file_index):
+            message(f"No ankle data",
+                        level='warning', display=(not quiet), log=log)
+            message("", level='info', display=(not quiet), log=log)
+            return False
+        
+        # set indices and handles case if ankle data is missing
+        l_file_index = l_file_index[0] if l_file_index else r_file_index[0]
+        r_file_index = r_file_index[0] if r_file_index else l_file_index[0]
+        
+        # find accelerometer indices
+        assert self.device_list.loc[l_file_index, 'device_type'] == self.device_list.loc[r_file_index, 'device_type']
+        device_type = self.device_list.loc[l_file_index, 'device_type']
+        accel_index = self.sensors_switch[device_type].index('ACCELEROMETER')
+        sig_indices = self.sensor_channels_switch[device_type][accel_index]
+        
+        # get ankle files and only take accelerometer signals
+        l_file = self.devices[l_file_index]
+        r_file = self.devices[r_file_index]
+        l_file.signals = [l_file.signals[i] for i in sig_indices]
+        r_file.signals = [r_file.signals[i] for i in sig_indices]
+        
+        # checks to see if files exist
+        if not (l_file and r_file):
+            message(f"No device data",
+                        level='warning', display=(not quiet), log=log)
+            message("", level='info', display=(not quiet), log=log)
+            return False
+        
+        # run gait algorithm to find bouts
+        wb = WalkingBouts(l_file, r_file, left_kwargs={'axis': 1}, right_kwargs={'axis': 1})
+        
+        # save bout times
+        self.gait_times = wb.export_bouts()
+        
+        return True
+        
+        
+        
+        
     def nonwear(self, save=False, quiet=False, log=True):
 
         # process nonwear for all devices
