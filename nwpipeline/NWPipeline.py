@@ -2,11 +2,11 @@ import os
 import datetime as dt
 from pathlib import Path
 import logging
-
 from tqdm import tqdm
 import pandas as pd
 import nwdata
 import nwnonwear
+import traceback
 from nwpipeline import __version__
 from macro_gait.WalkingBouts import WalkingBouts
 
@@ -80,17 +80,22 @@ class NWPipeline:
                 message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not quiet),
                         log=log)
                 message("", level='info', display=(not quiet), log=log)
-
-                # get devices for this collection from device_list
-                coll_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
-                                                           (self.device_list['coll_id'] == coll_id)]
-                coll_device_list_df.reset_index(inplace=True, drop=True)
-
-                # construct collection class and process
-                coll = NWCollection(subject_id=subject_id, coll_id=coll_id, device_list=coll_device_list_df,
-                                    dirs=self.dirs)
-                coll.process(single_stage=single_stage, overwrite_header=overwrite_header, min_crop_duration=3,
-                             max_crop_time_to_eof=20, quiet=quiet, log=log)
+                
+                try:
+                    # get devices for this collection from device_list
+                    coll_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
+                                                               (self.device_list['coll_id'] == coll_id)]
+                    coll_device_list_df.reset_index(inplace=True, drop=True)
+    
+                    # construct collection class and process
+                    coll = NWCollection(subject_id=subject_id, coll_id=coll_id, device_list=coll_device_list_df,
+                                        dirs=self.dirs)
+                    coll.process(single_stage=single_stage, overwrite_header=overwrite_header, min_crop_duration=3,
+                                 max_crop_time_to_eof=20, quiet=quiet, log=log)
+                except:
+                    tb = traceback.format_exc()
+                    message(tb, level='error', display=(not quiet),
+                        log=log)
 
         message("---- End ----------------------------------------------\n", level='info', display=(not quiet), log=log)
 
