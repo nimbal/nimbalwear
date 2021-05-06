@@ -126,6 +126,9 @@ class NWCollection:
                               'BITF': [[1, 2, 3], [0]],
                               'NONW': [[0, 1]]}
 
+    device_locations = {'left_ankle': ['LA', 'LEFTANKLE', 'LANKLE'],
+                        'right_ankle': ['RA', 'RIGHTANKLE', 'RANKLE']}
+
     devices = []
     nonwear_times = pd.DataFrame()
     gait_times = pd.DataFrame()
@@ -571,7 +574,7 @@ class NWCollection:
 
     def gait(self, save=False, quiet=False, log=True):
 
-        message("Reading gait data from files...", level='info', display=(not quiet), log=log)
+        message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
 
@@ -617,6 +620,8 @@ class NWCollection:
 
         # save bout times
         self.gait_times = wb.export_bouts()
+
+        #TODO: add info to log about steps and bouts detected
 
         #TODO: add option to save as file
 
