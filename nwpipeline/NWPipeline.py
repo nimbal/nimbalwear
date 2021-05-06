@@ -577,15 +577,12 @@ class NWCollection:
         message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
-
         # TODO: these device locations only work for ReMiNDD data
         l_file_index = self.device_list.loc[self.device_list['device_location'] == 'LA'].index.values
         r_file_index = self.device_list.loc[self.device_list['device_location'] == 'RA'].index.values
 
-        # TODO: WARNING needs device info prefix - same further down
-
         if not (l_file_index or r_file_index):
-            message(f"No ankle data",
+            message(f"{self.subject_id}_{self.coll_id}: No ankle data",
                     level='warning', display=(not quiet), log=log)
             message("", level='info', display=(not quiet), log=log)
             return False
@@ -610,7 +607,7 @@ class NWCollection:
 
         # checks to see if files exist
         if not (l_file and r_file):
-            message(f"No device data",
+            message(f"{self.subject_id}_{self.coll_id}: No device data",
                     level='warning', display=(not quiet), log=log)
             message("", level='info', display=(not quiet), log=log)
             return False
