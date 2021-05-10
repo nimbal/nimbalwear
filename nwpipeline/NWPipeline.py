@@ -290,7 +290,6 @@ class NWCollection:
     def gait(self, save=False, quiet=False, log=True):
         message("Reading gait data from files...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
-        print(self.device_list)
         l_file_index = self.device_list.loc[self.device_list['device_location'] == 'LA'].index.values
         r_file_index = self.device_list.loc[self.device_list['device_location'] == 'RA'].index.values
         
@@ -327,7 +326,23 @@ class NWCollection:
         wb = WalkingBouts(l_file, r_file, left_kwargs={'axis': 1}, right_kwargs={'axis': 1})
         
         # save bout times
-        self.gait_times = wb.export_bouts()
+        self.bout_times = wb.export_bouts()
+        self.step_times = wb.export_steps()
+
+        if save:
+            # create all file path variables
+            bouts_csv_name = '.'.join(['_'.join([self.subject_id, self.coll_id ,"GAIT_BOUTS"]), "csv"])
+            steps_csv_name = '.'.join(['_'.join([self.subject_id, self.coll_id ,"GAIT_STEPS"]), "csv"])
+            bouts_csv_path = os.path.join(self.dirs['gait'], bouts_csv_name)
+            steps_csv_path = os.path.join(self.dirs['gait'], steps_csv_name)
+
+            message(f"Saving {bouts_csv_path}", level='info', display=(not quiet), log=log)
+            message(f"Saving {steps_csv_path}", level='info', display=(not quiet), log=log)
+
+            self.bout_times.to_csv(bouts_csv_path, index=False)
+            self.step_times.to_csv(steps_csv_path, index=False)
+
+        message("", level='info', display=(not quiet), log=log)
         
         return True
         
