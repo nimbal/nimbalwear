@@ -2,13 +2,14 @@ import os
 import datetime as dt
 from pathlib import Path
 import logging
+import traceback
 
 from tqdm import tqdm
 import pandas as pd
 import nwdata
 import nwnonwear
 from nwpipeline import __version__
-from macro_gait.WalkingBouts import WalkingBouts
+import nwgait
 
 class NWPipeline:
 
@@ -37,6 +38,7 @@ class NWPipeline:
 
         # pipeline data files
         self.device_list_path = os.path.join(self.dirs['meta'], 'device_list.csv')
+        self.log_file_path = os.path.join(self.dirs['logs'], "processing.log")
 
         # TODO: check for required files (raw data, device_list)
 
@@ -47,11 +49,11 @@ class NWPipeline:
         for key, value in self.dirs.items():
             Path(value).mkdir(parents=True, exist_ok=True)
 
-        log_file_path = os.path.join(self.dirs['logs'], "processing.log")
-        logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', filename=log_file_path,
-                            level=logging.DEBUG)
 
     def run(self, subject_ids=None, coll_ids=None, single_stage=None, overwrite_header=False, quiet=False, log=True):
+
+        logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', filename=self.log_file_path,
+                            level=logging.INFO)
 
         message("\n\n", level='info', display=(not quiet), log=log)
         message(f"---- Start processing pipeline ----------------------------------------------",
@@ -80,17 +82,22 @@ class NWPipeline:
                 message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not quiet),
                         log=log)
                 message("", level='info', display=(not quiet), log=log)
-
-                # get devices for this collection from device_list
-                coll_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
-                                                           (self.device_list['coll_id'] == coll_id)]
-                coll_device_list_df.reset_index(inplace=True, drop=True)
-
-                # construct collection class and process
-                coll = NWCollection(subject_id=subject_id, coll_id=coll_id, device_list=coll_device_list_df,
-                                    dirs=self.dirs)
-                coll.process(single_stage=single_stage, overwrite_header=overwrite_header, min_crop_duration=3,
-                             max_crop_time_to_eof=20, quiet=quiet, log=log)
+                
+                try:
+                    # get devices for this collection from device_list
+                    coll_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
+                                                               (self.device_list['coll_id'] == coll_id)]
+                    coll_device_list_df.reset_index(inplace=True, drop=True)
+    
+                    # construct collection class and process
+                    coll = NWCollection(subject_id=subject_id, coll_id=coll_id, device_list=coll_device_list_df,
+                                        dirs=self.dirs)
+                    coll.process(single_stage=single_stage, overwrite_header=overwrite_header, min_crop_duration=3,
+                                 max_crop_time_to_eof=20, quiet=quiet, log=log)
+                except:
+                    tb = traceback.format_exc()
+                    message(tb, level='error', display=(not quiet),
+                        log=log)
 
         message("---- End ----------------------------------------------\n", level='info', display=(not quiet), log=log)
 
@@ -118,6 +125,9 @@ class NWCollection:
     sensor_channels_switch = {'GNAC': [[0, 1, 2], [3], [4], [5]],
                               'BITF': [[1, 2, 3], [0]],
                               'NONW': [[0, 1]]}
+
+    device_locations = {'left_ankle': ['LA', 'LEFTANKLE', 'LANKLE'],
+                        'right_ankle': ['RA', 'RIGHTANKLE', 'RANKLE']}
 
     devices = []
     nonwear_times = pd.DataFrame()
@@ -175,6 +185,8 @@ class NWCollection:
         return True
 
     def read(self, single_stage=None, overwrite_header=False, save=False, rename_file=False, quiet=False, log=True):
+
+        # TODO: for single stage, only read needed devices?
 
         message("Reading device data from files...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
@@ -345,9 +357,6 @@ class NWCollection:
         message("", level='info', display=(not quiet), log=log)
         
         return True
-        
-        
-        
         
     def nonwear(self, save=False, quiet=False, log=True):
 
@@ -622,6 +631,57 @@ class NWCollection:
 
         return True
 
+    def gait(self, save=False, quiet=False, log=True):
+
+        message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
+        message("", level='info', display=(not quiet), log=log)
+
+        # TODO: these device locations only work for ReMiNDD data
+        l_file_index = self.device_list.loc[self.device_list['device_location'] == 'LA'].index.values
+        r_file_index = self.device_list.loc[self.device_list['device_location'] == 'RA'].index.values
+
+        if not (l_file_index or r_file_index):
+            message(f"{self.subject_id}_{self.coll_id}: No ankle data",
+                    level='warning', display=(not quiet), log=log)
+            message("", level='info', display=(not quiet), log=log)
+            return False
+
+        # set indices and handles case if ankle data is missing
+        l_file_index = l_file_index[0] if l_file_index else r_file_index[0]
+        r_file_index = r_file_index[0] if r_file_index else l_file_index[0]
+
+        # find accelerometer indices
+        assert self.device_list.loc[l_file_index, 'device_type'] == self.device_list.loc[r_file_index, 'device_type']
+        device_type = self.device_list.loc[l_file_index, 'device_type']
+        accel_index = self.sensors_switch[device_type].index('ACCELEROMETER')
+        sig_indices = self.sensor_channels_switch[device_type][accel_index]
+
+        # get ankle files and only take accelerometer signals
+        l_file = self.devices[l_file_index]
+        r_file = self.devices[r_file_index]
+        l_file.signals = [l_file.signals[i] for i in sig_indices]
+        r_file.signals = [r_file.signals[i] for i in sig_indices]
+
+        # TODO: should do same above for signal_headers even if not used
+
+        # checks to see if files exist
+        if not (l_file and r_file):
+            message(f"{self.subject_id}_{self.coll_id}: No device data",
+                    level='warning', display=(not quiet), log=log)
+            message("", level='info', display=(not quiet), log=log)
+            return False
+
+        # run gait algorithm to find bouts
+        wb = nwgait.WalkingBouts(l_file, r_file, left_kwargs={'axis': 1}, right_kwargs={'axis': 1})
+
+        # save bout times
+        self.gait_times = wb.export_bouts()
+
+        #TODO: add info to log about steps and bouts detected
+
+        #TODO: add option to save as file
+
+        return True
 
 def message(msg, level='info', display=True, log=True):
 
