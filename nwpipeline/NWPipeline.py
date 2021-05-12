@@ -11,6 +11,7 @@ import nwnonwear
 from nwpipeline import __version__
 import nwgait
 
+
 class NWPipeline:
 
     def __init__(self, study_dir):
@@ -48,7 +49,6 @@ class NWPipeline:
         # initialize folder structure
         for key, value in self.dirs.items():
             Path(value).mkdir(parents=True, exist_ok=True)
-
 
     def run(self, subject_ids=None, coll_ids=None, single_stage=None, overwrite_header=False, quiet=False, log=True):
 
@@ -96,8 +96,7 @@ class NWPipeline:
                                  max_crop_time_to_eof=20, quiet=quiet, log=log)
                 except:
                     tb = traceback.format_exc()
-                    message(tb, level='error', display=(not quiet),
-                        log=log)
+                    message(tb, level='error', display=(not quiet), log=log)
 
         message("---- End ----------------------------------------------\n", level='info', display=(not quiet), log=log)
 
@@ -131,7 +130,8 @@ class NWCollection:
 
     devices = []
     nonwear_times = pd.DataFrame()
-    gait_times = pd.DataFrame()
+    bout_times = pd.DataFrame()
+    step_times = pd.DataFrame()
 
     def __init__(self, subject_id, coll_id, device_list, dirs):
 
@@ -140,7 +140,8 @@ class NWCollection:
         self.device_list = device_list
         self.dirs = dirs
 
-    def process(self, single_stage=None, overwrite_header=False, min_crop_duration=1, max_crop_time_to_eof=20, quiet=False, log=True):
+    def process(self, single_stage=None, overwrite_header=False, min_crop_duration=1, max_crop_time_to_eof=20,
+                quiet=False, log=True):
         """Processes the collection
 
         Args:
@@ -166,7 +167,8 @@ class NWCollection:
 
         # crop final nonwear
         if single_stage in [None, 'crop']:
-            self.crop(save=True, min_duration=min_crop_duration, max_time_to_eof=max_crop_time_to_eof, quiet=quiet, log=log)
+            self.crop(save=True, min_duration=min_crop_duration, max_time_to_eof=max_crop_time_to_eof, quiet=quiet,
+                      log=log)
 
         # save sensor edf files
         if single_stage in [None, 'save_sensors']:
@@ -241,7 +243,6 @@ class NWCollection:
             import_func()
             device_data.deidentify()
 
-
             # check header against device list info
             header_comp = {'subject_id': [(device_data.header['patientcode'] == subject_id),
                                           device_data.header['patientcode'],
@@ -297,65 +298,6 @@ class NWCollection:
 
             self.devices.append(device_data)
 
-        return True
-
-    def gait(self, save=False, quiet=False, log=True):
-        message("Reading gait data from files...", level='info', display=(not quiet), log=log)
-        message("", level='info', display=(not quiet), log=log)
-        l_file_index = self.device_list.loc[self.device_list['device_location'] == 'LA'].index.values
-        r_file_index = self.device_list.loc[self.device_list['device_location'] == 'RA'].index.values
-        
-        if not (l_file_index or r_file_index):
-            message(f"No ankle data",
-                        level='warning', display=(not quiet), log=log)
-            message("", level='info', display=(not quiet), log=log)
-            return False
-        
-        # set indices and handles case if ankle data is missing
-        l_file_index = l_file_index[0] if l_file_index else r_file_index[0]
-        r_file_index = r_file_index[0] if r_file_index else l_file_index[0]
-        
-        # find accelerometer indices
-        assert self.device_list.loc[l_file_index, 'device_type'] == self.device_list.loc[r_file_index, 'device_type']
-        device_type = self.device_list.loc[l_file_index, 'device_type']
-        accel_index = self.sensors_switch[device_type].index('ACCELEROMETER')
-        sig_indices = self.sensor_channels_switch[device_type][accel_index]
-        
-        # get ankle files and only take accelerometer signals
-        l_file = self.devices[l_file_index]
-        r_file = self.devices[r_file_index]
-        l_file.signals = [l_file.signals[i] for i in sig_indices]
-        r_file.signals = [r_file.signals[i] for i in sig_indices]
-        
-        # checks to see if files exist
-        if not (l_file and r_file):
-            message(f"No device data",
-                        level='warning', display=(not quiet), log=log)
-            message("", level='info', display=(not quiet), log=log)
-            return False
-        
-        # run gait algorithm to find bouts
-        wb = WalkingBouts(l_file, r_file, left_kwargs={'axis': 1}, right_kwargs={'axis': 1})
-        
-        # save bout times
-        self.bout_times = wb.export_bouts()
-        self.step_times = wb.export_steps()
-
-        if save:
-            # create all file path variables
-            bouts_csv_name = '.'.join(['_'.join([self.subject_id, self.coll_id ,"GAIT_BOUTS"]), "csv"])
-            steps_csv_name = '.'.join(['_'.join([self.subject_id, self.coll_id ,"GAIT_STEPS"]), "csv"])
-            bouts_csv_path = os.path.join(self.dirs['gait'], bouts_csv_name)
-            steps_csv_path = os.path.join(self.dirs['gait'], steps_csv_name)
-
-            message(f"Saving {bouts_csv_path}", level='info', display=(not quiet), log=log)
-            message(f"Saving {steps_csv_path}", level='info', display=(not quiet), log=log)
-
-            self.bout_times.to_csv(bouts_csv_path, index=False)
-            self.step_times.to_csv(steps_csv_path, index=False)
-
-        message("", level='info', display=(not quiet), log=log)
-        
         return True
         
     def nonwear(self, save=False, quiet=False, log=True):
@@ -517,8 +459,6 @@ class NWCollection:
             device_location = row['device_location']
             device_file_name = row['file_name']
 
-
-
             if self.devices[index] is None:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No device data",
                         level='warning', display=(not quiet), log=log)
@@ -641,8 +581,7 @@ class NWCollection:
         r_file_index = self.device_list.loc[self.device_list['device_location'] == 'RA'].index.values
 
         if not (l_file_index or r_file_index):
-            message(f"{self.subject_id}_{self.coll_id}: No ankle data",
-                    level='warning', display=(not quiet), log=log)
+            message(f"{self.subject_id}_{self.coll_id}: No ankle data", level='warning', display=(not quiet), log=log)
             message("", level='info', display=(not quiet), log=log)
             return False
 
@@ -666,8 +605,7 @@ class NWCollection:
 
         # checks to see if files exist
         if not (l_file and r_file):
-            message(f"{self.subject_id}_{self.coll_id}: No device data",
-                    level='warning', display=(not quiet), log=log)
+            message(f"{self.subject_id}_{self.coll_id}: No device data", level='warning', display=(not quiet), log=log)
             message("", level='info', display=(not quiet), log=log)
             return False
 
@@ -675,13 +613,28 @@ class NWCollection:
         wb = nwgait.WalkingBouts(l_file, r_file, left_kwargs={'axis': 1}, right_kwargs={'axis': 1})
 
         # save bout times
-        self.gait_times = wb.export_bouts()
+        self.bout_times = wb.export_bouts()
+        self.step_times = wb.export_steps()
 
-        #TODO: add info to log about steps and bouts detected
+        # TODO: add info to log about steps and bouts detected
 
-        #TODO: add option to save as file
+        if save:
+            # create all file path variables
+            bouts_csv_name = '.'.join(['_'.join([self.subject_id, self.coll_id, "GAIT_BOUTS"]), "csv"])
+            steps_csv_name = '.'.join(['_'.join([self.subject_id, self.coll_id, "GAIT_STEPS"]), "csv"])
+            bouts_csv_path = os.path.join(self.dirs['gait'], bouts_csv_name)
+            steps_csv_path = os.path.join(self.dirs['gait'], steps_csv_name)
+
+            message(f"Saving {bouts_csv_path}", level='info', display=(not quiet), log=log)
+            self.bout_times.to_csv(bouts_csv_path, index=False)
+
+            message(f"Saving {steps_csv_path}", level='info', display=(not quiet), log=log)
+            self.step_times.to_csv(steps_csv_path, index=False)
+
+        message("", level='info', display=(not quiet), log=log)
 
         return True
+
 
 def message(msg, level='info', display=True, log=True):
 
