@@ -10,6 +10,7 @@ import nwdata
 import nwnonwear
 from nwpipeline import __version__
 import nwgait
+from functools import wraps
 
 
 class NWPipeline:
@@ -139,6 +140,39 @@ class NWCollection:
         self.coll_id = coll_id
         self.device_list = device_list
         self.dirs = dirs
+        self.status_path = os.path.join(self.dirs['meta'], 'status.csv')
+        # the keys are the same as the function names
+        self.coll_status = {
+            'nwcollection_id': f'{self.subject_id}_{self.coll_id}',
+            'read': '',
+            'nonwear': '',
+            'read_nonwear': '',
+            'crop': '',
+            'save_sensors': '',
+            'gait': ''
+        }
+        self.status_df = pd.read_csv(self.status_path) if os.path.exists(self.status_path) else pd.DataFrame(columns=self.coll_status.keys())
+    
+    def coll_status(f):
+        @wraps(f)
+        def coll_status_wrapper(self, *args, **kwargs):
+            coll_id = f'{self.subject_id}_{self.coll_id}'
+            if coll_id in self.status_df['nwcollection_id']:
+                index = self.status_df.loc[self.status_df['nwcollection_id'] == coll_id].index[0]
+            else:
+                index = (self.status_df.index.max() + 1)
+
+            try:
+                res = f(self, *args, **kwargs)
+                self.coll_status[f.__name__] = 'Success'
+                return res
+            except Exception as e:
+                self.coll_status[f.__name__] = f'Failed: {str(e)}'
+                raise e
+            finally:
+                self.status_df.loc[index] = self.coll_status
+                self.status_df.to_csv(self.status_path, index=False)
+        return coll_status_wrapper
 
     def process(self, single_stage=None, overwrite_header=False, min_crop_duration=1, max_crop_time_to_eof=20,
                 quiet=False, log=True):
@@ -186,6 +220,7 @@ class NWCollection:
 
         return True
 
+    @coll_status
     def read(self, single_stage=None, overwrite_header=False, save=False, rename_file=False, quiet=False, log=True):
 
         # TODO: for single stage, only read needed devices?
@@ -299,7 +334,8 @@ class NWCollection:
             self.devices.append(device_data)
 
         return True
-        
+
+    @coll_status 
     def nonwear(self, save=False, quiet=False, log=True):
 
         # process nonwear for all devices
@@ -399,6 +435,7 @@ class NWCollection:
 
         return True
 
+    @coll_status
     def read_nonwear(self, quiet=False, log=True):
 
         # read nonwear data for all devices
@@ -443,6 +480,7 @@ class NWCollection:
 
         return True
 
+    @coll_status
     def crop(self, save=False, quiet=False, min_duration=1, max_time_to_eof=20, log=True):
 
         message("Cropping final nonwear...", level='info', display=(not quiet), log=log)
@@ -526,6 +564,7 @@ class NWCollection:
 
         return True
 
+    @coll_status
     def save_sensors(self, quiet=False, log=True):
 
         message("Separating sensors from devices...", level='info', display=(not quiet), log=log)
@@ -571,6 +610,7 @@ class NWCollection:
 
         return True
 
+    @coll_status
     def gait(self, save=False, quiet=False, log=True):
 
         message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
@@ -581,9 +621,7 @@ class NWCollection:
         r_file_index = self.device_list.loc[self.device_list['device_location'] == 'RA'].index.values
 
         if not (l_file_index or r_file_index):
-            message(f"{self.subject_id}_{self.coll_id}: No ankle data", level='warning', display=(not quiet), log=log)
-            message("", level='info', display=(not quiet), log=log)
-            return False
+            raise Exception(f'{self.subject_id}_{self.coll_id}: No left or right ankle file found')
 
         # set indices and handles case if ankle data is missing
         l_file_index = l_file_index[0] if l_file_index else r_file_index[0]
@@ -605,9 +643,7 @@ class NWCollection:
 
         # checks to see if files exist
         if not (l_file and r_file):
-            message(f"{self.subject_id}_{self.coll_id}: No device data", level='warning', display=(not quiet), log=log)
-            message("", level='info', display=(not quiet), log=log)
-            return False
+            raise Exception(f'{self.subject_id}_{self.coll_id}: Could not find nwgait object from index')
 
         # run gait algorithm to find bouts
         wb = nwgait.WalkingBouts(l_file, r_file, left_kwargs={'axis': 1}, right_kwargs={'axis': 1})
