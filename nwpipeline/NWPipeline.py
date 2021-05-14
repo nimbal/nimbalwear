@@ -615,12 +615,11 @@ class NWCollection:
         message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
-        # TODO: these device locations only work for ReMiNDD data
-        l_file_index = self.device_list.loc[self.device_list['device_location'] == 'LA'].index.values
-        r_file_index = self.device_list.loc[self.device_list['device_location'] == 'RA'].index.values
+        l_file_index = self.device_list.loc[self.device_list['device_location'].isin(self.device_locations['left_ankle'])].index.values
+        r_file_index = self.device_list.loc[self.device_list['device_location'].isin(self.device_locations['right_ankle'])].index.values
 
         if not (l_file_index or r_file_index):
-            raise Exception(f'{self.subject_id}_{self.coll_id}: No left or right ankle file found')
+            raise Exception(f'{self.subject_id}_{self.coll_id}: No left or right ankle device found in device list')
 
         # set indices and handles case if ankle data is missing
         l_file_index = l_file_index[0] if l_file_index else r_file_index[0]
@@ -635,14 +634,12 @@ class NWCollection:
         # get ankle files and only take accelerometer signals
         l_file = self.devices[l_file_index]
         r_file = self.devices[r_file_index]
-        l_file.signals = [l_file.signals[i] for i in sig_indices]
-        r_file.signals = [r_file.signals[i] for i in sig_indices]
-
-        # TODO: should do same above for signal_headers even if not used
+        l_file.signals, l_file.signal_headers = map(list, zip(*[(l_file.signals[i], l_file.signal_headers[i]) for i in sig_indices]))
+        r_file.signals, r_file.signal_headers = map(list, zip(*[(r_file.signals[i], l_file.signal_headers[i]) for i in sig_indices]))
 
         # checks to see if files exist
         if not (l_file and r_file):
-            raise Exception(f'{self.subject_id}_{self.coll_id}: Could not find nwgait object from index')
+            raise Exception(f'{self.subject_id}_{self.coll_id}: Either left or right ankle device data is missing')
 
         # run gait algorithm to find bouts
         wb = nwgait.WalkingBouts(l_file, r_file, left_kwargs={'axis': 1}, right_kwargs={'axis': 1})
@@ -651,8 +648,10 @@ class NWCollection:
         self.bout_times = wb.export_bouts()
         self.step_times = wb.export_steps()
 
-        # TODO: add info to log about steps and bouts detected
-
+        message(f"{self.subject_id}_{self.coll_id}: Found {self.bout_times.shape[0]} bouts",
+                    level='info', display=(not quiet), log=log)
+        message(f"{self.subject_id}_{self.coll_id}: Found {self.step_times.shape[0]} steps",
+                    level='info', display=(not quiet), log=log)
         if save:
             # create all file path variables
             bouts_csv_name = '.'.join(['_'.join([self.subject_id, self.coll_id, "GAIT_BOUTS"]), "csv"])
