@@ -156,12 +156,11 @@ class NWCollection:
     def coll_status(f):
         @wraps(f)
         def coll_status_wrapper(self, *args, **kwargs):
-            coll_id = f'{self.subject_id}_{self.coll_id}'
-            if coll_id in self.status_df['nwcollection_id']:
-                index = self.status_df.loc[self.status_df['nwcollection_id'] == coll_id].index[0]
+            if self.coll_status['nwcollection_id'] in self.status_df['nwcollection_id'].values:
+                index = self.status_df.loc[self.status_df['nwcollection_id'] == self.coll_status['nwcollection_id']].index[0]
             else:
                 index = (self.status_df.index.max() + 1)
-
+            
             try:
                 res = f(self, *args, **kwargs)
                 self.coll_status[f.__name__] = 'Success'
@@ -170,7 +169,7 @@ class NWCollection:
                 self.coll_status[f.__name__] = f'Failed: {str(e)}'
                 raise e
             finally:
-                self.status_df.loc[index] = self.coll_status
+                self.status_df.loc[index, list(self.coll_status.keys())] = list(self.coll_status.values())
                 self.status_df.to_csv(self.status_path, index=False)
         return coll_status_wrapper
 
