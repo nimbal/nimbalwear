@@ -576,7 +576,6 @@ class NWCollection:
         message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
-        # TODO: these device locations only work for ReMiNDD data
         l_file_index = self.device_list.loc[self.device_list['device_location'].isin(self.device_locations['left_ankle'])].index.values
         r_file_index = self.device_list.loc[self.device_list['device_location'].isin(self.device_locations['right_ankle'])].index.values
 
