@@ -580,7 +580,7 @@ class NWCollection:
         r_file_index = self.device_list.loc[self.device_list['device_location'].isin(self.device_locations['right_ankle'])].index.values
 
         if not (l_file_index or r_file_index):
-            message(f"{self.subject_id}_{self.coll_id}: No left or right ankle file found", level='warning', display=(not quiet), log=log)
+            message(f"{self.subject_id}_{self.coll_id}: No left or right ankle device found in device list", level='warning', display=(not quiet), log=log)
             message("", level='info', display=(not quiet), log=log)
             return False
 
