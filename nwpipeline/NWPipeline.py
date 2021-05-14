@@ -602,7 +602,7 @@ class NWCollection:
 
         # checks to see if files exist
         if not (l_file and r_file):
-            message(f"{self.subject_id}_{self.coll_id}: Could not find nwgait object from index", level='warning', display=(not quiet), log=log)
+            message(f"{self.subject_id}_{self.coll_id}: Either left or right ankle device data is missing", level='warning', display=(not quiet), log=log)
             message("", level='info', display=(not quiet), log=log)
             return False
 
