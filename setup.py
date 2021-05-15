@@ -29,5 +29,6 @@ setuptools.setup(
                       'pyedflib@git+https://github.com/holgern/pyedflib@v0.1.21#egg=pyedflib',
                       'nwdata@git+https://github.com/nimbal/nwdata@v0.2.0#egg=nwdata',
                       'nwnonwear@git+https://github.com/nimbal/nwnonwear@v0.1.0#egg=nwnonwear',
-                      'nwgait@git+https://github.com/nimbal/nwgait@v0.0.1#egg=nwgait'],
+                      'nwactivity@git+https://github.com/nimbal/nwactivity@v0.1.0#egg=nwactivity',
+                      'nwgait@git+https://github.com/nimbal/nwgait@v0.1.0#egg=nwgait'],
 )
