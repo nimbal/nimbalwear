@@ -10,6 +10,7 @@ import nwdata
 import nwnonwear
 from nwpipeline import __version__
 import nwgait
+import nwactivity
 
 
 class NWPipeline:
@@ -32,6 +33,7 @@ class NWPipeline:
             'nonwear': 'analyzed/nonwear',
             'standard_nonwear_times': 'analyzed/nonwear/standard_nonwear_times',
             'activity': 'analyzed/activity',
+            'daily_activity': 'analyzed/activity/daily_activity',
             'gait': 'analyzed/gait',
             'sleep': 'analyzed/sleep'}
 
@@ -126,6 +128,7 @@ class NWCollection:
                               'NONW': [[0, 1]]}
 
     device_locations = {'left_ankle': ['LA', 'LEFTANKLE', 'LANKLE'],
+                        'left_wrist': ['LW', 'LEFTWRIST', 'LWRIST'],
                         'right_ankle': ['RA', 'RIGHTANKLE', 'RANKLE']}
 
     devices = []
@@ -177,6 +180,8 @@ class NWCollection:
         # process posture
 
         # process activity levels
+        if single_stage in [None, 'activity']:
+            self.activity(save=True, quiet=quiet, log=log)
 
         # process gait
         if single_stage in [None, 'gait']:
@@ -199,6 +204,8 @@ class NWCollection:
                          'NONW': lambda: device_data.import_nonw(device_file_path, quiet=quiet)}
 
         self.devices = []
+
+        # TODO: select only devices need for single stage if not None
 
         # read in all data files for one subject
         for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
@@ -243,6 +250,8 @@ class NWCollection:
             import_func()
             device_data.deidentify()
 
+            mismatch = False
+
             # check header against device list info
             header_comp = {'subject_id': [(device_data.header['patientcode'] == subject_id),
                                           device_data.header['patientcode'],
@@ -269,8 +278,9 @@ class NWCollection:
                     message(f"{subject_id}_{coll_id}_{device_type}_{device_location}:  {key} mismatch: " +
                             f"{value[1]} (header) != {value[2]} (device list)",
                             level='warning', display=(not quiet), log=log)
+                    mismatch = True
 
-            if overwrite_header:
+            if mismatch and overwrite_header:
 
                 message("Overwriting header from device list", level='info', display=(not quiet), log=log)
 
@@ -568,6 +578,69 @@ class NWCollection:
                 self.devices[index].export_edf(file_path=sen_path, sig_nums_out=sen_channels)
 
             message("", level='info', display=(not quiet), log=log)
+
+        return True
+
+    def activity(self, save=False, quiet=False, log=True):
+
+        message("Calculating activity levels...", level='info', display=(not quiet), log=log)
+        message("", level='info', display=(not quiet), log=log)
+
+        epoch_length = 15
+
+        # TODO: Find non-dominant rather than left wrist (need to add participant info)
+        wrist_device_index = self.device_list.loc[
+            self.device_list['device_location'].isin(self.device_locations['left_wrist'])].index.values
+
+        if not wrist_device_index:
+            message(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list", level='warning',
+                    display=(not quiet), log=log)
+            message("", level='info', display=(not quiet), log=log)
+            return False
+
+        # TODO: add warning if multiple devices match - use first match
+
+        wrist_device_index = wrist_device_index[0]
+
+        accel_x_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer x')
+        accel_y_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer y')
+        accel_z_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer z')
+
+        message(f"Calculating {epoch_length}-second epoch intensities...", level='info', display=(not quiet), log=log)
+
+        # TODO: need to allow variable epoch_length and dominant?
+        avm, epoch_intensity = \
+            nwactivity.calc_wrist_powell(x=self.devices[wrist_device_index].signals[accel_x_sig],
+                                         y=self.devices[wrist_device_index].signals[accel_y_sig],
+                                         z=self.devices[wrist_device_index].signals[accel_z_sig],
+                                         sample_rate=self.devices[wrist_device_index].signal_headers[accel_x_sig]['sample_rate'],
+                                         epoch_length=epoch_length, dominant=False, quiet=quiet)
+
+        #total_activity = nwactivity.sum_total_activity(epoch_intensity=epoch_intensity, epoch_length=epoch_length, quiet=quiet)
+
+        message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log)
+        daily_activity = nwactivity.sum_daily_activity(epoch_intensity, epoch_length=epoch_length,
+                                            start_datetime=self.devices[wrist_device_index].header['startdate'], quiet=quiet)
+
+        if save:
+
+            # TODO: output epoch avm and intensity?
+            # TODO: output total activity?
+
+            # TODO: add identifier columns
+            # TODO: tweak output columns, remove some, add day_num
+
+            # create all file path variables
+            activity_csv_name = '.'.join(['_'.join([self.subject_id, self.coll_id, "DAILY_ACTIVITY"]), "csv"])
+            activity_csv_path = os.path.join(self.dirs['daily_activity'], activity_csv_name)
+
+            Path(os.path.dirname(activity_csv_path)).mkdir(parents=True, exist_ok=True)
+
+            message(f"Saving {activity_csv_path}", level='info', display=(not quiet), log=log)
+
+            daily_activity.to_csv(activity_csv_path, index=False)
+
+        message("", level='info', display=(not quiet), log=log)
 
         return True
 
