@@ -33,6 +33,7 @@ class NWPipeline:
             'nonwear': 'analyzed/nonwear',
             'standard_nonwear_times': 'analyzed/nonwear/standard_nonwear_times',
             'activity': 'analyzed/activity',
+            'epoch_activity': 'analyzed/activity/epoch_activity',
             'daily_activity': 'analyzed/activity/daily_activity',
             'gait': 'analyzed/gait',
             'sleep': 'analyzed/sleep'}
@@ -135,6 +136,8 @@ class NWCollection:
     nonwear_times = pd.DataFrame()
     bout_times = pd.DataFrame()
     step_times = pd.DataFrame()
+    daily_activity = pd.DataFrame()
+    epoch_activity = pd.DataFrame()
 
     def __init__(self, subject_id, coll_id, device_list, dirs):
 
@@ -380,6 +383,7 @@ class NWCollection:
             nonwear_times['start_time'] = start_times
             nonwear_times['end_time'] = end_times
 
+            # add study_code
             nonwear_times['subject_id'] = subject_id
             nonwear_times['coll_id'] = coll_id
             nonwear_times['device_type'] = device_type
@@ -586,13 +590,15 @@ class NWCollection:
         message("Calculating activity levels...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
+        self.epoch_activity = pd.DataFrame()
+
         epoch_length = 15
 
         # TODO: Find non-dominant rather than left wrist (need to add participant info)
         wrist_device_index = self.device_list.loc[
             self.device_list['device_location'].isin(self.device_locations['left_wrist'])].index.values
 
-        if not wrist_device_index:
+        if len(wrist_device_index) == 0:
             message(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list", level='warning',
                     display=(not quiet), log=log)
             message("", level='info', display=(not quiet), log=log)
@@ -606,39 +612,48 @@ class NWCollection:
         accel_y_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer y')
         accel_z_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer z')
 
-        message(f"Calculating {epoch_length}-second epoch intensities...", level='info', display=(not quiet), log=log)
+        message(f"Calculating {epoch_length}-second epoch activity...", level='info', display=(not quiet), log=log)
 
         # TODO: need to allow variable epoch_length and dominant?
-        avm, epoch_intensity = \
+        self.epoch_activity = \
             nwactivity.calc_wrist_powell(x=self.devices[wrist_device_index].signals[accel_x_sig],
                                          y=self.devices[wrist_device_index].signals[accel_y_sig],
                                          z=self.devices[wrist_device_index].signals[accel_z_sig],
                                          sample_rate=self.devices[wrist_device_index].signal_headers[accel_x_sig]['sample_rate'],
                                          epoch_length=epoch_length, dominant=False, quiet=quiet)
 
+        # TODO: add study_code
+        self.epoch_activity.insert(loc=0, column='subject_id', value=self.subject_id)
+        self.epoch_activity.insert(loc=1, column='coll_id', value=self.coll_id)
+
         #total_activity = nwactivity.sum_total_activity(epoch_intensity=epoch_intensity, epoch_length=epoch_length, quiet=quiet)
 
         message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log)
-        daily_activity = nwactivity.sum_daily_activity(epoch_intensity, epoch_length=epoch_length,
+        self.daily_activity = nwactivity.sum_daily_activity(epoch_intensity=self.epoch_activity['intensity'], epoch_length=epoch_length,
                                             start_datetime=self.devices[wrist_device_index].header['startdate'], quiet=quiet)
+        # TODO: add study_code
+        self.daily_activity.insert(loc=0, column='subject_id', value=self.subject_id)
+        self.daily_activity.insert(loc=1, column='coll_id', value=self.coll_id)
+
+        # TODO: more detailed log info about what was done, epochs, days, intensities?
 
         if save:
 
-            # TODO: output epoch avm and intensity?
-            # TODO: output total activity?
-
-            # TODO: add identifier columns
-            # TODO: tweak output columns, remove some, add day_num
-
             # create all file path variables
-            activity_csv_name = '.'.join(['_'.join([self.subject_id, self.coll_id, "DAILY_ACTIVITY"]), "csv"])
-            activity_csv_path = os.path.join(self.dirs['daily_activity'], activity_csv_name)
+            epoch_activity_csv_name = '.'.join(['_'.join([self.subject_id, self.coll_id, "EPOCH_ACTIVITY"]), "csv"])
+            daily_activity_csv_name = '.'.join(['_'.join([self.subject_id, self.coll_id, "DAILY_ACTIVITY"]), "csv"])
 
-            Path(os.path.dirname(activity_csv_path)).mkdir(parents=True, exist_ok=True)
+            epoch_activity_csv_path = os.path.join(self.dirs['epoch_activity'], epoch_activity_csv_name)
+            daily_activity_csv_path = os.path.join(self.dirs['daily_activity'], daily_activity_csv_name)
 
-            message(f"Saving {activity_csv_path}", level='info', display=(not quiet), log=log)
+            Path(os.path.dirname(epoch_activity_csv_path)).mkdir(parents=True, exist_ok=True)
+            Path(os.path.dirname(daily_activity_csv_path)).mkdir(parents=True, exist_ok=True)
 
-            daily_activity.to_csv(activity_csv_path, index=False)
+            message(f"Saving {epoch_activity_csv_path}", level='info', display=(not quiet), log=log)
+            self.epoch_activity.to_csv(epoch_activity_csv_path, index=False)
+
+            message(f"Saving {daily_activity_csv_path}", level='info', display=(not quiet), log=log)
+            self.daily_activity.to_csv(daily_activity_csv_path, index=False)
 
         message("", level='info', display=(not quiet), log=log)
 
