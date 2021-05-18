@@ -725,6 +725,7 @@ class NWCollection:
 
         return True
 
+    @coll_status
     def gait(self, save=False, quiet=False, log=True):
 
         message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
