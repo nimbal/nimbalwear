@@ -26,6 +26,13 @@ To include a specific release, replace `@latest` with the tag associated with th
 
 # Changes by version
 
+v0.3.0
+- add gait processing (nwgait v0.1.0)
+- add unexpected error handling with traceback output to log
+- add activity processing (nwactivity v0.1.0)
+- add study_code as an identifier for all generated data
+- add nonwear_bout_id to nonwear output (nwnonwear v0.1.1)
+
 v0.2.0
 - add nonwear processing (nwnonwear v0.1.0)
 - add option to process only a single stage of the pipeline

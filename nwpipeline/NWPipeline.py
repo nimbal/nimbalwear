@@ -3,6 +3,7 @@ import datetime as dt
 from pathlib import Path
 import logging
 import traceback
+from functools import wraps
 
 from tqdm import tqdm
 import pandas as pd
@@ -10,7 +11,7 @@ import nwdata
 import nwnonwear
 from nwpipeline import __version__
 import nwgait
-from functools import wraps
+import nwactivity
 
 
 class NWPipeline:
@@ -19,6 +20,9 @@ class NWPipeline:
 
         # initialize folder structure
         self.study_dir = os.path.abspath(study_dir)
+
+        # get study code
+        self.study_code = os.path.basename(self.study_dir)
 
         self.dirs = {
             'study': '',
@@ -33,19 +37,26 @@ class NWPipeline:
             'nonwear': 'analyzed/nonwear',
             'standard_nonwear_times': 'analyzed/nonwear/standard_nonwear_times',
             'activity': 'analyzed/activity',
+            'epoch_activity': 'analyzed/activity/epoch_activity',
+            'daily_activity': 'analyzed/activity/daily_activity',
             'gait': 'analyzed/gait',
             'sleep': 'analyzed/sleep'}
 
         self.dirs = {key: os.path.join(self.study_dir, value) for key, value in self.dirs.items()}
 
         # pipeline data files
-        self.device_list_path = os.path.join(self.dirs['meta'], 'device_list.csv')
+        self.device_info_path = os.path.join(self.dirs['meta'], 'devices.csv')
         self.log_file_path = os.path.join(self.dirs['logs'], "processing.log")
 
         # TODO: check for required files (raw data, device_list)
 
         # read device list
-        self.device_list = pd.read_csv(self.device_list_path, dtype=str).fillna('')
+        self.device_info = pd.read_csv(self.device_info_path, dtype=str).fillna('')
+
+        # TODO: Check devices.csv integrity
+        # - ensure study code same for all rows (required) and matches study_dir (warning)
+        # - unique combo of study, subject, coll, device type, device location (blanks allowed if still unique)
+        # - ensure no missing file names
 
         # initialize folder structure
         for key, value in self.dirs.items():
@@ -70,6 +81,7 @@ class NWPipeline:
             coll_ids = self.get_coll_ids()
 
         message(f"Version: {__version__}", level='info', display=(not quiet), log=log)
+        message(f"Study: {self.study_code}", level='info', display=(not quiet), log=log)
         message(f"Subjects: {subject_ids}", level='info', display=(not quiet), log=log)
         message(f"Collections: {coll_ids}", level='info', display=(not quiet), log=log)
         if single_stage is not None:
@@ -86,12 +98,13 @@ class NWPipeline:
                 
                 try:
                     # get devices for this collection from device_list
-                    coll_device_list_df = self.device_list.loc[(self.device_list['subject_id'] == subject_id) &
-                                                               (self.device_list['coll_id'] == coll_id)]
+                    coll_device_list_df = self.device_info.loc[(self.device_info['study_code'] == self.study_code) &
+                                                               (self.device_info['subject_id'] == subject_id) &
+                                                               (self.device_info['coll_id'] == coll_id)]
                     coll_device_list_df.reset_index(inplace=True, drop=True)
     
                     # construct collection class and process
-                    coll = NWCollection(subject_id=subject_id, coll_id=coll_id, device_list=coll_device_list_df,
+                    coll = NWCollection(study_code=self.study_code, subject_id=subject_id, coll_id=coll_id, device_info=coll_device_list_df,
                                         dirs=self.dirs)
                     coll.process(single_stage=single_stage, overwrite_header=overwrite_header, min_crop_duration=3,
                                  max_crop_time_to_eof=20, quiet=quiet, log=log)
@@ -103,14 +116,14 @@ class NWPipeline:
 
     def get_subject_ids(self):
 
-        subject_ids = self.device_list['subject_id'].unique()
+        subject_ids = self.device_info['subject_id'].unique()
         subject_ids.sort()
 
         return subject_ids
 
     def get_coll_ids(self):
 
-        coll_ids = self.device_list['coll_id'].unique()
+        coll_ids = self.device_info['coll_id'].unique()
         coll_ids.sort()
 
         return coll_ids
@@ -127,18 +140,22 @@ class NWCollection:
                               'NONW': [[0, 1]]}
 
     device_locations = {'left_ankle': ['LA', 'LEFTANKLE', 'LANKLE'],
+                        'left_wrist': ['LW', 'LEFTWRIST', 'LWRIST'],
                         'right_ankle': ['RA', 'RIGHTANKLE', 'RANKLE']}
 
     devices = []
     nonwear_times = pd.DataFrame()
     bout_times = pd.DataFrame()
     step_times = pd.DataFrame()
+    daily_activity = pd.DataFrame()
+    epoch_activity = pd.DataFrame()
 
-    def __init__(self, subject_id, coll_id, device_list, dirs):
+    def __init__(self, study_code, subject_id, coll_id, device_info, dirs):
 
+        self.study_code = study_code
         self.subject_id = subject_id
         self.coll_id = coll_id
-        self.device_list = device_list
+        self.device_info = device_info
         self.dirs = dirs
         self.status_path = os.path.join(self.dirs['meta'], 'status.csv')
         # the keys are the same as the function names
@@ -210,6 +227,8 @@ class NWCollection:
         # process posture
 
         # process activity levels
+        if single_stage in [None, 'activity']:
+            self.activity(save=True, quiet=quiet, log=log)
 
         # process gait
         if single_stage in [None, 'gait']:
@@ -234,10 +253,13 @@ class NWCollection:
 
         self.devices = []
 
+        # TODO: select only devices need for single stage if not None
+
         # read in all data files for one subject
-        for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
+        for index, row in tqdm(self.device_info.iterrows(), total=self.device_info.shape[0], leave=False,
                                desc='Reading all device data'):
 
+            study_code = row['study_code']
             subject_id = row['subject_id']
             coll_id = row['coll_id']
             device_type = row['device_type']
@@ -277,8 +299,13 @@ class NWCollection:
             import_func()
             device_data.deidentify()
 
+            mismatch = False
+
             # check header against device list info
-            header_comp = {'subject_id': [(device_data.header['patientcode'] == subject_id),
+            header_comp = {'study_code': [(device_data.header['admincode'] == study_code),
+                                          device_data.header['admincode'],
+                                          self.study_code],
+                           'subject_id': [(device_data.header['patientcode'] == subject_id),
                                           device_data.header['patientcode'],
                                           subject_id],
                            'coll_id': [(device_data.header['patient_additional'] == coll_id),
@@ -303,11 +330,13 @@ class NWCollection:
                     message(f"{subject_id}_{coll_id}_{device_type}_{device_location}:  {key} mismatch: " +
                             f"{value[1]} (header) != {value[2]} (device list)",
                             level='warning', display=(not quiet), log=log)
+                    mismatch = True
 
-            if overwrite_header:
+            if mismatch and overwrite_header:
 
                 message("Overwriting header from device list", level='info', display=(not quiet), log=log)
 
+                device_data.header['admincode'] = study_code
                 device_data.header['patientcode'] = subject_id
                 device_data.header['patient_additional'] = coll_id
                 device_data.header['equipment'] = '_'.join([device_type, device_id])
@@ -315,7 +344,7 @@ class NWCollection:
 
             if single_stage in [None, 'read'] and save:
 
-                # TODO: option to rename files
+                # TODO: option to rename files (or maybe not even an option, just do it)
 
                 # create all file path variables
                 standard_device_path = os.path.join(self.dirs['standard_device_edf'], device_type, device_edf_name)
@@ -344,10 +373,11 @@ class NWCollection:
         self.nonwear_times = pd.DataFrame()
 
         # detect nonwear for each device
-        for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
+        for index, row in tqdm(self.device_info.iterrows(), total=self.device_info.shape[0], leave=False,
                                desc='Detecting non-wear'):
 
             # get info from device list
+            study_code = row['study_code']
             subject_id = row['subject_id']
             coll_id = row['coll_id']
             device_type = row['device_type']
@@ -405,14 +435,16 @@ class NWCollection:
             nonwear_times['start_time'] = start_times
             nonwear_times['end_time'] = end_times
 
+            # add study_code
+            nonwear_times['study_code'] = study_code
             nonwear_times['subject_id'] = subject_id
             nonwear_times['coll_id'] = coll_id
             nonwear_times['device_type'] = device_type
             nonwear_times['device_location'] = device_location
 
             # reorder columns
-            nonwear_times = nonwear_times[['subject_id', 'coll_id', 'device_type', 'device_location',
-                                          'start_time', 'end_time']]
+            nonwear_times = nonwear_times[['study_code', 'subject_id', 'coll_id', 'device_type', 'device_location',
+                                          'nonwear_bout_id', 'start_time', 'end_time']]
 
             # append to collection attribute
             self.nonwear_times = self.nonwear_times.append(nonwear_times, ignore_index=True)
@@ -420,8 +452,8 @@ class NWCollection:
             if save:
 
                 # create all file path variables
-                device_file_base = os.path.splitext(device_file_name)[0]
-                nonwear_csv_name = '.'.join(['_'.join([device_file_base, "NONWEAR"]), "csv"])
+                nonwear_file_base = '_'.join([study_code, subject_id, coll_id, device_type, device_location, "NONWEAR"])
+                nonwear_csv_name = '.'.join([nonwear_file_base, "csv"])
                 nonwear_csv_path = os.path.join(self.dirs['standard_nonwear_times'], device_type, nonwear_csv_name)
 
                 Path(os.path.dirname(nonwear_csv_path)).mkdir(parents=True, exist_ok=True)
@@ -444,18 +476,18 @@ class NWCollection:
         self.nonwear_times = pd.DataFrame()
 
         # detect nonwear for each device
-        for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
+        for index, row in tqdm(self.device_info.iterrows(), total=self.device_info.shape[0], leave=False,
                                desc='Reading all non-wear data'):
 
             # get info from device list
+            study_code = row['study_code']
             subject_id = row['subject_id']
             coll_id = row['coll_id']
             device_type = row['device_type']
             device_location = row['device_location']
-            device_file_name = row['file_name']
 
-            device_file_base = os.path.splitext(device_file_name)[0]
-            nonwear_csv_name = '.'.join(['_'.join([device_file_base, "NONWEAR"]), "csv"])
+            nonwear_file_base = '_'.join([study_code, subject_id, coll_id, device_type, device_location, "NONWEAR"])
+            nonwear_csv_name = '.'.join([nonwear_file_base, "csv"])
             nonwear_csv_path = os.path.join(self.dirs['standard_nonwear_times'], device_type, nonwear_csv_name)
 
             if not os.path.isfile(nonwear_csv_path):
@@ -486,10 +518,11 @@ class NWCollection:
         message("", level='info', display=(not quiet), log=log)
 
         # crop final nonwear from all device data
-        for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
+        for index, row in tqdm(self.device_info.iterrows(), total=self.device_info.shape[0], leave=False,
                                desc='Cropping final nonwear'):
 
             # get info from device list
+            study_code = row['study_code']
             subject_id = row['subject_id']
             coll_id = row['coll_id']
             device_type = row['device_type']
@@ -506,7 +539,8 @@ class NWCollection:
             if not self.nonwear_times.empty:
 
                 # get last device nonwear period
-                last_nonwear = self.nonwear_times.loc[(self.nonwear_times['subject_id'] == subject_id) &
+                last_nonwear = self.nonwear_times.loc[(self.nonwear_times['study_code'] == study_code) &
+                                                      (self.nonwear_times['subject_id'] == subject_id) &
                                                       (self.nonwear_times['coll_id'] == coll_id) &
                                                       (self.nonwear_times['device_type'] == device_type) &
                                                       (self.nonwear_times['device_location'] == device_location)][-1:]
@@ -569,7 +603,7 @@ class NWCollection:
         message("Separating sensors from devices...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
-        for index, row in tqdm(self.device_list.iterrows(), total=self.device_list.shape[0], leave=False,
+        for index, row in tqdm(self.device_info.iterrows(), total=self.device_info.shape[0], leave=False,
                                desc='Saving sensor edfs'):
 
             if self.devices[index] is None:
@@ -609,14 +643,95 @@ class NWCollection:
 
         return True
 
+
     @coll_status
+    def activity(self, save=False, quiet=False, log=True):
+
+        message("Calculating activity levels...", level='info', display=(not quiet), log=log)
+        message("", level='info', display=(not quiet), log=log)
+
+        self.epoch_activity = pd.DataFrame()
+
+        epoch_length = 15
+
+        # TODO: Find non-dominant rather than left wrist (need to add participant info)
+        wrist_device_index = self.device_info.loc[
+            self.device_info['device_location'].isin(self.device_locations['left_wrist'])].index.values
+
+        if len(wrist_device_index) == 0:
+            message(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list", level='warning',
+                    display=(not quiet), log=log)
+            message("", level='info', display=(not quiet), log=log)
+            return False
+
+        # TODO: add warning if multiple devices match - use first match
+
+        wrist_device_index = wrist_device_index[0]
+
+        accel_x_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer x')
+        accel_y_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer y')
+        accel_z_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer z')
+
+        message(f"Calculating {epoch_length}-second epoch activity...", level='info', display=(not quiet), log=log)
+
+        # TODO: need to allow variable epoch_length and dominant?
+        self.epoch_activity = \
+            nwactivity.calc_wrist_powell(x=self.devices[wrist_device_index].signals[accel_x_sig],
+                                         y=self.devices[wrist_device_index].signals[accel_y_sig],
+                                         z=self.devices[wrist_device_index].signals[accel_z_sig],
+                                         sample_rate=self.devices[wrist_device_index].signal_headers[accel_x_sig]['sample_rate'],
+                                         epoch_length=epoch_length, dominant=False, quiet=quiet)
+
+        # TODO: add study_code
+        self.epoch_activity.insert(loc=0, column='study_code', value=self.study_code)
+        self.epoch_activity.insert(loc=1, column='subject_id', value=self.subject_id)
+        self.epoch_activity.insert(loc=2, column='coll_id', value=self.coll_id)
+
+        #total_activity = nwactivity.sum_total_activity(epoch_intensity=epoch_intensity, epoch_length=epoch_length, quiet=quiet)
+
+        message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log)
+        self.daily_activity = nwactivity.sum_daily_activity(epoch_intensity=self.epoch_activity['intensity'], epoch_length=epoch_length,
+                                            start_datetime=self.devices[wrist_device_index].header['startdate'], quiet=quiet)
+        # TODO: add study_code
+        self.daily_activity.insert(loc=0, column='study_code', value=self.study_code)
+        self.daily_activity.insert(loc=1, column='subject_id', value=self.subject_id)
+        self.daily_activity.insert(loc=2, column='coll_id', value=self.coll_id)
+
+        # TODO: more detailed log info about what was done, epochs, days, intensities?
+
+        if save:
+
+            # create all file path variables
+            epoch_activity_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
+                                                          self.coll_id, "EPOCH_ACTIVITY"]),
+                                                "csv"])
+            daily_activity_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
+                                                          self.coll_id, "DAILY_ACTIVITY"]),
+                                                "csv"])
+
+            epoch_activity_csv_path = os.path.join(self.dirs['epoch_activity'], epoch_activity_csv_name)
+            daily_activity_csv_path = os.path.join(self.dirs['daily_activity'], daily_activity_csv_name)
+
+            Path(os.path.dirname(epoch_activity_csv_path)).mkdir(parents=True, exist_ok=True)
+            Path(os.path.dirname(daily_activity_csv_path)).mkdir(parents=True, exist_ok=True)
+
+            message(f"Saving {epoch_activity_csv_path}", level='info', display=(not quiet), log=log)
+            self.epoch_activity.to_csv(epoch_activity_csv_path, index=False)
+
+            message(f"Saving {daily_activity_csv_path}", level='info', display=(not quiet), log=log)
+            self.daily_activity.to_csv(daily_activity_csv_path, index=False)
+
+        message("", level='info', display=(not quiet), log=log)
+
+        return True
+
     def gait(self, save=False, quiet=False, log=True):
 
         message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
-        l_file_index = self.device_list.loc[self.device_list['device_location'].isin(self.device_locations['left_ankle'])].index.values
-        r_file_index = self.device_list.loc[self.device_list['device_location'].isin(self.device_locations['right_ankle'])].index.values
+        l_file_index = self.device_info.loc[self.device_info['device_location'].isin(self.device_locations['left_ankle'])].index.values
+        r_file_index = self.device_info.loc[self.device_info['device_location'].isin(self.device_locations['right_ankle'])].index.values
 
         if not (l_file_index or r_file_index):
             raise Exception(f'{self.subject_id}_{self.coll_id}: No left or right ankle device found in device list')
@@ -626,8 +741,8 @@ class NWCollection:
         r_file_index = r_file_index[0] if r_file_index else l_file_index[0]
 
         # find accelerometer indices
-        assert self.device_list.loc[l_file_index, 'device_type'] == self.device_list.loc[r_file_index, 'device_type']
-        device_type = self.device_list.loc[l_file_index, 'device_type']
+        assert self.device_info.loc[l_file_index, 'device_type'] == self.device_info.loc[r_file_index, 'device_type']
+        device_type = self.device_info.loc[l_file_index, 'device_type']
         accel_index = self.sensors_switch[device_type].index('ACCELEROMETER')
         sig_indices = self.sensor_channels_switch[device_type][accel_index]
 
@@ -652,10 +767,15 @@ class NWCollection:
                     level='info', display=(not quiet), log=log)
         message(f"{self.subject_id}_{self.coll_id}: Found {self.step_times.shape[0]} steps",
                     level='info', display=(not quiet), log=log)
+
         if save:
             # create all file path variables
-            bouts_csv_name = '.'.join(['_'.join([self.subject_id, self.coll_id, "GAIT_BOUTS"]), "csv"])
-            steps_csv_name = '.'.join(['_'.join([self.subject_id, self.coll_id, "GAIT_STEPS"]), "csv"])
+            bouts_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
+                                                 self.coll_id, "GAIT_BOUTS"]),
+                                       "csv"])
+            steps_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
+                                                 self.coll_id, "GAIT_STEPS"]),
+                                       "csv"])
             bouts_csv_path = os.path.join(self.dirs['gait'], bouts_csv_name)
             steps_csv_path = os.path.join(self.dirs['gait'], steps_csv_name)
 
