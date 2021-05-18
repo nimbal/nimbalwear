@@ -163,9 +163,9 @@ class NWCollection:
             'nwcollection_id': f'{self.subject_id}_{self.coll_id}',
             'read': '',
             'nonwear': '',
-            'read_nonwear': '',
             'crop': '',
             'save_sensors': '',
+            'activity': '',
             'gait': ''
         }
         self.status_df = pd.read_csv(self.status_path) if os.path.exists(self.status_path) else pd.DataFrame(columns=self.coll_status.keys())
@@ -466,7 +466,6 @@ class NWCollection:
 
         return True
 
-    @coll_status
     def read_nonwear(self, quiet=False, log=True):
 
         # read nonwear data for all devices
@@ -642,7 +641,6 @@ class NWCollection:
             message("", level='info', display=(not quiet), log=log)
 
         return True
-
 
     @coll_status
     def activity(self, save=False, quiet=False, log=True):
