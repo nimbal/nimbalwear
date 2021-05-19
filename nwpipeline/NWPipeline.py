@@ -142,6 +142,7 @@ class NWCollection:
 
     device_locations = {'left_ankle': ['LA', 'LEFTANKLE', 'LANKLE'],
                         'left_wrist': ['LW', 'LEFTWRIST', 'LWRIST'],
+                        'right_wrist': ['RW', 'RIGHTWRIST', 'RWRIST'],
                         'right_ankle': ['RA', 'RIGHTANKLE', 'RANKLE']}
 
     devices = []
@@ -757,82 +758,80 @@ class NWCollection:
 
         return True
 
-    def sleep(self, save=False, quiet=False, log=True):
+    def sleep(self, save=False, quiet=False, log=True, non_dom_wrist='left_wrist'):
         message("Detecting sleep...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
-        self.sleep_times = pd.DataFrame()
+        index = self.device_info.loc[self.device_info['device_location'].isin(self.device_locations[non_dom_wrist])].index.values
+        if not index:
+            raise Exception(f"{self.subject_id}_{self.coll_id}: Non-dominant wrist index not found")
+        
+        index = index[0]
         # detecting sleep for each device
-        for index, row in tqdm(self.device_info.iterrows(), total=self.device_info.shape[0], leave=False,
-                               desc='Detecting sleep'):
-            # get info from device list
-            study_code = row['study_code']
-            subject_id = row['subject_id']
-            coll_id = row['coll_id']
-            device_type = row['device_type']
-            device_location = row['device_location']
-            device_file_name = row['file_name']
+        self.sleep_times = pd.DataFrame()
 
-            # check for data loaded
-            if self.devices[index] is None:
-                message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No device data",
-                        level='warning', display=(not quiet), log=log)
-                message("", level='info', display=(not quiet), log=log)
-                continue
+        # get info from device list
+        study_code = self.device_info.loc[index, 'study_code']
+        subject_id = self.device_info.loc[index, 'subject_id']
+        coll_id = self.device_info.loc[index, 'coll_id']
+        device_type = self.device_info.loc[index, 'device_type']
+        device_location = self.device_info.loc[index, 'device_location']
+        device_file_name = self.device_info.loc[index, 'file_name']
 
-            # TODO: search signal headers for signal labels
-            accel_x_sig = self.devices[index].get_signal_index('Accelerometer x')
-            accel_y_sig = self.devices[index].get_signal_index('Accelerometer y')
-            accel_z_sig = self.devices[index].get_signal_index('Accelerometer z')
-            start_time = pd.to_datetime(self.devices[index].header['startdate'])
-            accel_freq = self.devices[index].signal_headers[accel_x_sig]['sample_rate']
-            end_time = start_time + dt.timedelta(seconds=len(self.devices[index].signals[accel_x_sig]) / accel_freq)
-            accel_timestamps = np.asarray(pd.date_range(start_time, end_time, periods=len(self.devices[index].signals[accel_x_sig])))
+        # check for data loaded
+        if self.devices[index] is None:
+            raise Exception(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No device data")
 
-            sptwindow = nwsleep.sptwindow()
+        # TODO: search signal headers for signal labels
+        accel_x_sig = self.devices[index].get_signal_index('Accelerometer x')
+        accel_y_sig = self.devices[index].get_signal_index('Accelerometer y')
+        accel_z_sig = self.devices[index].get_signal_index('Accelerometer z')
+        start_time = pd.to_datetime(self.devices[index].header['startdate'])
+        accel_freq = self.devices[index].signal_headers[accel_x_sig]['sample_rate']
+        end_time = start_time + dt.timedelta(seconds=len(self.devices[index].signals[accel_x_sig]) / accel_freq)
+        accel_timestamps = np.asarray(pd.date_range(start_time, end_time, periods=len(self.devices[index].signals[accel_x_sig])))
 
-            sleepwake = sptwindow.get_sleep_array(
-                x_values=self.devices[index].signals[accel_x_sig],
-                y_values=self.devices[index].signals[accel_y_sig],
-                z_values=self.devices[index].signals[accel_z_sig],
-                accelerometer_timestamps=accel_timestamps, accelerometer_frequency=accel_freq)
+        sptwindow = nwsleep.sptwindow()
 
-            nonwear_file_base = '_'.join([study_code, subject_id, coll_id, device_type, device_location, "NONWEAR"])
-            nonwear_csv_name = '.'.join([nonwear_file_base, "csv"])
-            nonwear_csv_path = os.path.join(self.dirs['standard_nonwear_times'], device_type, nonwear_csv_name)
+        sleepwake = sptwindow.get_sleep_array(
+            x_values=self.devices[index].signals[accel_x_sig],
+            y_values=self.devices[index].signals[accel_y_sig],
+            z_values=self.devices[index].signals[accel_z_sig],
+            accelerometer_timestamps=accel_timestamps, accelerometer_frequency=accel_freq)
 
-            if not os.path.exists(nonwear_csv_path):
-                message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No non wear data for sleep",
-                        level='warning', display=(not quiet), log=log)
-                message("", level='info', display=(not quiet), log=log)
-                continue
-            
-            sleepwindow = sptwindow.sptwindow_HDCZA(subject=subject_id,
-                                                    x_values=sleepwake['x'],
-                                                    y_values=sleepwake['y'],
-                                                    z_values=sleepwake['z'],
-                                                    accelerometer_timestamps=accel_timestamps,
-                                                    accelerometer_frequency=accel_freq,
-                                                    accelerometer_reading=False,
-                                                    study=None,
-                                                    site=None,
-                                                    path_to_nonwear=nonwear_csv_path,
-                                                    path_to_sleepwindow=None
-                                                    )
-            self.sleep_times = self.sleep_times.append(sleepwindow, ignore_index=True)
-            if save:
-                # create all file path variables
-                device_file_base = os.path.splitext(device_file_name)[0]
-                sleep_csv_name = '.'.join(['_'.join([device_file_base, "SLEEP"]), "csv"])
-                sleep_csv_path = os.path.join(self.dirs['sleep'], device_type, sleep_csv_name)
+        nonwear_file_base = '_'.join([study_code, subject_id, coll_id, device_type, device_location, "NONWEAR"])
+        nonwear_csv_name = '.'.join([nonwear_file_base, "csv"])
+        nonwear_csv_path = os.path.join(self.dirs['standard_nonwear_times'], device_type, nonwear_csv_name)
 
-                Path(os.path.dirname(sleep_csv_path)).mkdir(parents=True, exist_ok=True)
+        if not os.path.exists(nonwear_csv_path):
+            raise Exception(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No non wear data for sleep")
+        
+        sleepwindow = sptwindow.sptwindow_HDCZA(subject=subject_id,
+                                                x_values=sleepwake['x'],
+                                                y_values=sleepwake['y'],
+                                                z_values=sleepwake['z'],
+                                                accelerometer_timestamps=accel_timestamps,
+                                                accelerometer_frequency=accel_freq,
+                                                accelerometer_reading=False,
+                                                study=None,
+                                                site=None,
+                                                path_to_nonwear=nonwear_csv_path,
+                                                path_to_sleepwindow=None
+                                                )
+        self.sleep_times = self.sleep_times.append(sleepwindow, ignore_index=True)
+        if save:
+            # create all file path variables
+            device_file_base = os.path.splitext(device_file_name)[0]
+            sleep_csv_name = '.'.join(['_'.join([device_file_base, "SLEEP"]), "csv"])
+            sleep_csv_path = os.path.join(self.dirs['sleep'], device_type, sleep_csv_name)
 
-                message(f"Saving {sleep_csv_path}", level='info', display=(not quiet), log=log)
+            Path(os.path.dirname(sleep_csv_path)).mkdir(parents=True, exist_ok=True)
 
-                sleepwindow.to_csv(sleep_csv_path, index=False)
+            message(f"Saving {sleep_csv_path}", level='info', display=(not quiet), log=log)
 
-            message("", level='info', display=(not quiet), log=log)
+            sleepwindow.to_csv(sleep_csv_path, index=False)
+
+        message("", level='info', display=(not quiet), log=log)
 
 def message(msg, level='info', display=True, log=True):
 
