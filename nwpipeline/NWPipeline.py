@@ -3,6 +3,7 @@ import datetime as dt
 from pathlib import Path
 import logging
 import traceback
+from functools import wraps
 
 from tqdm import tqdm
 import pandas as pd
@@ -91,6 +92,7 @@ class NWPipeline:
 
             for coll_id in tqdm(coll_ids, desc="Processing collections", leave=False):
 
+                message("", level='info', display=(not quiet), log=log)
                 message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not quiet),
                         log=log)
                 message("", level='info', display=(not quiet), log=log)
@@ -110,6 +112,8 @@ class NWPipeline:
                 except:
                     tb = traceback.format_exc()
                     message(tb, level='error', display=(not quiet), log=log)
+
+                del coll
 
         message("---- End ----------------------------------------------\n", level='info', display=(not quiet), log=log)
 
@@ -156,6 +160,39 @@ class NWCollection:
         self.coll_id = coll_id
         self.device_info = device_info
         self.dirs = dirs
+        self.status_path = os.path.join(self.dirs['meta'], 'status.csv')
+        # the keys are the same as the function names
+        self.coll_status = {
+            'nwcollection_id': f'{self.subject_id}_{self.coll_id}',
+            'read': '',
+            'nonwear': '',
+            'crop': '',
+            'save_sensors': '',
+            'activity': '',
+            'gait': ''
+        }
+        self.status_df = pd.read_csv(self.status_path) if os.path.exists(self.status_path) else pd.DataFrame(columns=self.coll_status.keys())
+    
+    def coll_status(f):
+        @wraps(f)
+        def coll_status_wrapper(self, *args, **kwargs):
+            if self.coll_status['nwcollection_id'] in self.status_df['nwcollection_id'].values:
+                index = self.status_df.loc[self.status_df['nwcollection_id'] == self.coll_status['nwcollection_id']].index[0]
+                self.coll_status = self.status_df.to_dict(orient='records')[index]
+            else:
+                index = (self.status_df.index.max() + 1)
+            
+            try:
+                res = f(self, *args, **kwargs)
+                self.coll_status[f.__name__] = 'Success'
+                return res
+            except Exception as e:
+                self.coll_status[f.__name__] = f'Failed'
+                message(str(e), level='error', display=(not kwargs['quiet']), log=kwargs['log'])
+            finally:
+                self.status_df.loc[index, list(self.coll_status.keys())] = list(self.coll_status.values())
+                self.status_df.to_csv(self.status_path, index=False)
+        return coll_status_wrapper
 
     def process(self, single_stage=None, overwrite_header=False, min_crop_duration=1, max_crop_time_to_eof=20,
                 quiet=False, log=True):
@@ -205,6 +242,7 @@ class NWCollection:
 
         return True
 
+    @coll_status
     def read(self, single_stage=None, overwrite_header=False, save=False, rename_file=False, quiet=False, log=True):
 
         # TODO: for single stage, only read needed devices?
@@ -328,7 +366,8 @@ class NWCollection:
             self.devices.append(device_data)
 
         return True
-        
+
+    @coll_status 
     def nonwear(self, save=False, quiet=False, log=True):
 
         # process nonwear for all devices
@@ -475,6 +514,7 @@ class NWCollection:
 
         return True
 
+    @coll_status
     def crop(self, save=False, quiet=False, min_duration=1, max_time_to_eof=20, log=True):
 
         message("Cropping final nonwear...", level='info', display=(not quiet), log=log)
@@ -560,6 +600,7 @@ class NWCollection:
 
         return True
 
+    @coll_status
     def save_sensors(self, quiet=False, log=True):
 
         message("Separating sensors from devices...", level='info', display=(not quiet), log=log)
@@ -605,6 +646,7 @@ class NWCollection:
 
         return True
 
+    @coll_status
     def activity(self, save=False, quiet=False, log=True):
 
         message("Calculating activity levels...", level='info', display=(not quiet), log=log)
@@ -619,10 +661,7 @@ class NWCollection:
             self.device_info['device_location'].isin(self.device_locations['left_wrist'])].index.values
 
         if len(wrist_device_index) == 0:
-            message(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list", level='warning',
-                    display=(not quiet), log=log)
-            message("", level='info', display=(not quiet), log=log)
-            return False
+            raise Exception(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list")
 
         # TODO: add warning if multiple devices match - use first match
 
@@ -685,6 +724,7 @@ class NWCollection:
 
         return True
 
+    @coll_status
     def gait(self, save=False, quiet=False, log=True):
 
         message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
@@ -694,9 +734,7 @@ class NWCollection:
         r_file_index = self.device_info.loc[self.device_info['device_location'].isin(self.device_locations['right_ankle'])].index.values
 
         if not (l_file_index or r_file_index):
-            message(f"{self.subject_id}_{self.coll_id}: No left or right ankle device found in device list", level='warning', display=(not quiet), log=log)
-            message("", level='info', display=(not quiet), log=log)
-            return False
+            raise Exception(f'{self.subject_id}_{self.coll_id}: No left or right ankle device found in device list')
 
         # set indices and handles case if ankle data is missing
         l_file_index = l_file_index[0] if l_file_index else r_file_index[0]
@@ -716,9 +754,7 @@ class NWCollection:
 
         # checks to see if files exist
         if not (l_file and r_file):
-            message(f"{self.subject_id}_{self.coll_id}: Either left or right ankle device data is missing", level='warning', display=(not quiet), log=log)
-            message("", level='info', display=(not quiet), log=log)
-            return False
+            raise Exception(f'{self.subject_id}_{self.coll_id}: Either left or right ankle device data is missing')
 
         # run gait algorithm to find bouts
         wb = nwgait.WalkingBouts(l_file, r_file, left_kwargs={'axis': 1}, right_kwargs={'axis': 1})
