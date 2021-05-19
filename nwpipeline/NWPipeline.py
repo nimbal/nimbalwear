@@ -92,6 +92,7 @@ class NWPipeline:
 
             for coll_id in tqdm(coll_ids, desc="Processing collections", leave=False):
 
+                message("", level='info', display=(not quiet), log=log)
                 message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not quiet),
                         log=log)
                 message("", level='info', display=(not quiet), log=log)
@@ -111,6 +112,8 @@ class NWPipeline:
                 except:
                     tb = traceback.format_exc()
                     message(tb, level='error', display=(not quiet), log=log)
+
+                del coll
 
         message("---- End ----------------------------------------------\n", level='info', display=(not quiet), log=log)
 
@@ -175,6 +178,7 @@ class NWCollection:
         def coll_status_wrapper(self, *args, **kwargs):
             if self.coll_status['nwcollection_id'] in self.status_df['nwcollection_id'].values:
                 index = self.status_df.loc[self.status_df['nwcollection_id'] == self.coll_status['nwcollection_id']].index[0]
+                self.coll_status = self.status_df.to_dict(orient='records')[index]
             else:
                 index = (self.status_df.index.max() + 1)
             
@@ -183,8 +187,8 @@ class NWCollection:
                 self.coll_status[f.__name__] = 'Success'
                 return res
             except Exception as e:
-                self.coll_status[f.__name__] = f'Failed: {str(e)}'
-                raise e
+                self.coll_status[f.__name__] = f'Failed'
+                message(str(e), level='error', display=(not kwargs['quiet']), log=kwargs['log'])
             finally:
                 self.status_df.loc[index, list(self.coll_status.keys())] = list(self.coll_status.values())
                 self.status_df.to_csv(self.status_path, index=False)
@@ -657,10 +661,7 @@ class NWCollection:
             self.device_info['device_location'].isin(self.device_locations['left_wrist'])].index.values
 
         if len(wrist_device_index) == 0:
-            message(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list", level='warning',
-                    display=(not quiet), log=log)
-            message("", level='info', display=(not quiet), log=log)
-            return False
+            raise Exception(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list")
 
         # TODO: add warning if multiple devices match - use first match
 
