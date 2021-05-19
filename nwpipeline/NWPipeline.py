@@ -836,12 +836,10 @@ class NWCollection:
             z_values=self.devices[index].signals[accel_z_sig],
             accelerometer_timestamps=accel_timestamps, accelerometer_frequency=accel_freq)
 
-        nonwear_file_base = '_'.join([study_code, subject_id, coll_id, device_type, device_location, "NONWEAR"])
-        nonwear_csv_name = '.'.join([nonwear_file_base, "csv"])
-        nonwear_csv_path = os.path.join(self.dirs['standard_nonwear_times'], device_type, nonwear_csv_name)
+        nonwear_times_subj = self.nonwear_times.loc[self.nonwear_times['subject_id'] == subject_id].copy()
 
-        if not os.path.exists(nonwear_csv_path):
-            raise Exception(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No non wear data for sleep")
+        if nonwear_times_subj.shape[0] == 0:
+            raise Exception(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No non wear data for subject")
         
         sleepwindow = sptwindow.sptwindow_HDCZA(subject=subject_id,
                                                 x_values=sleepwake['x'],
@@ -852,7 +850,7 @@ class NWCollection:
                                                 accelerometer_reading=False,
                                                 study=None,
                                                 site=None,
-                                                path_to_nonwear=nonwear_csv_path,
+                                                path_to_nonwear=nonwear_times_subj,
                                                 path_to_sleepwindow=None
                                                 )
         self.sleep_times = self.sleep_times.append(sleepwindow, ignore_index=True)
