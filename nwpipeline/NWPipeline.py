@@ -794,6 +794,7 @@ class NWCollection:
 
         return True
 
+    @coll_status
     def sleep(self, save=False, quiet=False, log=True, non_dom_wrist='left_wrist'):
         message("Detecting sleep...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
