@@ -26,6 +26,9 @@ To include a specific release, replace `@latest` with the tag associated with th
 
 # Changes by version
 
+v0.4.0
+- update `nwactivity` to require v0.1.1 (remove mvpa from daily summary)
+
 v0.3.0
 - add gait processing (nwgait v0.1.0)
 - add unexpected error handling with traceback output to log
