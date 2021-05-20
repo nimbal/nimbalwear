@@ -160,6 +160,11 @@ class NWCollection:
         self.coll_id = coll_id
         self.device_info = device_info
         self.dirs = dirs
+
+        # this will need to be read from participants.csv once incorporated
+        self.participant = {'dominant_hand': 'right'}
+
+
         self.status_path = os.path.join(self.dirs['meta'], 'status.csv')
         # the keys are the same as the function names
         self.coll_status = {
@@ -657,8 +662,11 @@ class NWCollection:
         epoch_length = 15
 
         # TODO: Find non-dominant rather than left wrist (need to add participant info)
+
+        device_location = 'left_wrist' if self.participant['dominant_hand'] == 'right' else 'right_wrist'
+
         wrist_device_index = self.device_info.loc[
-            self.device_info['device_location'].isin(self.device_locations['left_wrist'])].index.values
+            self.device_info['device_location'].isin(self.device_locations[device_location])].index.values
 
         if len(wrist_device_index) == 0:
             raise Exception(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list")
@@ -681,7 +689,6 @@ class NWCollection:
                                          sample_rate=self.devices[wrist_device_index].signal_headers[accel_x_sig]['sample_rate'],
                                          epoch_length=epoch_length, dominant=False, quiet=quiet)
 
-        # TODO: add study_code
         self.epoch_activity.insert(loc=0, column='study_code', value=self.study_code)
         self.epoch_activity.insert(loc=1, column='subject_id', value=self.subject_id)
         self.epoch_activity.insert(loc=2, column='coll_id', value=self.coll_id)
@@ -691,7 +698,7 @@ class NWCollection:
         message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log)
         self.daily_activity = nwactivity.sum_daily_activity(epoch_intensity=self.epoch_activity['intensity'], epoch_length=epoch_length,
                                             start_datetime=self.devices[wrist_device_index].header['startdate'], quiet=quiet)
-        # TODO: add study_code
+
         self.daily_activity.insert(loc=0, column='study_code', value=self.study_code)
         self.daily_activity.insert(loc=1, column='subject_id', value=self.subject_id)
         self.daily_activity.insert(loc=2, column='coll_id', value=self.coll_id)
