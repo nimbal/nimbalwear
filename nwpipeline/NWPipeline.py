@@ -40,6 +40,9 @@ class NWPipeline:
             'epoch_activity': 'analyzed/activity/epoch_activity',
             'daily_activity': 'analyzed/activity/daily_activity',
             'gait': 'analyzed/gait',
+            'gait_steps': 'analyzed/gait/steps',
+            'gait_bouts': 'analyzed/gait/bouts',
+            'daily_gait': 'analyzed/gait/daily_gait',
             'sleep': 'analyzed/sleep'}
 
         self.dirs = {key: os.path.join(self.study_dir, value) for key, value in self.dirs.items()}
@@ -731,9 +734,30 @@ class NWCollection:
 
         return True
 
+    @staticmethod
+    def daily_gait(bout_times):
+        bout_times['date'] = pd.to_datetime(bout_times['start_timestamp']).dt.date
+        daily_gait_dict = {
+            'start_time': [],
+            'end_time': [],
+            'longest_bout_length_secs': [],
+            'num_bouts_over_3mins': [],
+            'total_steps': []
+        }
+
+        for date, group_df in bout_times.groupby('date'):
+            daily_gait_dict['start_time'].append(group_df['start_timestamp'].min())
+            daily_gait_dict['end_time'].append(group_df['end_timestamp'].max())
+            daily_gait_dict['longest_bout_length_secs'].append(group_df['bout_length_sec'].max())
+            daily_gait_dict['total_steps'].append(group_df['number_steps'].sum())
+            daily_gait_dict['num_bouts_over_3mins'].append(group_df.loc[group_df['bout_length_sec'] > 180].shape[0])
+        
+        daily_gait_df = pd.DataFrame(daily_gait_dict)
+        daily_gait_df['day_num'] = daily_gait_df.index
+        return daily_gait_df
+
     @coll_status
     def gait(self, save=False, quiet=False, log=True):
-
         message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
@@ -768,7 +792,11 @@ class NWCollection:
 
         # save bout times
         self.bout_times = wb.export_bouts()
+        self.bout_times = self.identify_df(self.bout_times)
         self.step_times = wb.export_steps()
+        self.step_times = self.identify_df(self.step_times)
+        self.daily_gait = NWCollection.daily_gait(self.bout_times)
+        self.daily_gait = self.identify_df(self.daily_gait)
 
         message(f"{self.subject_id}_{self.coll_id}: Found {self.bout_times.shape[0]} bouts",
                     level='info', display=(not quiet), log=log)
@@ -783,8 +811,12 @@ class NWCollection:
             steps_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
                                                  self.coll_id, "GAIT_STEPS"]),
                                        "csv"])
-            bouts_csv_path = os.path.join(self.dirs['gait'], bouts_csv_name)
-            steps_csv_path = os.path.join(self.dirs['gait'], steps_csv_name)
+            daily_gait_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
+                                                 self.coll_id, "DAILY_GAIT"]),
+                                       "csv"])
+            bouts_csv_path = os.path.join(self.dirs['gait_steps'], bouts_csv_name)
+            steps_csv_path = os.path.join(self.dirs['gait_bouts'], steps_csv_name)
+            daily_gait_csv_path = os.path.join(self.dirs['daily_gait'], daily_gait_csv_name)
 
             message(f"Saving {bouts_csv_path}", level='info', display=(not quiet), log=log)
             self.bout_times.to_csv(bouts_csv_path, index=False)
@@ -792,10 +824,18 @@ class NWCollection:
             message(f"Saving {steps_csv_path}", level='info', display=(not quiet), log=log)
             self.step_times.to_csv(steps_csv_path, index=False)
 
+            message(f"Saving {daily_gait_csv_path}", level='info', display=(not quiet), log=log)
+            self.daily_gait.to_csv(daily_gait_csv_path, index=False)
+
         message("", level='info', display=(not quiet), log=log)
 
         return True
 
+    def identify_df(self, df):
+        df.insert(loc=0, column='study_code', value=self.study_code)
+        df.insert(loc=1, column='subject_id', value=self.subject_id)
+        df.insert(loc=2, column='coll_id', value=self.coll_id)
+        return df
 
 def message(msg, level='info', display=True, log=True):
 
@@ -811,3 +851,4 @@ def message(msg, level='info', display=True, log=True):
     if log:
         func = level_switch.get(level, lambda: 'Invalid')
         func()
+
