@@ -216,7 +216,7 @@ class NWCollection:
         # synchronize devices
 
         # process nonwear for all devices
-        if single_stage in [None, 'nonwear', 'sleep']:
+        if single_stage in [None, 'nonwear']:
             self.nonwear(save=True, quiet=quiet, log=log)
 
         if single_stage == 'crop':
