@@ -757,6 +757,11 @@ class NWCollection:
         # get ankle files and only take accelerometer signals
         l_file = self.devices[l_file_index]
         r_file = self.devices[r_file_index]
+
+        # checks to see if files exist
+        if not (l_file and r_file):
+            raise Exception(f'{self.subject_id}_{self.coll_id}: Either left or right ankle device data is missing')
+
         l_file.signals, l_file.signal_headers = map(list, zip(*[(l_file.signals[i], l_file.signal_headers[i]) for i in sig_indices]))
         r_file.signals, r_file.signal_headers = map(list, zip(*[(r_file.signals[i], l_file.signal_headers[i]) for i in sig_indices]))
 
