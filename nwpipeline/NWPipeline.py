@@ -869,10 +869,11 @@ class NWCollection:
                                                 )
         self.sleep_times = self.sleep_times.append(sleepwindow, ignore_index=True)
         if save:
+
             # create all file path variables
-            device_file_base = os.path.splitext(device_file_name)[0]
-            sleep_csv_name = '.'.join(['_'.join([device_file_base, "SLEEP"]), "csv"])
-            sleep_csv_path = os.path.join(self.dirs['sleep'], device_type, sleep_csv_name)
+
+            sleep_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id, self.coll_id, "SLEEP"]), "csv"])
+            sleep_csv_path = os.path.join(self.dirs['sleep'], sleep_csv_name)
 
             Path(os.path.dirname(sleep_csv_path)).mkdir(parents=True, exist_ok=True)
 
