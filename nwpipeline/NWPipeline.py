@@ -167,7 +167,6 @@ class NWCollection:
         # this will need to be read from participants.csv once incorporated
         self.participant = {'dominant_hand': 'right'}
 
-
         self.status_path = os.path.join(self.dirs['meta'], 'status.csv')
         # the keys are the same as the function names
         self.coll_status = {
@@ -177,7 +176,8 @@ class NWCollection:
             'crop': '',
             'save_sensors': '',
             'activity': '',
-            'gait': ''
+            'gait': '',
+            'sleep': '',
         }
         self.status_df = pd.read_csv(self.status_path) if os.path.exists(self.status_path) else pd.DataFrame(columns=self.coll_status.keys())
     
@@ -221,10 +221,10 @@ class NWCollection:
         # synchronize devices
 
         # process nonwear for all devices
-        if single_stage in [None, 'nonwear', 'sleep']:
+        if single_stage in [None, 'nonwear']:
             self.nonwear(save=True, quiet=quiet, log=log)
 
-        if single_stage == 'crop':
+        if single_stage in ['crop', 'sleep']:
             self.read_nonwear(quiet=quiet, log=log)
 
         # crop final nonwear
@@ -802,45 +802,52 @@ class NWCollection:
         return True
 
     @coll_status
-    def sleep(self, save=False, quiet=False, log=True, non_dom_wrist='left_wrist'):
+    def sleep(self, save=False, quiet=False, log=True):
         message("Detecting sleep...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
-        index = self.device_info.loc[self.device_info['device_location'].isin(self.device_locations[non_dom_wrist])].index.values
-        if not index:
-            raise Exception(f"{self.subject_id}_{self.coll_id}: Non-dominant wrist index not found")
-        
-        index = index[0]
+        device_location = 'left_wrist' if self.participant['dominant_hand'] == 'right' else 'right_wrist'
+
+        wrist_device_index = self.device_info.loc[
+            self.device_info['device_location'].isin(self.device_locations[device_location])].index.values
+
+        if len(wrist_device_index) == 0:
+            raise Exception(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list")
+
+        # TODO: add warning if multiple devices match - use first match
+
+        wrist_device_index = wrist_device_index[0]
+
         # detecting sleep for each device
         self.sleep_times = pd.DataFrame()
 
         # get info from device list
-        study_code = self.device_info.loc[index, 'study_code']
-        subject_id = self.device_info.loc[index, 'subject_id']
-        coll_id = self.device_info.loc[index, 'coll_id']
-        device_type = self.device_info.loc[index, 'device_type']
-        device_location = self.device_info.loc[index, 'device_location']
-        device_file_name = self.device_info.loc[index, 'file_name']
+        study_code = self.device_info.loc[wrist_device_index, 'study_code']
+        subject_id = self.device_info.loc[wrist_device_index, 'subject_id']
+        coll_id = self.device_info.loc[wrist_device_index, 'coll_id']
+        device_type = self.device_info.loc[wrist_device_index, 'device_type']
+        device_location = self.device_info.loc[wrist_device_index, 'device_location']
+        device_file_name = self.device_info.loc[wrist_device_index, 'file_name']
 
         # check for data loaded
-        if self.devices[index] is None:
+        if self.devices[wrist_device_index] is None:
             raise Exception(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No device data")
 
         # TODO: search signal headers for signal labels
-        accel_x_sig = self.devices[index].get_signal_index('Accelerometer x')
-        accel_y_sig = self.devices[index].get_signal_index('Accelerometer y')
-        accel_z_sig = self.devices[index].get_signal_index('Accelerometer z')
-        start_time = pd.to_datetime(self.devices[index].header['startdate'])
-        accel_freq = self.devices[index].signal_headers[accel_x_sig]['sample_rate']
-        end_time = start_time + dt.timedelta(seconds=len(self.devices[index].signals[accel_x_sig]) / accel_freq)
-        accel_timestamps = np.asarray(pd.date_range(start_time, end_time, periods=len(self.devices[index].signals[accel_x_sig])))
+        accel_x_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer x')
+        accel_y_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer y')
+        accel_z_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer z')
+        start_time = pd.to_datetime(self.devices[wrist_device_index].header['startdate'])
+        accel_freq = self.devices[wrist_device_index].signal_headers[accel_x_sig]['sample_rate']
+        end_time = start_time + dt.timedelta(seconds=len(self.devices[wrist_device_index].signals[accel_x_sig]) / accel_freq)
+        accel_timestamps = np.asarray(pd.date_range(start_time, end_time, periods=len(self.devices[wrist_device_index].signals[accel_x_sig])))
 
         sptwindow = nwsleep.sptwindow()
 
         sleepwake = sptwindow.get_sleep_array(
-            x_values=self.devices[index].signals[accel_x_sig],
-            y_values=self.devices[index].signals[accel_y_sig],
-            z_values=self.devices[index].signals[accel_z_sig],
+            x_values=self.devices[wrist_device_index].signals[accel_x_sig],
+            y_values=self.devices[wrist_device_index].signals[accel_y_sig],
+            z_values=self.devices[wrist_device_index].signals[accel_z_sig],
             accelerometer_timestamps=accel_timestamps, accelerometer_frequency=accel_freq)
 
         nonwear_times_subj = self.nonwear_times.loc[self.nonwear_times['subject_id'] == subject_id].copy()

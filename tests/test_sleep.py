@@ -1,6 +1,6 @@
 import nwpipeline as nwpl
 
-study_dir = '/Volumes/KIT_DATA/test_ReMiNDD'
+study_dir = '/Volumes/KIT_DATA/test_sleep'
 
 test_nwpl = nwpl.NWPipeline(study_dir)
 
@@ -13,4 +13,4 @@ test_nwpl = nwpl.NWPipeline(study_dir)
 # print(subject_ids)
 # print(coll_ids)
 
-test_nwpl.run(single_stage='gait', subject_ids=['1027'], overwrite_header=True, quiet=True, log=True)
+test_nwpl.run(single_stage='sleep', overwrite_header=True, quiet=True, log=True)
