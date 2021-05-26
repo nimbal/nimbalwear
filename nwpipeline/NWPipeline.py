@@ -161,7 +161,7 @@ class NWCollection:
         self.device_info = device_info
         self.dirs = dirs
 
-        # TODO: this will need to be read from participants.csv once incorporated
+        # TODO: this will need to be read from participants.csv once incorporated - also change to participant_info
         self.participant = {'dominant_hand': 'right'}
 
 
@@ -210,11 +210,14 @@ class NWCollection:
         """Processes the collection
 
         Args:
-            single_stage (str): None, 'read', 'nonwear', 'crop', 'save_sensors'
+            single_stage (str): None, 'read', 'nonwear', 'crop', 'save_sensors', 'activity', 'gait', 'sleep, 'posture'
             ...
         Returns:
             True if successful, False otherwise.
         """
+
+        if single_stage in ['activity', 'gait', 'sleep']:
+            self.required_devices(single_stage=single_stage, quiet=quiet, log=log)
 
         # read data from all devices in collection
         self.read(single_stage=single_stage, overwrite_header=overwrite_header, save=True, quiet=quiet, log=log)
@@ -253,10 +256,42 @@ class NWCollection:
 
         return True
 
-    @coll_status
-    def read(self, single_stage=None, overwrite_header=False, save=False, rename_file=False, quiet=False, log=True):
+    def required_devices(self, single_stage, quiet=False, log=True):
+        ''' Select only required devices for single stage processing.
 
-        # TODO: for single stage, only read needed devices?
+        :param single_stage:
+        :param quiet:
+        :param log:
+        :return:
+
+        '''
+
+        req_dev_switch = {'activity': [['GNAC'],
+                                       ['left_wrist' if self.participant['dominant_hand'] == 'right'
+                                        else 'right_wrist']],
+                          'gait': [['GNAC'],
+                                   ['left_ankle', 'right_ankle']],
+                          'sleep': [['GNAC'],
+                                       ['left_wrist' if self.participant['dominant_hand'] == 'right'
+                                        else 'right_wrist']]}
+
+
+        device_types = req_dev_switch[single_stage][0]
+
+        device_locations = []
+        for dev_loc in req_dev_switch[single_stage][1]:
+            device_locations.extend(self.device_locations[dev_loc])
+
+        self.device_info = self.device_info[(self.device_info['device_type'].isin(device_types)) &
+                                            (self.device_info['device_location'].isin(device_locations))]
+
+        self.device_info.reset_index(inplace=True, drop=True)
+
+        return True
+
+
+    @coll_status
+    def read(self, single_stage=None, overwrite_header=False, save=False, quiet=False, log=True):
 
         message("Reading device data from files...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
@@ -775,10 +810,6 @@ class NWCollection:
         l_file.signals, l_file.signal_headers = map(list, zip(*[(l_file.signals[i], l_file.signal_headers[i]) for i in sig_indices]))
         r_file.signals, r_file.signal_headers = map(list, zip(*[(r_file.signals[i], l_file.signal_headers[i]) for i in sig_indices]))
 
-        # checks to see if files exist
-        if not (l_file and r_file):
-            raise Exception(f'{self.subject_id}_{self.coll_id}: Either left or right ankle device data is missing')
-
         # run gait algorithm to find bouts
         wb = nwgait.WalkingBouts(l_file, r_file, left_kwargs={'axis': 1}, right_kwargs={'axis': 1})
 
@@ -822,7 +853,7 @@ def message(msg, level='info', display=True, log=True):
                     'critical': lambda: logging.critical(msg)}
 
     if display:
-        print(msg + "\n")
+        print(msg)
 
     if log:
         func = level_switch.get(level, lambda: 'Invalid')
