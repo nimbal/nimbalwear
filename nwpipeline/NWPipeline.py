@@ -676,6 +676,10 @@ class NWCollection:
 
         wrist_device_index = wrist_device_index[0]
 
+        # checks to see if files exist
+        if not self.devices[wrist_device_index]:
+            raise Exception(f'{self.subject_id}_{self.coll_id}: Wrist device data is missing')
+
         accel_x_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer x')
         accel_y_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer y')
         accel_z_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer z')
