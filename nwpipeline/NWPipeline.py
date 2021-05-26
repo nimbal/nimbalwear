@@ -734,28 +734,6 @@ class NWCollection:
 
         return True
 
-    @staticmethod
-    def daily_gait(bout_times):
-        bout_times['date'] = pd.to_datetime(bout_times['start_timestamp']).dt.date
-        daily_gait_dict = {
-            'start_time': [],
-            'end_time': [],
-            'longest_bout_length_secs': [],
-            'num_bouts_over_3mins': [],
-            'total_steps': []
-        }
-
-        for date, group_df in bout_times.groupby('date'):
-            daily_gait_dict['start_time'].append(group_df['start_timestamp'].min())
-            daily_gait_dict['end_time'].append(group_df['end_timestamp'].max())
-            daily_gait_dict['longest_bout_length_secs'].append(group_df['bout_length_sec'].max())
-            daily_gait_dict['total_steps'].append(group_df['number_steps'].sum())
-            daily_gait_dict['num_bouts_over_3mins'].append(group_df.loc[group_df['bout_length_sec'] > 180].shape[0])
-        
-        daily_gait_df = pd.DataFrame(daily_gait_dict)
-        daily_gait_df['day_num'] = daily_gait_df.index
-        return daily_gait_df
-
     @coll_status
     def gait(self, save=False, quiet=False, log=True):
         message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
@@ -795,8 +773,20 @@ class NWCollection:
         self.bout_times = self.identify_df(self.bout_times)
         self.step_times = wb.export_steps()
         self.step_times = self.identify_df(self.step_times)
-        self.daily_gait = NWCollection.daily_gait(self.bout_times)
+        self.daily_gait = nwgait.WalkingBouts.daily_gait(self.bout_times)
         self.daily_gait = self.identify_df(self.daily_gait)
+
+        # adjusting gait parameters
+        self.bout_times['gait_bout_num'] += 1
+        self.step_times['gait_bout_num'] += 1
+
+        bout_cols = ['study_code','subject_id','coll_id','gait_bout_num','start_timestamp','end_timestamp']
+        self.bout_times = self.bout_times[bout_cols]
+        step_cols = ['study_code','subject_id','coll_id','step_num',
+            'gait_bout_num','foot','avg_speed','heel_strike_accel',
+            'heel_strike_time','mid_swing_accel','mid_swing_time','step_length',
+            'step_state','step_time','swing_start_accel','swing_start_time' ]
+        self.step_times = self.step_times[step_cols]
 
         message(f"{self.subject_id}_{self.coll_id}: Found {self.bout_times.shape[0]} bouts",
                     level='info', display=(not quiet), log=log)
@@ -814,8 +804,8 @@ class NWCollection:
             daily_gait_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
                                                  self.coll_id, "DAILY_GAIT"]),
                                        "csv"])
-            bouts_csv_path = os.path.join(self.dirs['gait_steps'], bouts_csv_name)
-            steps_csv_path = os.path.join(self.dirs['gait_bouts'], steps_csv_name)
+            bouts_csv_path = os.path.join(self.dirs['gait_bouts'], bouts_csv_name)
+            steps_csv_path = os.path.join(self.dirs['gait_steps'], steps_csv_name)
             daily_gait_csv_path = os.path.join(self.dirs['daily_gait'], daily_gait_csv_name)
 
             message(f"Saving {bouts_csv_path}", level='info', display=(not quiet), log=log)
