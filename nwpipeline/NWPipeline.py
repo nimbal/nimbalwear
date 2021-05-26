@@ -166,37 +166,43 @@ class NWCollection:
 
 
         self.status_path = os.path.join(self.dirs['meta'], 'status.csv')
-        # the keys are the same as the function names
-        self.coll_status = {
-            'nwcollection_id': f'{self.subject_id}_{self.coll_id}',
-            'read': '',
-            'nonwear': '',
-            'crop': '',
-            'save_sensors': '',
-            'activity': '',
-            'gait': ''
-        }
-        self.status_df = pd.read_csv(self.status_path) if os.path.exists(self.status_path) else pd.DataFrame(columns=self.coll_status.keys())
+
     
     def coll_status(f):
         @wraps(f)
         def coll_status_wrapper(self, *args, **kwargs):
-            if self.coll_status['nwcollection_id'] in self.status_df['nwcollection_id'].values:
-                index = self.status_df.loc[self.status_df['nwcollection_id'] == self.coll_status['nwcollection_id']].index[0]
-                self.coll_status = self.status_df.to_dict(orient='records')[index]
+
+            # the keys are the same as the function names
+            coll_status = {
+                'nwcollection_id': f'{self.subject_id}_{self.coll_id}',
+                'read': '',
+                'nonwear': '',
+                'crop': '',
+                'save_sensors': '',
+                'activity': '',
+                'gait': ''
+            }
+
+            status_df = pd.read_csv(self.status_path) if os.path.exists(self.status_path) \
+                else pd.DataFrame(columns=coll_status.keys())
+
+            if coll_status['nwcollection_id'] in status_df['nwcollection_id'].values:
+                index = status_df.loc[status_df['nwcollection_id'] == coll_status['nwcollection_id']].index[0]
+                coll_status = status_df.to_dict(orient='records')[index]
             else:
-                index = (self.status_df.index.max() + 1)
+                index = (status_df.index.max() + 1)
+
             
             try:
                 res = f(self, *args, **kwargs)
-                self.coll_status[f.__name__] = 'Success'
+                coll_status[f.__name__] = 'Success'
                 return res
             except Exception as e:
-                self.coll_status[f.__name__] = f'Failed'
+                coll_status[f.__name__] = f'Failed'
                 message(str(e), level='error', display=(not kwargs['quiet']), log=kwargs['log'])
             finally:
-                self.status_df.loc[index, list(self.coll_status.keys())] = list(self.coll_status.values())
-                self.status_df.to_csv(self.status_path, index=False)
+                status_df.loc[index, list(coll_status.keys())] = list(coll_status.values())
+                status_df.to_csv(self.status_path, index=False)
         return coll_status_wrapper
 
     def process(self, single_stage=None, overwrite_header=False, min_crop_duration=1, max_crop_time_to_eof=20,
