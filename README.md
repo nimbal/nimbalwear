@@ -28,6 +28,9 @@ To include a specific release, replace `@latest` with the tag associated with th
 
 v0.4.0
 - update `nwactivity` to require v0.1.1 (remove mvpa from daily summary)
+- add pipeline status tracking
+- renames EDF files to standard names based on information from devices.csv
+- loads data only required devices for single stage
 
 v0.3.0
 - add gait processing (nwgait v0.1.0)
