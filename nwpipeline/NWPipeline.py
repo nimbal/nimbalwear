@@ -777,10 +777,8 @@ class NWCollection:
         self.daily_gait = self.identify_df(self.daily_gait)
 
         # adjusting gait parameters
-        self.bout_times['gait_bout_num'] += 1
-        self.step_times['gait_bout_num'] += 1
-
-        bout_cols = ['study_code','subject_id','coll_id','gait_bout_num','start_timestamp','end_timestamp']
+        bout_cols = ['study_code','subject_id','coll_id','gait_bout_num',
+            'start_timestamp','end_timestamp', 'number_steps']
         self.bout_times = self.bout_times[bout_cols]
         step_cols = ['study_code','subject_id','coll_id','step_num',
             'gait_bout_num','foot','avg_speed','heel_strike_accel',
