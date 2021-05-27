@@ -13,4 +13,4 @@ test_nwpl = nwpl.NWPipeline(study_dir)
 # print(subject_ids)
 # print(coll_ids)
 
-test_nwpl.run(single_stage='activity', subject_ids=['1027'], overwrite_header=True, quiet=True, log=True)
+test_nwpl.run(single_stage='gait', subject_ids=['1027'], overwrite_header=True, quiet=True, log=True)

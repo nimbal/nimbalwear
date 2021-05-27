@@ -40,6 +40,9 @@ class NWPipeline:
             'epoch_activity': 'analyzed/activity/epoch_activity',
             'daily_activity': 'analyzed/activity/daily_activity',
             'gait': 'analyzed/gait',
+            'gait_steps': 'analyzed/gait/steps',
+            'gait_bouts': 'analyzed/gait/bouts',
+            'daily_gait': 'analyzed/gait/daily_gait',
             'sleep': 'analyzed/sleep'}
 
         self.dirs = {key: os.path.join(self.study_dir, value) for key, value in self.dirs.items()}
@@ -779,7 +782,6 @@ class NWCollection:
 
     @coll_status
     def gait(self, save=False, quiet=False, log=True):
-
         message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
@@ -815,7 +817,21 @@ class NWCollection:
 
         # save bout times
         self.bout_times = wb.export_bouts()
+        self.bout_times = self.identify_df(self.bout_times)
         self.step_times = wb.export_steps()
+        self.step_times = self.identify_df(self.step_times)
+        self.daily_gait = nwgait.WalkingBouts.daily_gait(self.bout_times)
+        self.daily_gait = self.identify_df(self.daily_gait)
+
+        # adjusting gait parameters
+        bout_cols = ['study_code','subject_id','coll_id','gait_bout_num',
+            'start_timestamp','end_timestamp', 'number_steps']
+        self.bout_times = self.bout_times[bout_cols]
+        step_cols = ['study_code','subject_id','coll_id','step_num',
+            'gait_bout_num','foot','avg_speed','heel_strike_accel',
+            'heel_strike_time','mid_swing_accel','mid_swing_time','step_length',
+            'step_state','step_time','swing_start_accel','swing_start_time' ]
+        self.step_times = self.step_times[step_cols]
 
         message(f"{self.subject_id}_{self.coll_id}: Found {self.bout_times.shape[0]} bouts",
                     level='info', display=(not quiet), log=log)
@@ -830,8 +846,12 @@ class NWCollection:
             steps_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
                                                  self.coll_id, "GAIT_STEPS"]),
                                        "csv"])
-            bouts_csv_path = os.path.join(self.dirs['gait'], bouts_csv_name)
-            steps_csv_path = os.path.join(self.dirs['gait'], steps_csv_name)
+            daily_gait_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
+                                                 self.coll_id, "DAILY_GAIT"]),
+                                       "csv"])
+            bouts_csv_path = os.path.join(self.dirs['gait_bouts'], bouts_csv_name)
+            steps_csv_path = os.path.join(self.dirs['gait_steps'], steps_csv_name)
+            daily_gait_csv_path = os.path.join(self.dirs['daily_gait'], daily_gait_csv_name)
 
             message(f"Saving {bouts_csv_path}", level='info', display=(not quiet), log=log)
             self.bout_times.to_csv(bouts_csv_path, index=False)
@@ -839,10 +859,18 @@ class NWCollection:
             message(f"Saving {steps_csv_path}", level='info', display=(not quiet), log=log)
             self.step_times.to_csv(steps_csv_path, index=False)
 
+            message(f"Saving {daily_gait_csv_path}", level='info', display=(not quiet), log=log)
+            self.daily_gait.to_csv(daily_gait_csv_path, index=False)
+
         message("", level='info', display=(not quiet), log=log)
 
         return True
 
+    def identify_df(self, df):
+        df.insert(loc=0, column='study_code', value=self.study_code)
+        df.insert(loc=1, column='subject_id', value=self.subject_id)
+        df.insert(loc=2, column='coll_id', value=self.coll_id)
+        return df
 
 def message(msg, level='info', display=True, log=True):
 
@@ -858,3 +886,4 @@ def message(msg, level='info', display=True, log=True):
     if log:
         func = level_switch.get(level, lambda: 'Invalid')
         func()
+
