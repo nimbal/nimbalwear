@@ -781,7 +781,7 @@ class NWCollection:
         return True
 
     @coll_status
-    def gait(self, save=False, quiet=False, log=True):
+    def gait(self, save=False, quiet=False, log=True, axis=1):
         message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
@@ -797,9 +797,6 @@ class NWCollection:
 
         # find accelerometer indices
         assert self.device_info.loc[l_file_index, 'device_type'] == self.device_info.loc[r_file_index, 'device_type']
-        device_type = self.device_info.loc[l_file_index, 'device_type']
-        accel_index = self.sensors_switch[device_type].index('ACCELEROMETER')
-        sig_indices = self.sensor_channels_switch[device_type][accel_index]
 
         # get ankle files and only take accelerometer signals
         l_file = self.devices[l_file_index]
@@ -809,11 +806,27 @@ class NWCollection:
         if not (l_file and r_file):
             raise Exception(f'{self.subject_id}_{self.coll_id}: Either left or right ankle device data is missing')
 
-        l_file.signals, l_file.signal_headers = map(list, zip(*[(l_file.signals[i], l_file.signal_headers[i]) for i in sig_indices]))
-        r_file.signals, r_file.signal_headers = map(list, zip(*[(r_file.signals[i], l_file.signal_headers[i]) for i in sig_indices]))
+        # convert inputs to objects as inputs
+        l_accel_x_sig = l_file.get_signal_index('Accelerometer x')
+        l_accel_y_sig = l_file.get_signal_index('Accelerometer y')
+        l_accel_z_sig = l_file.get_signal_index('Accelerometer z')
+        l_obj = nwgait.AccelReader.sig_init(raw_x=l_file.signals[l_accel_x_sig],
+            raw_y=l_file.signals[l_accel_y_sig],
+            raw_z=l_file.signals[l_accel_z_sig],
+            startdate = l_file.header['startdate'],
+            freq=l_file.signal_headers[axis]['sample_rate'])
 
+        r_accel_x_sig = r_file.get_signal_index('Accelerometer x')
+        r_accel_y_sig = r_file.get_signal_index('Accelerometer y')
+        r_accel_z_sig = r_file.get_signal_index('Accelerometer z')
+        r_obj = nwgait.AccelReader.sig_init(raw_x=r_file.signals[r_accel_x_sig],
+            raw_y=r_file.signals[r_accel_y_sig],
+            raw_z=r_file.signals[r_accel_z_sig],
+            startdate = r_file.header['startdate'],
+            freq=r_file.signal_headers[axis]['sample_rate'])
+        
         # run gait algorithm to find bouts
-        wb = nwgait.WalkingBouts(l_file, r_file, left_kwargs={'axis': 1}, right_kwargs={'axis': 1})
+        wb = nwgait.WalkingBouts(l_obj, r_obj, left_kwargs={'axis': axis}, right_kwargs={'axis': axis})
 
         # save bout times
         self.bout_times = wb.export_bouts()
