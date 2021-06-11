@@ -33,6 +33,7 @@ v0.4.0
 - add pipeline status tracking
 - renames EDF files to standard names based on information from devices.csv
 - loads data only required devices for single stage
+- add support for Axivity AX6 devices (update `nwdata` to require v0.3.0)
 
 v0.3.0
 - add gait processing (nwgait v0.1.0)
