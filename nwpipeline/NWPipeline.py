@@ -137,11 +137,15 @@ class NWPipeline:
 
 class NWCollection:
 
+    # TODO: should gyroscope be included with accelerometer when separating signals?
+
     sensors_switch = {'GNAC': ['ACCELEROMETER', 'TEMPERATURE', 'LIGHT', 'BUTTON'],
+                      'AXV6': ['GYROSCOPE', 'ACCELEROMETER', 'LIGHT', 'TEMPERATURE'],
                       'BITF': ['ACCELEROMETER', 'ECG'],
                       'NONW': ['PLSOX']}
 
     sensor_channels_switch = {'GNAC': [[0, 1, 2], [3], [4], [5]],
+                              'AXV6': [[0, 1, 2], [3, 4, 5], [6], [7]],
                               'BITF': [[1, 2, 3], [0]],
                               'NONW': [[0, 1]]}
 
@@ -164,8 +168,8 @@ class NWCollection:
         self.device_info = device_info
         self.dirs = dirs
 
-        # TODO: this will need to be read from participants.csv once incorporated - also change to participant_info
-        self.participant = {'dominant_hand': 'right'}
+        # TODO: this will need to be read from subjects.csv once incorporated - also change to participant_info
+        self.subject_info = {'dominant_hand': 'right'}
 
 
         self.status_path = os.path.join(self.dirs['meta'], 'status.csv')
@@ -195,7 +199,6 @@ class NWCollection:
             else:
                 index = (status_df.index.max() + 1)
 
-            
             try:
                 res = f(self, *args, **kwargs)
                 coll_status[f.__name__] = 'Success'
@@ -269,15 +272,14 @@ class NWCollection:
 
         '''
 
-        req_dev_switch = {'activity': [['GNAC'],
-                                       ['left_wrist' if self.participant['dominant_hand'] == 'right'
+        req_dev_switch = {'activity': [['GNAC', 'AXV6'],
+                                       ['left_wrist' if self.subject_info['dominant_hand'] == 'right'
                                         else 'right_wrist']],
-                          'gait': [['GNAC'],
+                          'gait': [['GNAC', 'AXV6'],
                                    ['left_ankle', 'right_ankle']],
-                          'sleep': [['GNAC'],
-                                       ['left_wrist' if self.participant['dominant_hand'] == 'right'
+                          'sleep': [['GNAC', 'AXV6'],
+                                       ['left_wrist' if self.subject_info['dominant_hand'] == 'right'
                                         else 'right_wrist']]}
-
 
         device_types = req_dev_switch[single_stage][0]
 
@@ -301,12 +303,11 @@ class NWCollection:
 
         import_switch = {'EDF': lambda: device_data.import_edf(device_file_path, quiet=quiet),
                          'GNAC': lambda: device_data.import_gnac(device_file_path, correct_drift=True, quiet=quiet),
+                         'AXV6': lambda: device_data.import_axiv(device_file_path, resample=True, quiet=quiet),
                          'BITF': lambda: device_data.import_bitf(device_file_path),
                          'NONW': lambda: device_data.import_nonw(device_file_path, quiet=quiet)}
 
         self.devices = []
-
-        # TODO: select only devices need for single stage if not None
 
         # read in all data files for one subject
         for index, row in tqdm(self.device_info.iterrows(), total=self.device_info.shape[0], leave=False,
@@ -708,7 +709,7 @@ class NWCollection:
 
         epoch_length = 15
 
-        device_location = 'left_wrist' if self.participant['dominant_hand'] == 'right' else 'right_wrist'
+        device_location = 'left_wrist' if self.subject_info['dominant_hand'] == 'right' else 'right_wrist'
 
         wrist_device_index = self.device_info.loc[
             self.device_info['device_location'].isin(self.device_locations[device_location])].index.values
