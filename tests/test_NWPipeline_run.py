@@ -13,4 +13,4 @@ subject_ids = None
 # print(subject_ids)
 # print(coll_ids)
 
-test_nwpl.run(subject_ids=subject_ids, single_stage='gait', overwrite_header=True, quiet=True, log=True)
+test_nwpl.run(subject_ids=['1027'], single_stage='gait', overwrite_header=True, quiet=True, log=True)
