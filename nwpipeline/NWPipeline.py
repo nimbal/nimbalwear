@@ -896,7 +896,7 @@ class NWCollection:
         message("Detecting sleep...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
-        device_location = 'left_wrist' if self.participant['dominant_hand'] == 'right' else 'right_wrist'
+        device_location = 'left_wrist' if self.subject_info['dominant_hand'] == 'right' else 'right_wrist'
 
         wrist_device_index = self.device_info.loc[
             self.device_info['device_location'].isin(self.device_locations[device_location])].index.values
