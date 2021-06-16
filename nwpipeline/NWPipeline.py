@@ -206,9 +206,12 @@ class NWCollection:
                 res = f(self, *args, **kwargs)
                 coll_status[f.__name__] = 'Success'
                 return res
-            except Exception as e:
+            except NWException as e:
                 coll_status[f.__name__] = f'Failed'
                 message(str(e), level='error', display=(not kwargs['quiet']), log=kwargs['log'])
+            except Exception as e:
+                coll_status[f.__name__] = f'Failed'
+                raise e
             finally:
                 status_df.loc[index, list(coll_status.keys())] = list(coll_status.values())
                 status_df.to_csv(self.status_path, index=False)
@@ -302,7 +305,6 @@ class NWCollection:
 
     @coll_status
     def read(self, single_stage=None, overwrite_header=False, save=False, quiet=False, log=True):
-
         message("Reading device data from files...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
@@ -720,7 +722,7 @@ class NWCollection:
             self.device_info['device_location'].isin(self.device_locations[device_location])].index.values
 
         if len(wrist_device_index) == 0:
-            raise Exception(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list")
+            raise NWException(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list")
 
         # TODO: add warning if multiple devices match - use first match
 
@@ -728,7 +730,7 @@ class NWCollection:
 
         # checks to see if files exist
         if not self.devices[wrist_device_index]:
-            raise Exception(f'{self.subject_id}_{self.coll_id}: Wrist device data is missing')
+            raise NWException(f'{self.subject_id}_{self.coll_id}: Wrist device data is missing')
 
         accel_x_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer x')
         accel_y_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer y')
@@ -795,7 +797,7 @@ class NWCollection:
         r_file_index = self.device_info.loc[self.device_info['device_location'].isin(self.device_locations['right_ankle'])].index.values
 
         if not (l_file_index or r_file_index):
-            raise Exception(f'{self.subject_id}_{self.coll_id}: No left or right ankle device found in device list')
+            raise NWException(f'{self.subject_id}_{self.coll_id}: No left or right ankle device found in device list')
 
         # set indices and handles case if ankle data is missing
         l_file_index = l_file_index[0] if l_file_index else r_file_index[0]
@@ -810,7 +812,7 @@ class NWCollection:
 
         # checks to see if files exist
         if not (l_file and r_file):
-            raise Exception(f'{self.subject_id}_{self.coll_id}: Either left or right ankle device data is missing')
+            raise NWException(f'{self.subject_id}_{self.coll_id}: Either left or right ankle device data is missing')
 
         # convert inputs to objects as inputs
         l_accel_x_sig = l_file.get_signal_index('Accelerometer x')
@@ -988,3 +990,6 @@ def message(msg, level='info', display=True, log=True):
         func = level_switch.get(level, lambda: 'Invalid')
         func()
 
+class NWException(Exception):
+    """Hit NWException when an expected error occurs in pipeline"""
+    pass
