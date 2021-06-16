@@ -49,12 +49,19 @@ class NWPipeline:
 
         # pipeline data files
         self.device_info_path = os.path.join(self.dirs['meta'], 'devices.csv')
+        self.subject_info_path = os.path.join(self.dirs['meta'], 'subjects.csv')
         self.log_file_path = os.path.join(self.dirs['logs'], "processing.log")
 
         # TODO: check for required files (raw data, device_list)
 
         # read device list
         self.device_info = pd.read_csv(self.device_info_path, dtype=str).fillna('')
+
+        # read subject level info
+        if os.path.exists(self.subject_info_path):
+            self.subject_info = pd.read_csv(self.subject_info_path, dtype=str).fillna('')
+        else:
+            self.subject_info = None
 
         # TODO: Check devices.csv integrity
         # - ensure study code same for all rows (required) and matches study_dir (warning)
@@ -89,6 +96,8 @@ class NWPipeline:
         message(f"Collections: {coll_ids}", level='info', display=(not quiet), log=log)
         if single_stage is not None:
             message(f"Single stage: {single_stage}", level='info', display=(not quiet), log=log)
+        if not isinstance(self.subject_info, pd.DataFrame):
+            message("Missing subjects info file in meta folder `subjects.csv`", level='warning', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
         for subject_id in tqdm(subject_ids, desc="Processing subjects", leave=True):
@@ -106,10 +115,16 @@ class NWPipeline:
                                                                (self.device_info['subject_id'] == subject_id) &
                                                                (self.device_info['coll_id'] == coll_id)]
                     coll_device_list_df.reset_index(inplace=True, drop=True)
+
+                    coll_subject_dict = {}
+                    if isinstance(self.subject_info, pd.DataFrame):
+                        coll_subject_df = self.subject_info.loc[(self.subject_info['study_code'] == self.study_code) &
+                                                                    (self.subject_info['subject_id'] == subject_id)]
+                        coll_subject_dict = coll_subject_df.iloc[0].to_dict() if coll_subject_df.shape[0] > 0 else {}
     
                     # construct collection class and process
                     coll = NWCollection(study_code=self.study_code, subject_id=subject_id, coll_id=coll_id, device_info=coll_device_list_df,
-                                        dirs=self.dirs)
+                                        subject_info=coll_subject_dict, dirs=self.dirs)
                     coll.process(single_stage=single_stage, overwrite_header=overwrite_header, min_crop_duration=3,
                                  max_crop_time_to_eof=20, quiet=quiet, log=log)
                 except:
@@ -160,7 +175,7 @@ class NWCollection:
     daily_activity = pd.DataFrame()
     epoch_activity = pd.DataFrame()
 
-    def __init__(self, study_code, subject_id, coll_id, device_info, dirs):
+    def __init__(self, study_code, subject_id, coll_id, device_info, subject_info, dirs):
 
         self.study_code = study_code
         self.subject_id = subject_id
@@ -169,7 +184,7 @@ class NWCollection:
         self.dirs = dirs
 
         # TODO: this will need to be read from subjects.csv once incorporated - also change to participant_info
-        self.subject_info = {'dominant_hand': 'right'}
+        self.subject_info = subject_info if subject_info else {'dominant_hand': 'right'}
 
 
         self.status_path = os.path.join(self.dirs['meta'], 'status.csv')
