@@ -26,6 +26,11 @@ To include a specific release, replace `@latest` with the tag associated with th
 
 # Changes by version
 
+v0.5.0
+- update `nwdata` to require v0.4.0
+    - fixes bug where startdate not updated when cropping NWData
+    - adds method to get day indices of a signal
+
 v0.4.0
 - update `nwactivity` to require v0.1.1 (remove mvpa from daily summary)
 - update `nwgait` to require v0.1.2 (add daily gait summary)
