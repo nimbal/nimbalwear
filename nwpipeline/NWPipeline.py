@@ -26,26 +26,27 @@ class NWPipeline:
         # get study code
         self.study_code = os.path.basename(self.study_dir)
 
-        self.dirs = {
-            'study': '',
-            'meta': 'meta',
-            'logs': 'meta/logs',
-            'raw': 'raw',
-            'processed': 'processed',
-            'standard_device_edf': 'processed/standard_device_edf',
-            'cropped_device_edf': 'processed/cropped_device_edf',
-            'sensor_edf': 'processed/sensor_edf',
-            'analyzed': 'analyzed',
-            'nonwear': 'analyzed/nonwear',
-            'standard_nonwear_times': 'analyzed/nonwear/standard_nonwear_times',
-            'activity': 'analyzed/activity',
-            'epoch_activity': 'analyzed/activity/epoch_activity',
-            'daily_activity': 'analyzed/activity/daily_activity',
-            'gait': 'analyzed/gait',
-            'gait_steps': 'analyzed/gait/steps',
-            'gait_bouts': 'analyzed/gait/bouts',
-            'daily_gait': 'analyzed/gait/daily_gait',
-            'sleep': 'analyzed/sleep'}
+        self.dirs = {'study': '',
+                     'meta': 'meta',
+                     'logs': 'meta/logs',
+                     'raw': 'raw',
+                     'processed': 'processed',
+                     'standard_device_edf': 'processed/standard_device_edf',
+                     'cropped_device_edf': 'processed/cropped_device_edf',
+                     'sensor_edf': 'processed/sensor_edf',
+                     'analyzed': 'analyzed',
+                     'nonwear': 'analyzed/nonwear',
+                     'standard_nonwear_times': 'analyzed/nonwear/standard_nonwear_times',
+                     'activity': 'analyzed/activity',
+                     'epoch_activity': 'analyzed/activity/epoch_activity',
+                     'daily_activity': 'analyzed/activity/daily_activity',
+                     'gait': 'analyzed/gait',
+                     'gait_steps': 'analyzed/gait/steps',
+                     'gait_bouts': 'analyzed/gait/bouts',
+                     'daily_gait': 'analyzed/gait/daily_gait',
+                     'sleep': 'analyzed/sleep',
+                     'sptw': 'analyzed/sleep/sptw',
+                     'sleep_bouts': 'analyzed/sleep/sleep_bouts',}
 
         self.dirs = {key: os.path.join(self.study_dir, value) for key, value in self.dirs.items()}
 
@@ -65,7 +66,7 @@ class NWPipeline:
         else:
             self.subject_info = None
 
-        # TODO: Check devices.csv integrity
+        # TODO: Check devices.csv and subjects.csv integrity
         # - ensure study code same for all rows (required) and matches study_dir (warning)
         # - unique combo of study, subject, coll, device type, device location (blanks allowed if still unique)
         # - ensure no missing file names
@@ -118,6 +119,7 @@ class NWPipeline:
                                                                (self.device_info['coll_id'] == coll_id)]
                     coll_device_list_df.reset_index(inplace=True, drop=True)
 
+                    # TODO : make df instead of dict like device_list
                     coll_subject_dict = {}
                     if isinstance(self.subject_info, pd.DataFrame):
                         coll_subject_df = self.subject_info.loc[(self.subject_info['study_code'] == self.study_code) &
@@ -177,6 +179,8 @@ class NWCollection:
     step_times = pd.DataFrame()
     daily_activity = pd.DataFrame()
     epoch_activity = pd.DataFrame()
+    sptw = pd.DataFrame()
+    sleep_bouts = pd.DataFrame()
 
     def __init__(self, study_code, subject_id, coll_id, device_info, subject_info, dirs):
 
@@ -186,11 +190,9 @@ class NWCollection:
         self.device_info = device_info
         self.dirs = dirs
 
-        # TODO: this will need to be read from subjects.csv once incorporated - also change to participant_info
         self.subject_info = subject_info if subject_info else {'dominant_hand': 'right'}
 
         self.status_path = os.path.join(self.dirs['meta'], 'status.csv')
-
 
     def coll_status(f):
         @wraps(f)
@@ -474,7 +476,6 @@ class NWCollection:
                 message("", level='info', display=(not quiet), log=log)
                 continue
 
-            # TODO: search signal headers for signal labels
             accel_x_sig = self.devices[index].get_signal_index('Accelerometer x')
             accel_y_sig = self.devices[index].get_signal_index('Accelerometer y')
             accel_z_sig = self.devices[index].get_signal_index('Accelerometer z')
@@ -902,16 +903,13 @@ class NWCollection:
 
         return True
 
-    def identify_df(self, df):
-        df.insert(loc=0, column='study_code', value=self.study_code)
-        df.insert(loc=1, column='subject_id', value=self.subject_id)
-        df.insert(loc=2, column='coll_id', value=self.coll_id)
-        return df
-
     @coll_status
     def sleep(self, save=False, quiet=False, log=True):
         message("Detecting sleep...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
+
+        self.sptw = pd.DataFrame()
+        self.sleep_bouts = pd.DataFrame()
 
         device_location = 'left_wrist' if self.subject_info['dominant_hand'] == 'right' else 'right_wrist'
 
@@ -919,76 +917,68 @@ class NWCollection:
             self.device_info['device_location'].isin(self.device_locations[device_location])].index.values
 
         if len(wrist_device_index) == 0:
-            raise Exception(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list")
+            raise NWException(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list")
 
         # TODO: add warning if multiple devices match - use first match
-
         wrist_device_index = wrist_device_index[0]
 
-        # detecting sleep for each device
-        self.sleep_times = pd.DataFrame()
+        # checks to see if files exist
+        if not self.devices[wrist_device_index]:
+            raise NWException(f'{self.subject_id}_{self.coll_id}: Wrist device data is missing')
 
-        # get info from device list
-        study_code = self.device_info.loc[wrist_device_index, 'study_code']
-        subject_id = self.device_info.loc[wrist_device_index, 'subject_id']
-        coll_id = self.device_info.loc[wrist_device_index, 'coll_id']
-        device_type = self.device_info.loc[wrist_device_index, 'device_type']
-        device_location = self.device_info.loc[wrist_device_index, 'device_location']
-        device_file_name = self.device_info.loc[wrist_device_index, 'file_name']
-
-        # check for data loaded
-        if self.devices[wrist_device_index] is None:
-            raise Exception(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No device data")
-
-        # TODO: search signal headers for signal labels
         accel_x_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer x')
         accel_y_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer y')
         accel_z_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer z')
-        start_time = pd.to_datetime(self.devices[wrist_device_index].header['startdate'])
-        accel_freq = self.devices[wrist_device_index].signal_headers[accel_x_sig]['sample_rate']
-        end_time = start_time + dt.timedelta(seconds=len(self.devices[wrist_device_index].signals[accel_x_sig]) / accel_freq)
-        accel_timestamps = np.asarray(pd.date_range(start_time, end_time, periods=len(self.devices[wrist_device_index].signals[accel_x_sig])))
 
-        sptwindow = nwsleep.sptwindow()
+        self.sptw, self.sleep_bouts = nwsleep.detect_sleep(x_values=self.devices[wrist_device_index].signals[accel_x_sig],
+                                                 y_values=self.devices[wrist_device_index].signals[accel_y_sig],
+                                                 z_values=self.devices[wrist_device_index].signals[accel_z_sig],
+                                                 sample_rate=round(self.devices[wrist_device_index].signal_headers[accel_x_sig]['sample_rate']),
+                                                 start_datetime=self.devices[wrist_device_index].header['startdate'])
 
-        sleepwake = sptwindow.get_sleep_array(
-            x_values=self.devices[wrist_device_index].signals[accel_x_sig],
-            y_values=self.devices[wrist_device_index].signals[accel_y_sig],
-            z_values=self.devices[wrist_device_index].signals[accel_z_sig],
-            accelerometer_timestamps=accel_timestamps, accelerometer_frequency=accel_freq)
+        self.sptw.insert(loc=0, column='study_code', value=self.study_code)
+        self.sptw.insert(loc=1, column='subject_id', value=self.subject_id)
+        self.sptw.insert(loc=2, column='coll_id', value=self.coll_id)
 
-        nonwear_times_subj = self.nonwear_times.loc[self.nonwear_times['subject_id'] == subject_id].copy()
+        self.sleep_bouts.insert(loc=0, column='study_code', value=self.study_code)
+        self.sleep_bouts.insert(loc=1, column='subject_id', value=self.subject_id)
+        self.sleep_bouts.insert(loc=2, column='coll_id', value=self.coll_id)
 
-        if nonwear_times_subj.shape[0] == 0:
-            raise Exception(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No non wear data for subject")
-
-        sleepwindow = sptwindow.sptwindow_HDCZA(subject=subject_id,
-                                                x_values=sleepwake['x'],
-                                                y_values=sleepwake['y'],
-                                                z_values=sleepwake['z'],
-                                                accelerometer_timestamps=accel_timestamps,
-                                                accelerometer_frequency=accel_freq,
-                                                accelerometer_reading=False,
-                                                study=None,
-                                                site=None,
-                                                path_to_nonwear=nonwear_times_subj,
-                                                path_to_sleepwindow=None
-                                                )
-        self.sleep_times = self.sleep_times.append(sleepwindow, ignore_index=True)
         if save:
 
+            # TODO: REMOVE DP COLUMNS BEFORE WRITING
+            # TODO: ADD RELATIVE DAY?
+
             # create all file path variables
+            sptw_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
+                                                          self.coll_id, "SPTW"]),
+                                                "csv"])
+            sleep_bouts_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
+                                                          self.coll_id, "SLEEP_BOUTS"]),
+                                                "csv"])
 
-            sleep_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id, self.coll_id, "SLEEP"]), "csv"])
-            sleep_csv_path = os.path.join(self.dirs['sleep'], sleep_csv_name)
+            sptw_csv_path = os.path.join(self.dirs['sptw'], sptw_csv_name)
+            sleep_bouts_csv_path = os.path.join(self.dirs['sleep_bouts'], sleep_bouts_csv_name)
 
-            Path(os.path.dirname(sleep_csv_path)).mkdir(parents=True, exist_ok=True)
+            Path(os.path.dirname(sptw_csv_path)).mkdir(parents=True, exist_ok=True)
+            Path(os.path.dirname(sleep_bouts_csv_path)).mkdir(parents=True, exist_ok=True)
 
-            message(f"Saving {sleep_csv_path}", level='info', display=(not quiet), log=log)
+            message(f"Saving {sptw_csv_path}", level='info', display=(not quiet), log=log)
+            self.sptw.to_csv(sptw_csv_path, index=False)
 
-            sleepwindow.to_csv(sleep_csv_path, index=False)
+            message(f"Saving {sleep_bouts_csv_path}", level='info', display=(not quiet), log=log)
+            self.sleep_bouts.to_csv(sleep_bouts_csv_path, index=False)
 
         message("", level='info', display=(not quiet), log=log)
+
+        return True
+
+    def identify_df(self, df):
+        df.insert(loc=0, column='study_code', value=self.study_code)
+        df.insert(loc=1, column='subject_id', value=self.subject_id)
+        df.insert(loc=2, column='coll_id', value=self.coll_id)
+        return df
+
 
 def message(msg, level='info', display=True, log=True):
 
