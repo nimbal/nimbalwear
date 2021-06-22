@@ -46,7 +46,8 @@ class NWPipeline:
                      'daily_gait': 'analyzed/gait/daily_gait',
                      'sleep': 'analyzed/sleep',
                      'sptw': 'analyzed/sleep/sptw',
-                     'sleep_bouts': 'analyzed/sleep/sleep_bouts',}
+                     'sleep_bouts': 'analyzed/sleep/sleep_bouts',
+                     'daily_sleep': 'analyzed/sleep/daily_sleep'}
 
         self.dirs = {key: os.path.join(self.study_dir, value) for key, value in self.dirs.items()}
 
@@ -181,6 +182,7 @@ class NWCollection:
     epoch_activity = pd.DataFrame()
     sptw = pd.DataFrame()
     sleep_bouts = pd.DataFrame()
+    daily_sleep = pd.DataFrame()
 
     def __init__(self, study_code, subject_id, coll_id, device_info, subject_info, dirs):
 
@@ -910,6 +912,7 @@ class NWCollection:
 
         self.sptw = pd.DataFrame()
         self.sleep_bouts = pd.DataFrame()
+        self.daily_sleep = pd.DataFrame()
 
         device_location = 'left_wrist' if self.subject_info['dominant_hand'] == 'right' else 'right_wrist'
 
@@ -936,6 +939,9 @@ class NWCollection:
                                                  sample_rate=round(self.devices[wrist_device_index].signal_headers[accel_x_sig]['sample_rate']),
                                                  start_datetime=self.devices[wrist_device_index].header['startdate'])
 
+        self.daily_sleep = nwsleep.sptw_stats(self.sptw, self.sleep_bouts, type='daily_long')
+
+
         self.sptw.insert(loc=0, column='study_code', value=self.study_code)
         self.sptw.insert(loc=1, column='subject_id', value=self.subject_id)
         self.sptw.insert(loc=2, column='coll_id', value=self.coll_id)
@@ -944,30 +950,38 @@ class NWCollection:
         self.sleep_bouts.insert(loc=1, column='subject_id', value=self.subject_id)
         self.sleep_bouts.insert(loc=2, column='coll_id', value=self.coll_id)
 
+        self.daily_sleep.insert(loc=0, column='study_code', value=self.study_code)
+        self.daily_sleep.insert(loc=1, column='subject_id', value=self.subject_id)
+        self.daily_sleep.insert(loc=2, column='coll_id', value=self.coll_id)
+
         if save:
 
             # TODO: REMOVE DP COLUMNS BEFORE WRITING
-            # TODO: ADD RELATIVE DAY?
 
             # create all file path variables
-            sptw_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
-                                                          self.coll_id, "SPTW"]),
-                                                "csv"])
-            sleep_bouts_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
-                                                          self.coll_id, "SLEEP_BOUTS"]),
-                                                "csv"])
+            sptw_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id, self.coll_id, "SPTW"]), "csv"])
+            sleep_bouts_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id, self.coll_id, "SLEEP_BOUTS"]),
+                                             "csv"])
+
+            daily_sleep_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id, self.coll_id, "DAILY_SLEEP"]),
+                                             "csv"])
 
             sptw_csv_path = os.path.join(self.dirs['sptw'], sptw_csv_name)
             sleep_bouts_csv_path = os.path.join(self.dirs['sleep_bouts'], sleep_bouts_csv_name)
+            daily_sleep_csv_path = os.path.join(self.dirs['daily_sleep'], daily_sleep_csv_name)
 
             Path(os.path.dirname(sptw_csv_path)).mkdir(parents=True, exist_ok=True)
             Path(os.path.dirname(sleep_bouts_csv_path)).mkdir(parents=True, exist_ok=True)
+            Path(os.path.dirname(daily_sleep_csv_path)).mkdir(parents=True, exist_ok=True)
 
             message(f"Saving {sptw_csv_path}", level='info', display=(not quiet), log=log)
             self.sptw.to_csv(sptw_csv_path, index=False)
 
             message(f"Saving {sleep_bouts_csv_path}", level='info', display=(not quiet), log=log)
             self.sleep_bouts.to_csv(sleep_bouts_csv_path, index=False)
+
+            message(f"Saving {daily_sleep_csv_path}", level='info', display=(not quiet), log=log)
+            self.daily_sleep.to_csv(daily_sleep_csv_path, index=False)
 
         message("", level='info', display=(not quiet), log=log)
 
