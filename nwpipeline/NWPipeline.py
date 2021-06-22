@@ -860,6 +860,12 @@ class NWCollection:
         self.bout_times = self.identify_df(self.bout_times)
         self.step_times = wb.export_steps()
         self.step_times = self.identify_df(self.step_times)
+
+        message(f"Detected {self.bout_times.shape[0]} gait bouts", level='info', display=(not quiet), log=log)
+        message(f"Detected {self.step_times.shape[0]} steps", level='info', display=(not quiet), log=log)
+
+        message("Summarizing daily gait analytics...", level='info', display=(not quiet), log=log)
+
         self.daily_gait = nwgait.WalkingBouts.daily_gait(self.bout_times)
         self.daily_gait = self.identify_df(self.daily_gait)
 
@@ -873,10 +879,7 @@ class NWCollection:
             'step_state','step_time','swing_start_accel','swing_start_time' ]
         self.step_times = self.step_times[step_cols]
 
-        message(f"{self.subject_id}_{self.coll_id}: Found {self.bout_times.shape[0]} bouts",
-                    level='info', display=(not quiet), log=log)
-        message(f"{self.subject_id}_{self.coll_id}: Found {self.step_times.shape[0]} steps",
-                    level='info', display=(not quiet), log=log)
+
 
         if save:
             # create all file path variables
@@ -940,8 +943,12 @@ class NWCollection:
                                                  sample_rate=round(self.devices[wrist_device_index].signal_headers[accel_x_sig]['sample_rate']),
                                                  start_datetime=self.devices[wrist_device_index].header['startdate'])
 
-        self.daily_sleep = nwsleep.sptw_stats(self.sptw, self.sleep_bouts, type='daily_long')
+        message(f"Detected {self.sptw.shape[0]} sleep period time windows", level='info', display=(not quiet), log=log)
+        message(f"Detected {self.sleep_bouts.shape[0]} sleep bouts", level='info', display=(not quiet), log=log)
 
+        message("Summarizing daily sleep analytics...", level='info', display=(not quiet), log=log)
+
+        self.daily_sleep = nwsleep.sptw_stats(self.sptw, self.sleep_bouts, type='daily_long')
 
         self.sptw.insert(loc=0, column='study_code', value=self.study_code)
         self.sptw.insert(loc=1, column='subject_id', value=self.subject_id)
