@@ -28,7 +28,7 @@ setuptools.setup(
     install_requires=['tqdm', 'pandas',
                       'pyedflib@git+https://github.com/holgern/pyedflib@v0.1.21#egg=pyedflib',
                       'nwdata@git+https://github.com/nimbal/nwdata@v0.4.0#egg=nwdata',
-                      'nwnonwear@git+https://github.com/nimbal/nwnonwear@v0.1.1#egg=nwnonwear',
+                      'nwnonwear@git+https://github.com/nimbal/nwnonwear@v0.1.2#egg=nwnonwear',
                       'nwactivity@git+https://github.com/nimbal/nwactivity@v0.1.2#egg=nwactivity',
                       'nwgait@git+https://github.com/nimbal/nwgait@v0.1.2#egg=nwgait',
                       'nwsleep@git+https://github.com/nimbal/nwsleep@v0.1.0#egg=nwsleep'],

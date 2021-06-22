@@ -26,6 +26,9 @@ To include a specific release, replace `@latest` with the tag associated with th
 
 # Changes by version
 
+v0.6.0
+- add non-wear detection for Axivity devices (AXV6) (nwnonwear v0.1.2)
+
 v0.5.0
 - update `nwdata` to require v0.4.0
     - fixes bug where startdate not updated when cropping NWData
