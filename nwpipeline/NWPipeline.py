@@ -465,7 +465,7 @@ class NWCollection:
 
             # TODO: Add nonwear detection for other devices
 
-            if not device_type == 'GNAC':
+            if not device_type in ['AXV6', 'GNAC']:
                 message(f"Cannot detect non-wear for {device_type}_{device_location}",
                         level='info', display=(not quiet), log=log)
                 message("", level='info', display=(not quiet), log=log)
@@ -486,12 +486,13 @@ class NWCollection:
             # TODO: call different algorithm based on device_type or signals available??
             # TODO: log algorithm used
 
-            nonwear_times, nonwear_array = nwnonwear.vert_nonwear(
-                                                        x_values=self.devices[index].signals[accel_x_sig],
-                                                        y_values=self.devices[index].signals[accel_y_sig],
-                                                        z_values=self.devices[index].signals[accel_z_sig],
-                                                        temperature_values=self.devices[index].signals[temperature_sig],
-                                                        quiet=quiet)
+            nonwear_times, nonwear_array = nwnonwear.vert_nonwear(x_values=self.devices[index].signals[accel_x_sig],
+                                                                  y_values=self.devices[index].signals[accel_y_sig],
+                                                                  z_values=self.devices[index].signals[accel_z_sig],
+                                                                  temperature_values=self.devices[index].signals[temperature_sig],
+                                                                  accel_freq=self.devices[index].signal_headers[accel_x_sig]['sample_rate'],
+                                                                  temperature_freq=self.devices[index].signal_headers[temperature_sig]['sample_rate'],
+                                                                  quiet=quiet)
             algorithm_name = 'Vert algorithm'
 
             bout_count = nonwear_times.shape[0]
