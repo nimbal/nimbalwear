@@ -954,9 +954,10 @@ class NWCollection:
         self.daily_sleep.insert(loc=1, column='subject_id', value=self.subject_id)
         self.daily_sleep.insert(loc=2, column='coll_id', value=self.coll_id)
 
-        if save:
+        self.sptw.drop(['start_dp', 'end_dp'], axis='columns', inplace=True)
+        self.sleep_bouts.drop(['start_dp', 'end_dp'], axis='columns', inplace=True)
 
-            # TODO: REMOVE DP COLUMNS BEFORE WRITING
+        if save:
 
             # create all file path variables
             sptw_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id, self.coll_id, "SPTW"]), "csv"])
