@@ -30,6 +30,9 @@ v0.5.0
 - update `nwdata` to require v0.4.0
     - fixes bug where startdate not updated when cropping NWData
     - adds method to get day indices of a signal
+- add subjects.csv
+- add sleep detection and analysis (nwsleep v0.1.0)
+- fix bug where errors during collection not logged correctly
 
 v0.4.0
 - update `nwactivity` to require v0.1.1 (remove mvpa from daily summary)
