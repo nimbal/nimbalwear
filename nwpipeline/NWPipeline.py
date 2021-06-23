@@ -77,7 +77,7 @@ class NWPipeline:
             Path(value).mkdir(parents=True, exist_ok=True)
             # add data dictionary
             if key in self.data_dicts:
-                df = pd.DataFrame(self.data_dicts[key], index=['Description']).T
+                df = pd.DataFrame(self.data_dicts[key], index=["column_label", "description", "type", "values"]).T
                 p = os.path.join(value, f'{key}_dict.csv')
                 df.to_csv(p)
 

@@ -1,40 +1,195 @@
 {
     "gait_steps": {
-        "study_code": "Study Code",
-        "subject_id": "Subject ID",
-        "coll_id": "Collection ID",
-        "step_num": "Step Number",
-        "gait_bout_num": "Gait Bout Number",
-        "foot": "Which Foot",
-        "avg_speed": "Average Speed",
-        "heel_strike_accel": "Acceleration at heel strike time (m/s^2)",
-        "heel_strike_time": "Heel strike time (s)",
-        "mid_swing_accel": "Acceleration at mid swing time (m/s^2)",
-        "mid_swing_time": "Mid swing time",
-        "step_length": "Step length (data points)",
-        "step_state": "Step State",
-        "step_time": "Step time (seconds)",
-        "swing_start_accel": "Acceleration at swing start time (m/s^2)",
-        "swing_start_time": "Swing start time"
+        "study_code": {
+            "column_label": "",
+            "description": "study_code",
+            "type": "",
+            "values": ""
+        },
+        "subject_id": {
+            "column_label": "",
+            "description": "subject_id",
+            "type": "",
+            "values": ""
+        },
+        "coll_id": {
+            "column_label": "",
+            "description": "coll_id",
+            "type": "",
+            "values": ""
+        },
+        "step_num": {
+            "column_label": "",
+            "description": "step_num",
+            "type": "",
+            "values": ""
+        },
+        "gait_bout_num": {
+            "column_label": "",
+            "description": "gait_bout_num",
+            "type": "",
+            "values": ""
+        },
+        "foot": {
+            "column_label": "",
+            "description": "foot",
+            "type": "",
+            "values": ""
+        },
+        "avg_speed": {
+            "column_label": "",
+            "description": "avg_speed",
+            "type": "",
+            "values": ""
+        },
+        "heel_strike_accel": {
+            "column_label": "",
+            "description": "heel_strike_accel",
+            "type": "",
+            "values": ""
+        },
+        "heel_strike_time": {
+            "column_label": "",
+            "description": "heel_strike_time",
+            "type": "",
+            "values": ""
+        },
+        "mid_swing_accel": {
+            "column_label": "",
+            "description": "mid_swing_accel",
+            "type": "",
+            "values": ""
+        },
+        "mid_swing_time": {
+            "column_label": "",
+            "description": "mid_swing_time",
+            "type": "",
+            "values": ""
+        },
+        "step_length": {
+            "column_label": "",
+            "description": "step_length",
+            "type": "",
+            "values": ""
+        },
+        "step_state": {
+            "column_label": "",
+            "description": "step_state",
+            "type": "",
+            "values": ""
+        },
+        "step_time": {
+            "column_label": "",
+            "description": "step_time",
+            "type": "",
+            "values": ""
+        },
+        "swing_start_accel": {
+            "column_label": "",
+            "description": "swing_start_accel",
+            "type": "",
+            "values": ""
+        },
+        "swing_start_time": {
+            "column_label": "",
+            "description": "swing_start_time",
+            "type": "",
+            "values": ""
+        }
     },
     "gait_bouts": {
-        "study_code": "Study Code",
-        "subject_id": "Subject ID",
-        "coll_id": "Collection ID",
-        "gait_bout_num": "Gait Bout Number",
-        "start_timestamp": "Start Timestamp",
-        "end_timestamp": "End Timestamp",
-        "number_steps": "Number of Steps"
+        "study_code": {
+            "column_label": "",
+            "description": "study_code",
+            "type": "",
+            "values": ""
+        },
+        "subject_id": {
+            "column_label": "",
+            "description": "subject_id",
+            "type": "",
+            "values": ""
+        },
+        "coll_id": {
+            "column_label": "",
+            "description": "coll_id",
+            "type": "",
+            "values": ""
+        },
+        "gait_bout_num": {
+            "column_label": "",
+            "description": "gait_bout_num",
+            "type": "",
+            "values": ""
+        },
+        "start_timestamp": {
+            "column_label": "",
+            "description": "start_timestamp",
+            "type": "",
+            "values": ""
+        },
+        "end_timestamp": {
+            "column_label": "",
+            "description": "end_timestamp",
+            "type": "",
+            "values": ""
+        },
+        "number_steps": {
+            "column_label": "",
+            "description": "number_steps",
+            "type": "",
+            "values": ""
+        }
     },
     "daily_gait": {
-        "study_code": "Study Code",
-        "subject_id": "Subject ID",
-        "coll_id": "Collection ID",
-        "day_num": "Day number",
-        "date": "Date",
-        "longest_bout_length_secs": "Longest bout length in seconds",
-        "num_bouts_over_3mins": "Number of bouts over 3 minutes",
-        "total_steps": "total number of steps"
+        "study_code": {
+            "column_label": "",
+            "description": "study_code",
+            "type": "",
+            "values": ""
+        },
+        "subject_id": {
+            "column_label": "",
+            "description": "subject_id",
+            "type": "",
+            "values": ""
+        },
+        "coll_id": {
+            "column_label": "",
+            "description": "coll_id",
+            "type": "",
+            "values": ""
+        },
+        "day_num": {
+            "column_label": "",
+            "description": "day_num",
+            "type": "",
+            "values": ""
+        },
+        "date": {
+            "column_label": "",
+            "description": "date",
+            "type": "",
+            "values": ""
+        },
+        "longest_bout_length_secs": {
+            "column_label": "",
+            "description": "longest_bout_length_secs",
+            "type": "",
+            "values": ""
+        },
+        "num_bouts_over_3mins": {
+            "column_label": "",
+            "description": "num_bouts_over_3mins",
+            "type": "",
+            "values": ""
+        },
+        "total_steps": {
+            "column_label": "",
+            "description": "total_steps",
+            "type": "",
+            "values": ""
+        }
     },
     "sleep": {},
     "activity": {},
