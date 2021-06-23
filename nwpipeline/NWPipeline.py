@@ -4,6 +4,7 @@ from pathlib import Path
 import logging
 import traceback
 from functools import wraps
+import json
 
 from tqdm import tqdm
 import pandas as pd
@@ -52,6 +53,9 @@ class NWPipeline:
         self.subject_info_path = os.path.join(self.dirs['meta'], 'subjects.csv')
         self.log_file_path = os.path.join(self.dirs['logs'], "processing.log")
 
+        with open(os.path.join(Path(__file__).parent.absolute(),'data_dicts.json')) as f:
+            self.data_dicts = json.loads(f.read())
+
         # TODO: check for required files (raw data, device_list)
 
         # read device list
@@ -71,6 +75,11 @@ class NWPipeline:
         # initialize folder structure
         for key, value in self.dirs.items():
             Path(value).mkdir(parents=True, exist_ok=True)
+            # add data dictionary
+            if key in self.data_dicts:
+                df = pd.DataFrame(self.data_dicts[key], index=['Description']).T
+                p = os.path.join(value, f'{key}_dict.csv')
+                df.to_csv(p)
 
     def run(self, subject_ids=None, coll_ids=None, single_stage=None, overwrite_header=False, quiet=False, log=True):
 

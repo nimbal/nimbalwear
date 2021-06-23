@@ -1,0 +1,42 @@
+{
+    "gait_steps": {
+        "study_code": "Study Code",
+        "subject_id": "Subject ID",
+        "coll_id": "Collection ID",
+        "step_num": "Step Number",
+        "gait_bout_num": "Gait Bout Number",
+        "foot": "Which Foot",
+        "avg_speed": "Average Speed",
+        "heel_strike_accel": "Acceleration at heel strike time (m/s^2)",
+        "heel_strike_time": "Heel strike time (s)",
+        "mid_swing_accel": "Acceleration at mid swing time (m/s^2)",
+        "mid_swing_time": "Mid swing time",
+        "step_length": "Step length (data points)",
+        "step_state": "Step State",
+        "step_time": "Step time (seconds)",
+        "swing_start_accel": "Acceleration at swing start time (m/s^2)",
+        "swing_start_time": "Swing start time"
+    },
+    "gait_bouts": {
+        "study_code": "Study Code",
+        "subject_id": "Subject ID",
+        "coll_id": "Collection ID",
+        "gait_bout_num": "Gait Bout Number",
+        "start_timestamp": "Start Timestamp",
+        "end_timestamp": "End Timestamp",
+        "number_steps": "Number of Steps"
+    },
+    "daily_gait": {
+        "study_code": "Study Code",
+        "subject_id": "Subject ID",
+        "coll_id": "Collection ID",
+        "day_num": "Day number",
+        "date": "Date",
+        "longest_bout_length_secs": "Longest bout length in seconds",
+        "num_bouts_over_3mins": "Number of bouts over 3 minutes",
+        "total_steps": "total number of steps"
+    },
+    "sleep": {},
+    "activity": {},
+    "nonwear": {}
+}
