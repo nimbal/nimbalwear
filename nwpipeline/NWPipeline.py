@@ -810,8 +810,11 @@ class NWCollection:
             raise NWException(f'{self.subject_id}_{self.coll_id}: No left or right ankle device found in device list')
 
         # set indices and handles case if ankle data is missing
-        l_gait_device_index = l_gait_device_index[0] if l_gait_device_index else r_gait_device_index[0]
-        r_gait_device_index = r_gait_device_index[0] if r_gait_device_index else l_gait_device_index[0]
+        l_gait_device_index = l_gait_device_index if l_gait_device_index else r_gait_device_index
+        r_gait_device_index = r_gait_device_index if r_gait_device_index else l_gait_device_index
+
+        l_gait_device_index = l_gait_device_index[0]
+        r_gait_device_index = r_gait_device_index[0]
 
         # check to see that device_types match - comment because not necessary?
         # assert self.device_info.loc[l_gait_device_index, 'device_type'] == self.device_info.loc[r_gait_device_index, 'device_type']
@@ -842,6 +845,7 @@ class NWCollection:
             freq=self.devices[r_gait_device_index].signal_headers[r_accel_x_sig]['sample_rate'])
 
         # run gait algorithm to find bouts
+        # TODO: Add progress bars instead of print statements??
         wb = nwgait.WalkingBouts(l_obj, r_obj, left_kwargs={'axis': axis}, right_kwargs={'axis': axis})
 
         # save bout times
@@ -1134,6 +1138,7 @@ def message(msg, level='info', display=True, log=True):
     if log:
         func = level_switch.get(level, lambda: 'Invalid')
         func()
+
 
 class NWException(Exception):
     """Hit NWException when an expected error occurs in pipeline"""
