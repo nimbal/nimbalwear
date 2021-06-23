@@ -29,6 +29,8 @@ To include a specific release, replace `@latest` with the tag associated with th
 v0.6.0
 - add non-wear detection for Axivity devices (AXV6) (nwnonwear v0.1.2)
 - interpolate inserted values when correcting clock drift or sample rate (nwdata v0.5.0)
+- faster GENEActiv read and progress bars on clock drift correct (nwdata v0.6.0)
+- adjust device selection logic for activity, gait, sleep analytics
 
 v0.5.0
 - update `nwdata` to require v0.4.0
