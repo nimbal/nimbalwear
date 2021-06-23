@@ -120,7 +120,6 @@ class NWPipeline:
                                                                (self.device_info['coll_id'] == coll_id)]
                     coll_device_list_df.reset_index(inplace=True, drop=True)
 
-                    # TODO : make df instead of dict like device_list
                     coll_subject_dict = {}
                     if isinstance(self.subject_info, pd.DataFrame):
                         coll_subject_df = self.subject_info.loc[(self.subject_info['study_code'] == self.study_code) &
@@ -277,7 +276,7 @@ class NWCollection:
 
         # process activity levels
         if single_stage in [None, 'activity']:
-            self.activity(save=True, quiet=quiet, log=log)
+            self.activity(dominant=False, save=True, quiet=quiet, log=log)
 
         # process gait
         if single_stage in [None, 'gait']:
@@ -298,6 +297,8 @@ class NWCollection:
         :return:
 
         '''
+
+        # TODO: call select device methods
 
         req_dev_switch = {'activity': [['GNAC', 'AXV6'],
                                        ['left_wrist' if self.subject_info['dominant_hand'] == 'right'
@@ -726,7 +727,7 @@ class NWCollection:
         return True
 
     @coll_status
-    def activity(self, save=False, quiet=False, log=True):
+    def activity(self, dominant=False, save=False, quiet=False, log=True):
 
         message("Calculating activity levels...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
@@ -735,35 +736,30 @@ class NWCollection:
 
         epoch_length = 15
 
-        device_location = 'left_wrist' if self.subject_info['dominant_hand'] == 'right' else 'right_wrist'
+        activity_device_index, dominant = self.select_activity_device(dominant=dominant)
 
-        wrist_device_index = self.device_info.loc[
-            self.device_info['device_location'].isin(self.device_locations[device_location])].index.values
-
-        if len(wrist_device_index) == 0:
+        if len(activity_device_index) == 0:
             raise NWException(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list")
 
-        # TODO: add warning if multiple devices match - use first match
-
-        wrist_device_index = wrist_device_index[0]
+        activity_device_index = activity_device_index[0]
 
         # checks to see if files exist
-        if not self.devices[wrist_device_index]:
+        if not self.devices[activity_device_index]:
             raise NWException(f'{self.subject_id}_{self.coll_id}: Wrist device data is missing')
 
-        accel_x_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer x')
-        accel_y_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer y')
-        accel_z_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer z')
+        accel_x_sig = self.devices[activity_device_index].get_signal_index('Accelerometer x')
+        accel_y_sig = self.devices[activity_device_index].get_signal_index('Accelerometer y')
+        accel_z_sig = self.devices[activity_device_index].get_signal_index('Accelerometer z')
 
         message(f"Calculating {epoch_length}-second epoch activity...", level='info', display=(not quiet), log=log)
 
         # TODO: need to allow variable epoch_length and dominant?
         self.epoch_activity = \
-            nwactivity.calc_wrist_powell(x=self.devices[wrist_device_index].signals[accel_x_sig],
-                                         y=self.devices[wrist_device_index].signals[accel_y_sig],
-                                         z=self.devices[wrist_device_index].signals[accel_z_sig],
-                                         sample_rate=self.devices[wrist_device_index].signal_headers[accel_x_sig]['sample_rate'],
-                                         epoch_length=epoch_length, dominant=False, quiet=quiet)
+            nwactivity.calc_wrist_powell(x=self.devices[activity_device_index].signals[accel_x_sig],
+                                         y=self.devices[activity_device_index].signals[accel_y_sig],
+                                         z=self.devices[activity_device_index].signals[accel_z_sig],
+                                         sample_rate=self.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
+                                         epoch_length=epoch_length, dominant=dominant, quiet=quiet)
 
         self.epoch_activity.insert(loc=0, column='study_code', value=self.study_code)
         self.epoch_activity.insert(loc=1, column='subject_id', value=self.subject_id)
@@ -773,7 +769,7 @@ class NWCollection:
 
         message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log)
         self.daily_activity = nwactivity.sum_daily_activity(epoch_intensity=self.epoch_activity['intensity'], epoch_length=epoch_length,
-                                            start_datetime=self.devices[wrist_device_index].header['startdate'], quiet=quiet)
+                                            start_datetime=self.devices[activity_device_index].header['startdate'], quiet=quiet)
 
         self.daily_activity.insert(loc=0, column='study_code', value=self.study_code)
         self.daily_activity.insert(loc=1, column='subject_id', value=self.subject_id)
@@ -1001,6 +997,67 @@ class NWCollection:
         df.insert(loc=1, column='subject_id', value=self.subject_id)
         df.insert(loc=2, column='coll_id', value=self.coll_id)
         return df
+
+    def select_activity_device(self, dominant=False):
+
+        # select which device to use for activity level
+
+        # select eligible device types and locations
+        activity_device_types = ['GNAC', 'AXV6']
+        activity_locations = self.device_locations['right_wrist'] + self.device_locations['left_wrist']
+
+        # get index of all eligible devices
+        activity_device_index = self.device_info.loc[(self.device_info['device_type'].isin(activity_device_types)) &
+                                                     (self.device_info['device_location'].isin(
+                                                         activity_locations))].index.values.tolist()
+
+        # if multiple eligible devices we will try to choose one
+        if len(activity_device_index) > 1:
+
+            # if dominant hand is info is available we will choose based on dominant argument
+            if self.subject_info['dominant_hand']:
+
+                # select dominant or non-dominant based on argument
+                if dominant:
+                    wrist = 'right_wrist' if self.subject_info['dominant_hand'] == 'right' else 'left_wrist'
+                else:
+                    wrist = 'left_wrist' if self.subject_info['dominant_hand'] == 'right' else 'right_wrist'
+
+                # select devices at locations based on dominance
+                activity_locations = self.device_locations[wrist]
+                activity_device_index = self.device_info.loc[
+                    (self.device_info['device_type'].isin(activity_device_types)) &
+                    (self.device_info['device_location'].isin(activity_locations))].index.values.tolist()
+
+                # if still multiple eligible devices, take first one
+                if len(activity_device_index) > 1:
+                    activity_device_index = [activity_device_index[0]]
+
+                # if no eligible devices, go back and take first one from list of all eligible
+                elif len(activity_device_index) < 1:
+                    activity_locations = self.device_locations['right_wrist'] + self.device_locations['left_wrist']
+                    activity_device_index = self.device_info.loc[
+                        (self.device_info['device_type'].isin(activity_device_types)) &
+                        (self.device_info['device_location'].isin(activity_locations))].index.values.tolist()
+                    activity_device_index = [activity_device_index[0]]
+
+            # if no dominant hand info take first from list
+            else:
+                activity_device_index = [activity_device_index[0]]
+
+        # if only one device determine, if it is dominant
+        elif len(activity_device_index) == 1:
+
+            # if dominant hand info is available we will determine dominance
+            # if dominant hand info is available we will determine dominance
+            if self.subject_info['dominant_hand']:
+                dominant_wrist = self.subject_info['dominant_hand'] + '_wrist'
+                dominant = self.device_info.loc[activity_device_index]['device_location'].item() in \
+                           self.device_locations[dominant_wrist]
+
+            # if no dominant hand info available, assume dominant argument is correct
+
+        return activity_device_index, dominant
 
 
 def message(msg, level='info', display=True, log=True):
