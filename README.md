@@ -26,6 +26,20 @@ To include a specific release, replace `@latest` with the tag associated with th
 
 # Changes by version
 
+v0.6.0
+- add non-wear detection for Axivity devices (AXV6) (nwnonwear v0.1.2)
+- interpolate inserted values when correcting clock drift or sample rate (nwdata v0.5.0)
+- faster GENEActiv read and progress bars on clock drift correct (nwdata v0.6.0)
+- adjust device selection logic for activity, gait, sleep analytics
+
+v0.5.0
+- update `nwdata` to require v0.4.0
+    - fixes bug where startdate not updated when cropping NWData
+    - adds method to get day indices of a signal
+- add subjects.csv
+- add sleep detection and analysis (nwsleep v0.1.0)
+- fix bug where errors during collection not logged correctly
+
 v0.4.0
 - update `nwactivity` to require v0.1.1 (remove mvpa from daily summary)
 - update `nwgait` to require v0.1.2 (add daily gait summary)
