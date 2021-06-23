@@ -76,7 +76,8 @@ class NWPipeline:
         for key, value in self.dirs.items():
             Path(value).mkdir(parents=True, exist_ok=True)
 
-    def run(self, subject_ids=None, coll_ids=None, single_stage=None, overwrite_header=False, quiet=False, log=True):
+    def run(self, subject_ids=None, coll_ids=None, single_stage=None, overwrite_header=False, min_crop_duration=3,
+            max_crop_time_to_eof=20, activity_dominant=False, sleep_dominant=False, quiet=False, log=True):
 
         logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', filename=self.log_file_path,
                             level=logging.INFO)
@@ -127,10 +128,12 @@ class NWPipeline:
                         coll_subject_dict = coll_subject_df.iloc[0].to_dict() if coll_subject_df.shape[0] > 0 else {}
     
                     # construct collection class and process
-                    coll = NWCollection(study_code=self.study_code, subject_id=subject_id, coll_id=coll_id, device_info=coll_device_list_df,
-                                        subject_info=coll_subject_dict, dirs=self.dirs)
-                    coll.process(single_stage=single_stage, overwrite_header=overwrite_header, min_crop_duration=3,
-                                 max_crop_time_to_eof=20, quiet=quiet, log=log)
+                    coll = NWCollection(study_code=self.study_code, subject_id=subject_id, coll_id=coll_id,
+                                        device_info=coll_device_list_df, subject_info=coll_subject_dict, dirs=self.dirs)
+                    coll.process(single_stage=single_stage, overwrite_header=overwrite_header,
+                                 min_crop_duration=min_crop_duration, max_crop_time_to_eof=max_crop_time_to_eof,
+                                 activity_dominant=activity_dominant, sleep_dominant=sleep_dominant, quiet=quiet,
+                                 log=log)
                 except:
                     tb = traceback.format_exc()
                     message(tb, level='error', display=(not quiet), log=log)
@@ -227,6 +230,7 @@ class NWCollection:
             except NWException as e:
                 coll_status[f.__name__] = f'Failed'
                 message(str(e), level='error', display=(not kwargs['quiet']), log=kwargs['log'])
+                message('', level='info', display=(not kwargs['quiet']), log=kwargs['log'])
             except Exception as e:
                 coll_status[f.__name__] = f'Failed'
                 raise e
@@ -236,7 +240,7 @@ class NWCollection:
         return coll_status_wrapper
 
     def process(self, single_stage=None, overwrite_header=False, min_crop_duration=1, max_crop_time_to_eof=20,
-                quiet=False, log=True):
+                activity_dominant=False, sleep_dominant=False, quiet=False, log=True):
         """Processes the collection
 
         Args:
@@ -247,7 +251,8 @@ class NWCollection:
         """
 
         if single_stage in ['activity', 'gait', 'sleep']:
-            self.required_devices(single_stage=single_stage, quiet=quiet, log=log)
+            self.required_devices(single_stage=single_stage, activity_dominant=activity_dominant,
+                                  sleep_dominant=sleep_dominant, quiet=quiet, log=log)
 
         # read data from all devices in collection
         self.read(single_stage=single_stage, overwrite_header=overwrite_header, save=True, quiet=quiet, log=log)
@@ -276,7 +281,7 @@ class NWCollection:
 
         # process activity levels
         if single_stage in [None, 'activity']:
-            self.activity(dominant=False, save=True, quiet=quiet, log=log)
+            self.activity(dominant=activity_dominant, save=True, quiet=quiet, log=log)
 
         # process gait
         if single_stage in [None, 'gait']:
@@ -284,11 +289,11 @@ class NWCollection:
 
         # process sleep
         if single_stage in [None, 'sleep']:
-            self.sleep(save=True, quiet=quiet, log=log)
+            self.sleep(dominant=sleep_dominant, save=True, quiet=quiet, log=log)
 
         return True
 
-    def required_devices(self, single_stage, quiet=False, log=True):
+    def required_devices(self, single_stage, activity_dominant=False, sleep_dominant=False, quiet=False, log=True):
         ''' Select only required devices for single stage processing.
 
         :param single_stage:
@@ -298,30 +303,24 @@ class NWCollection:
 
         '''
 
-        # TODO: call select device methods
+        device_index = []
 
-        req_dev_switch = {'activity': [['GNAC', 'AXV6'],
-                                       ['left_wrist' if self.subject_info['dominant_hand'] == 'right'
-                                        else 'right_wrist']],
-                          'gait': [['GNAC', 'AXV6'],
-                                   ['left_ankle', 'right_ankle']],
-                          'sleep': [['GNAC', 'AXV6'],
-                                       ['left_wrist' if self.subject_info['dominant_hand'] == 'right'
-                                        else 'right_wrist']]}
+        if single_stage == 'activity':
+            activity_device_index, activity_dominant = self.select_activity_device(dominant=activity_dominant)
+            device_index += activity_device_index
+        elif single_stage == 'gait':
+            r_gait_device_index, l_gait_device_index = self.select_gait_device()
+            device_index += r_gait_device_index + l_gait_device_index
+        elif single_stage == 'sleep':
+            sleep_device_index, sleep_dominant = self.select_sleep_device(dominant=sleep_dominant)
+            device_index += sleep_device_index
 
-        device_types = req_dev_switch[single_stage][0]
+        device_index = list(set(device_index))
 
-        device_locations = []
-        for dev_loc in req_dev_switch[single_stage][1]:
-            device_locations.extend(self.device_locations[dev_loc])
-
-        self.device_info = self.device_info[(self.device_info['device_type'].isin(device_types)) &
-                                            (self.device_info['device_location'].isin(device_locations))]
-
+        self.device_info = self.device_info.iloc[device_index]
         self.device_info.reset_index(inplace=True, drop=True)
 
         return True
-
 
     @coll_status
     def read(self, single_stage=None, overwrite_header=False, save=False, quiet=False, log=True):
@@ -761,9 +760,7 @@ class NWCollection:
                                          sample_rate=self.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
                                          epoch_length=epoch_length, dominant=dominant, quiet=quiet)
 
-        self.epoch_activity.insert(loc=0, column='study_code', value=self.study_code)
-        self.epoch_activity.insert(loc=1, column='subject_id', value=self.subject_id)
-        self.epoch_activity.insert(loc=2, column='coll_id', value=self.coll_id)
+        self.epoch_activity = self.identify_df(self.epoch_activity)
 
         #total_activity = nwactivity.sum_total_activity(epoch_intensity=epoch_intensity, epoch_length=epoch_length, quiet=quiet)
 
@@ -771,11 +768,10 @@ class NWCollection:
         self.daily_activity = nwactivity.sum_daily_activity(epoch_intensity=self.epoch_activity['intensity'], epoch_length=epoch_length,
                                             start_datetime=self.devices[activity_device_index].header['startdate'], quiet=quiet)
 
-        self.daily_activity.insert(loc=0, column='study_code', value=self.study_code)
-        self.daily_activity.insert(loc=1, column='subject_id', value=self.subject_id)
-        self.daily_activity.insert(loc=2, column='coll_id', value=self.coll_id)
+        self.daily_activity = self.identify_df(self.daily_activity)
 
         # TODO: more detailed log info about what was done, epochs, days, intensities?
+        # TODO: info about algortihm and settings, device used, dominant vs non-dominant, in log, methods, or data table
 
         if save:
 
@@ -808,45 +804,42 @@ class NWCollection:
         message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
-        l_file_index = self.device_info.loc[self.device_info['device_location'].isin(self.device_locations['left_ankle'])].index.values
-        r_file_index = self.device_info.loc[self.device_info['device_location'].isin(self.device_locations['right_ankle'])].index.values
+        r_gait_device_index, l_gait_device_index = self.select_gait_device()
 
-        if not (l_file_index or r_file_index):
+        if not (l_gait_device_index or r_gait_device_index):
             raise NWException(f'{self.subject_id}_{self.coll_id}: No left or right ankle device found in device list')
 
         # set indices and handles case if ankle data is missing
-        l_file_index = l_file_index[0] if l_file_index else r_file_index[0]
-        r_file_index = r_file_index[0] if r_file_index else l_file_index[0]
+        l_gait_device_index = l_gait_device_index[0] if l_gait_device_index else r_gait_device_index[0]
+        r_gait_device_index = r_gait_device_index[0] if r_gait_device_index else l_gait_device_index[0]
 
-        # find accelerometer indices
-        assert self.device_info.loc[l_file_index, 'device_type'] == self.device_info.loc[r_file_index, 'device_type']
-
-        # get ankle files and only take accelerometer signals
-        l_file = self.devices[l_file_index]
-        r_file = self.devices[r_file_index]
+        # check to see that device_types match - comment because not necessary?
+        # assert self.device_info.loc[l_gait_device_index, 'device_type'] == self.device_info.loc[r_gait_device_index, 'device_type']
 
         # checks to see if files exist
-        if not (l_file and r_file):
+        if not (self.devices[l_gait_device_index] and self.devices[r_gait_device_index]):
             raise NWException(f'{self.subject_id}_{self.coll_id}: Either left or right ankle device data is missing')
 
         # convert inputs to objects as inputs
-        l_accel_x_sig = l_file.get_signal_index('Accelerometer x')
-        l_accel_y_sig = l_file.get_signal_index('Accelerometer y')
-        l_accel_z_sig = l_file.get_signal_index('Accelerometer z')
-        l_obj = nwgait.AccelReader.sig_init(raw_x=l_file.signals[l_accel_x_sig],
-            raw_y=l_file.signals[l_accel_y_sig],
-            raw_z=l_file.signals[l_accel_z_sig],
-            startdate = l_file.header['startdate'],
-            freq=l_file.signal_headers[axis]['sample_rate'])
+        l_accel_x_sig = self.devices[l_gait_device_index].get_signal_index('Accelerometer x')
+        l_accel_y_sig = self.devices[l_gait_device_index].get_signal_index('Accelerometer y')
+        l_accel_z_sig = self.devices[l_gait_device_index].get_signal_index('Accelerometer z')
 
-        r_accel_x_sig = r_file.get_signal_index('Accelerometer x')
-        r_accel_y_sig = r_file.get_signal_index('Accelerometer y')
-        r_accel_z_sig = r_file.get_signal_index('Accelerometer z')
-        r_obj = nwgait.AccelReader.sig_init(raw_x=r_file.signals[r_accel_x_sig],
-            raw_y=r_file.signals[r_accel_y_sig],
-            raw_z=r_file.signals[r_accel_z_sig],
-            startdate = r_file.header['startdate'],
-            freq=r_file.signal_headers[axis]['sample_rate'])
+        l_obj = nwgait.AccelReader.sig_init(raw_x=self.devices[l_gait_device_index].signals[l_accel_x_sig],
+            raw_y=self.devices[l_gait_device_index].signals[l_accel_y_sig],
+            raw_z=self.devices[l_gait_device_index].signals[l_accel_z_sig],
+            startdate = self.devices[l_gait_device_index].header['startdate'],
+            freq=self.devices[l_gait_device_index].signal_headers[l_accel_x_sig]['sample_rate'])
+
+        r_accel_x_sig = self.devices[r_gait_device_index].get_signal_index('Accelerometer x')
+        r_accel_y_sig = self.devices[r_gait_device_index].get_signal_index('Accelerometer y')
+        r_accel_z_sig = self.devices[r_gait_device_index].get_signal_index('Accelerometer z')
+
+        r_obj = nwgait.AccelReader.sig_init(raw_x=self.devices[r_gait_device_index].signals[r_accel_x_sig],
+            raw_y=self.devices[r_gait_device_index].signals[r_accel_y_sig],
+            raw_z=self.devices[r_gait_device_index].signals[r_accel_z_sig],
+            startdate = self.devices[r_gait_device_index].header['startdate'],
+            freq=self.devices[r_gait_device_index].signal_headers[r_accel_x_sig]['sample_rate'])
 
         # run gait algorithm to find bouts
         wb = nwgait.WalkingBouts(l_obj, r_obj, left_kwargs={'axis': axis}, right_kwargs={'axis': axis})
@@ -874,8 +867,6 @@ class NWCollection:
             'heel_strike_time','mid_swing_accel','mid_swing_time','step_length',
             'step_state','step_time','swing_start_accel','swing_start_time' ]
         self.step_times = self.step_times[step_cols]
-
-
 
         if save:
             # create all file path variables
@@ -906,7 +897,7 @@ class NWCollection:
         return True
 
     @coll_status
-    def sleep(self, save=False, quiet=False, log=True):
+    def sleep(self, dominant=False, save=False, quiet=False, log=True):
         message("Detecting sleep...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
@@ -914,30 +905,30 @@ class NWCollection:
         self.sleep_bouts = pd.DataFrame()
         self.daily_sleep = pd.DataFrame()
 
-        device_location = 'left_wrist' if self.subject_info['dominant_hand'] == 'right' else 'right_wrist'
+        sleep_device_index, dominant = self.select_sleep_device(dominant=dominant)
 
-        wrist_device_index = self.device_info.loc[
-            self.device_info['device_location'].isin(self.device_locations[device_location])].index.values
-
-        if len(wrist_device_index) == 0:
+        if len(sleep_device_index) == 0:
             raise NWException(f"{self.subject_id}_{self.coll_id}: Wrist device not found in device list")
 
-        # TODO: add warning if multiple devices match - use first match
-        wrist_device_index = wrist_device_index[0]
+        sleep_device_index = sleep_device_index[0]
 
         # checks to see if files exist
-        if not self.devices[wrist_device_index]:
+        if not self.devices[sleep_device_index]:
             raise NWException(f'{self.subject_id}_{self.coll_id}: Wrist device data is missing')
 
-        accel_x_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer x')
-        accel_y_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer y')
-        accel_z_sig = self.devices[wrist_device_index].get_signal_index('Accelerometer z')
+        accel_x_sig = self.devices[sleep_device_index].get_signal_index('Accelerometer x')
+        accel_y_sig = self.devices[sleep_device_index].get_signal_index('Accelerometer y')
+        accel_z_sig = self.devices[sleep_device_index].get_signal_index('Accelerometer z')
 
-        self.sptw, self.sleep_bouts = nwsleep.detect_sleep(x_values=self.devices[wrist_device_index].signals[accel_x_sig],
-                                                 y_values=self.devices[wrist_device_index].signals[accel_y_sig],
-                                                 z_values=self.devices[wrist_device_index].signals[accel_z_sig],
-                                                 sample_rate=round(self.devices[wrist_device_index].signal_headers[accel_x_sig]['sample_rate']),
-                                                 start_datetime=self.devices[wrist_device_index].header['startdate'])
+        # TODO: should sleep algorithm be modified if dominant vs non-dominant hand?
+        # TODO: use Andrew Lim cutoffs for sleep detection?
+
+        self.sptw, self.sleep_bouts = nwsleep.detect_sleep(x_values=self.devices[sleep_device_index].signals[accel_x_sig],
+                                                           y_values=self.devices[sleep_device_index].signals[accel_y_sig],
+                                                           z_values=self.devices[sleep_device_index].signals[accel_z_sig],
+                                                           sample_rate=round(self.devices[sleep_device_index].signal_headers[accel_x_sig]['sample_rate']),
+                                                           start_datetime=self.devices[sleep_device_index].header['startdate'],
+                                                           z_abs_threshold=5, min_sleep_length=5)
 
         message(f"Detected {self.sptw.shape[0]} sleep period time windows", level='info', display=(not quiet), log=log)
         message(f"Detected {self.sleep_bouts.shape[0]} sleep bouts", level='info', display=(not quiet), log=log)
@@ -946,17 +937,9 @@ class NWCollection:
 
         self.daily_sleep = nwsleep.sptw_stats(self.sptw, self.sleep_bouts, type='daily_long')
 
-        self.sptw.insert(loc=0, column='study_code', value=self.study_code)
-        self.sptw.insert(loc=1, column='subject_id', value=self.subject_id)
-        self.sptw.insert(loc=2, column='coll_id', value=self.coll_id)
-
-        self.sleep_bouts.insert(loc=0, column='study_code', value=self.study_code)
-        self.sleep_bouts.insert(loc=1, column='subject_id', value=self.subject_id)
-        self.sleep_bouts.insert(loc=2, column='coll_id', value=self.coll_id)
-
-        self.daily_sleep.insert(loc=0, column='study_code', value=self.study_code)
-        self.daily_sleep.insert(loc=1, column='subject_id', value=self.subject_id)
-        self.daily_sleep.insert(loc=2, column='coll_id', value=self.coll_id)
+        self.sptw = self.identify_df(self.sptw)
+        self.sleep_bouts = self.identify_df(self.sleep_bouts)
+        self.daily_sleep = self.identify_df(self.daily_sleep)
 
         self.sptw.drop(['start_dp', 'end_dp'], axis='columns', inplace=True)
         self.sleep_bouts.drop(['start_dp', 'end_dp'], axis='columns', inplace=True)
@@ -1008,8 +991,7 @@ class NWCollection:
 
         # get index of all eligible devices
         activity_device_index = self.device_info.loc[(self.device_info['device_type'].isin(activity_device_types)) &
-                                                     (self.device_info['device_location'].isin(
-                                                         activity_locations))].index.values.tolist()
+                                                     (self.device_info['device_location'].isin(activity_locations))].index.values.tolist()
 
         # if multiple eligible devices we will try to choose one
         if len(activity_device_index) > 1:
@@ -1049,7 +1031,6 @@ class NWCollection:
         elif len(activity_device_index) == 1:
 
             # if dominant hand info is available we will determine dominance
-            # if dominant hand info is available we will determine dominance
             if self.subject_info['dominant_hand']:
                 dominant_wrist = self.subject_info['dominant_hand'] + '_wrist'
                 dominant = self.device_info.loc[activity_device_index]['device_location'].item() in \
@@ -1058,6 +1039,85 @@ class NWCollection:
             # if no dominant hand info available, assume dominant argument is correct
 
         return activity_device_index, dominant
+
+    def select_gait_device(self):
+
+        # select eligible device types and locations
+        gait_device_types = ['GNAC', 'AXV6']
+        r_gait_locations = self.device_locations['right_ankle']
+        l_gait_locations = self.device_locations['left_ankle']
+
+        # get index of all eligible devices
+        r_gait_device_index = self.device_info.loc[(self.device_info['device_type'].isin(gait_device_types)) &
+                                                     (self.device_info['device_location'].isin(r_gait_locations))].index.values.tolist()
+
+        l_gait_device_index = self.device_info.loc[(self.device_info['device_type'].isin(gait_device_types)) &
+                                                     (self.device_info['device_location'].isin(l_gait_locations))].index.values.tolist()
+
+        #if more than one take the first
+        if len(r_gait_device_index) > 1:
+            r_gait_device_index = [r_gait_device_index[0]]
+        if len(l_gait_device_index) > 1:
+            l_gait_device_index = [l_gait_device_index[0]]
+
+        return r_gait_device_index, l_gait_device_index
+
+    def select_sleep_device(self, dominant=False):
+
+        # select which device to use for activity level
+
+        # select eligible device types and locations
+        sleep_device_types = ['GNAC', 'AXV6']
+        sleep_locations = self.device_locations['right_wrist'] + self.device_locations['left_wrist']
+
+        # get index of all eligible devices
+        sleep_device_index = self.device_info.loc[(self.device_info['device_type'].isin(sleep_device_types)) &
+                                                     (self.device_info['device_location'].isin(
+                                                         sleep_locations))].index.values.tolist()
+
+        # if multiple eligible devices we will try to choose one
+        if len(sleep_device_index) > 1:
+
+            # if dominant hand is info is available we will choose based on dominant argument
+            if self.subject_info['dominant_hand']:
+
+                # select dominant or non-dominant based on argument
+                if dominant:
+                    wrist = 'right_wrist' if self.subject_info['dominant_hand'] == 'right' else 'left_wrist'
+                else:
+                    wrist = 'left_wrist' if self.subject_info['dominant_hand'] == 'right' else 'right_wrist'
+
+                # select devices at locations based on dominance
+                sleep_locations = self.device_locations[wrist]
+                sleep_device_index = self.device_info.loc[(self.device_info['device_type'].isin(sleep_device_types)) &
+                                                          (self.device_info['device_location'].isin(sleep_locations))].index.values.tolist()
+
+                # if still multiple eligible devices, take first one
+                if len(sleep_device_index) > 1:
+                    sleep_device_index = [sleep_device_index[0]]
+
+                # if no eligible devices, go back and take first one from list of all eligible
+                elif len(sleep_device_index) < 1:
+                    sleep_locations = self.device_locations['right_wrist'] + self.device_locations['left_wrist']
+                    sleep_device_index = self.device_info.loc[(self.device_info['device_type'].isin(sleep_device_types)) &
+                                                              (self.device_info['device_location'].isin(sleep_locations))].index.values.tolist()
+                    sleep_device_index = [sleep_device_index[0]]
+
+            # if no dominant hand info take first from list
+            else:
+                sleep_device_index = [sleep_device_index[0]]
+
+        # if only one device determine, if it is dominant
+        elif len(sleep_device_index) == 1:
+
+            # if dominant hand info is available we will determine dominance
+            if self.subject_info['dominant_hand']:
+                dominant_wrist = self.subject_info['dominant_hand'] + '_wrist'
+                dominant = self.device_info.loc[sleep_device_index]['device_location'].item() in self.device_locations[dominant_wrist]
+
+            # if no dominant hand info available, assume dominant argument is correct
+
+        return sleep_device_index, dominant
 
 
 def message(msg, level='info', display=True, log=True):
