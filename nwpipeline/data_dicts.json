@@ -1,4 +1,148 @@
 {
+    "standard_nonwear_times": [
+        {
+            "column_label": "study_code",
+            "description": "study_code",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "subject_id",
+            "description": "subject_id",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "coll_id",
+            "description": "coll_id",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "device_type",
+            "description": "device_type",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "device_location",
+            "description": "device_location",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "nonwear_bout_id",
+            "description": "nonwear_bout_id",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "start_time",
+            "description": "start_time",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "end_time",
+            "description": "end_time",
+            "type": "",
+            "values": ""
+        }
+    ],
+    "epoch_activity": [
+        {
+            "column_label": "study_code",
+            "description": "study_code",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "subject_id",
+            "description": "subject_id",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "coll_id",
+            "description": "coll_id",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "epoch_num",
+            "description": "epoch_num",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "avm",
+            "description": "avm",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "intensity",
+            "description": "intensity",
+            "type": "",
+            "values": ""
+        }
+    ],
+    "daily_activity": [
+        {
+            "column_label": "study_code",
+            "description": "study_code",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "subject_id",
+            "description": "subject_id",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "coll_id",
+            "description": "coll_id",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "day_num",
+            "description": "day_num",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "date",
+            "description": "date",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "sedentary",
+            "description": "sedentary",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "light",
+            "description": "light",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "moderate",
+            "description": "moderate",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "vigorous",
+            "description": "vigorous",
+            "type": "",
+            "values": ""
+        }
+    ],
     "gait_steps": [
         {
             "column_label": "study_code",
@@ -191,7 +335,172 @@
             "values": ""
         }
     ],
-    "sleep": [],
-    "activity": [],
-    "nonwear": []
+    "sptw": [
+        {
+            "column_label": "study_code",
+            "description": "study_code",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "subject_id",
+            "description": "subject_id",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "coll_id",
+            "description": "coll_id",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "sptw_num",
+            "description": "sptw_num",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "relative_date",
+            "description": "relative_date",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "start_time",
+            "description": "start_time",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "end_time",
+            "description": "end_time",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "duration",
+            "description": "duration",
+            "type": "",
+            "values": ""
+        }
+    ],
+    "sleep_bouts": [
+        {
+            "column_label": "study_code",
+            "description": "study_code",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "subject_id",
+            "description": "subject_id",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "coll_id",
+            "description": "coll_id",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "sleep_bout_num",
+            "description": "sleep_bout_num",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "sptw_num",
+            "description": "sptw_num",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "start_time",
+            "description": "start_time",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "end_time",
+            "description": "end_time",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "duration",
+            "description": "duration",
+            "type": "",
+            "values": ""
+        }
+    ],
+    "daily_sleep": [
+        {
+            "column_label": "study_code",
+            "description": "study_code",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "subject_id",
+            "description": "subject_id",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "coll_id",
+            "description": "coll_id",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "day_num",
+            "description": "day_num",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "date",
+            "description": "date",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "type",
+            "description": "type",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "sptw_duration",
+            "description": "sptw_duration",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "total_sleep_duration",
+            "description": "total_sleep_duration",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "sleep_to_wake_duration",
+            "description": "sleep_to_wake_duration",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "se",
+            "description": "sleep efficiency",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "waso",
+            "description": "wakefulness after sleep onset",
+            "type": "",
+            "values": ""
+        }
+    ]
 }
