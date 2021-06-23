@@ -57,8 +57,8 @@ class NWPipeline:
         self.subject_info_path = os.path.join(self.dirs['meta'], 'subjects.csv')
         self.log_file_path = os.path.join(self.dirs['logs'], "processing.log")
 
-        with open(os.path.join(Path(__file__).parent.absolute(),'data_dicts.json')) as f:
-            self.data_dicts = json.loads(f.read())
+        with open(os.path.join(Path(__file__).parent.absolute(),'data_dicts.json'), 'r') as f:
+            self.data_dicts = json.load(f)
 
         # TODO: check for required files (raw data, device_list)
 
@@ -81,9 +81,9 @@ class NWPipeline:
             Path(value).mkdir(parents=True, exist_ok=True)
             # add data dictionary
             if key in self.data_dicts:
-                df = pd.DataFrame(self.data_dicts[key], index=["column_label", "description", "type", "values"]).T
+                df = pd.DataFrame(self.data_dicts[key])
                 p = os.path.join(value, f'{key}_dict.csv')
-                df.to_csv(p)
+                df.to_csv(p, index=False)
 
     def run(self, subject_ids=None, coll_ids=None, single_stage=None, overwrite_header=False, min_crop_duration=3,
             max_crop_time_to_eof=20, activity_dominant=False, sleep_dominant=False, quiet=False, log=True):
@@ -933,6 +933,13 @@ class NWCollection:
         accel_y_sig = self.devices[sleep_device_index].get_signal_index('Accelerometer y')
         accel_z_sig = self.devices[sleep_device_index].get_signal_index('Accelerometer z')
 
+        # get nonwear for sleep_device
+        device_nonwear = self.nonwear_times.loc[(self.nonwear_times['study_code'] == self.study_code) &
+                                                (self.nonwear_times['subject_id'] == self.subject_id) &
+                                                (self.nonwear_times['coll_id'] == self.coll_id) &
+                                                (self.nonwear_times['device_type'] == self.device_info.iloc[sleep_device_index]['device_type']) &
+                                                (self.nonwear_times['device_location'] == self.device_info.iloc[sleep_device_index]['device_location'])]
+
         # TODO: should sleep algorithm be modified if dominant vs non-dominant hand?
         # TODO: use Andrew Lim cutoffs for sleep detection?
 
@@ -941,6 +948,7 @@ class NWCollection:
                                                            z_values=self.devices[sleep_device_index].signals[accel_z_sig],
                                                            sample_rate=round(self.devices[sleep_device_index].signal_headers[accel_x_sig]['sample_rate']),
                                                            start_datetime=self.devices[sleep_device_index].header['startdate'],
+                                                           nonwear = device_nonwear,
                                                            z_abs_threshold=5, min_sleep_length=5)
 
         message(f"Detected {self.sptw.shape[0]} sleep period time windows", level='info', display=(not quiet), log=log)
