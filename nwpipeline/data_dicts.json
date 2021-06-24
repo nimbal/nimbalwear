@@ -417,6 +417,12 @@
             "values": ""
         },
         {
+            "column_label": "bout_detect",
+            "description": "bout_detect",
+            "type": "",
+            "values": ""
+        },
+        {
             "column_label": "start_time",
             "description": "start_time",
             "type": "",
@@ -463,6 +469,12 @@
         {
             "column_label": "date",
             "description": "date",
+            "type": "",
+            "values": ""
+        },
+        {
+            "column_label": "bout_detect",
+            "description": "bout_detect",
             "type": "",
             "values": ""
         },
