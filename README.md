@@ -29,7 +29,8 @@ To include a specific release, replace `@latest` with the tag associated with th
 v0.7.0
 - add mechanism to add data dictionaries to output folders
 - ignore non-wear when detecting sleep period time windows (nwsleep v0.2.0)
-- run t5a5 and t8a4 sleep bout detection 
+- run t5a5 and t8a4 sleep bout detection
+- require pyedflib v0.1.22
 
 v0.6.0
 - add non-wear detection for Axivity devices (AXV6) (nwnonwear v0.1.2)
