@@ -911,7 +911,7 @@ class NWCollection:
 
     @coll_status
     def sleep(self, dominant=False, save=False, quiet=False, log=True):
-        message("Detecting sleep...", level='info', display=(not quiet), log=log)
+        message("Analyzing sleep...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
         self.sptw = pd.DataFrame()
@@ -943,27 +943,52 @@ class NWCollection:
         # TODO: should sleep algorithm be modified if dominant vs non-dominant hand?
         # TODO: use Andrew Lim cutoffs for sleep detection?
 
-        self.sptw, self.sleep_bouts = nwsleep.detect_sleep(x_values=self.devices[sleep_device_index].signals[accel_x_sig],
-                                                           y_values=self.devices[sleep_device_index].signals[accel_y_sig],
-                                                           z_values=self.devices[sleep_device_index].signals[accel_z_sig],
-                                                           sample_rate=round(self.devices[sleep_device_index].signal_headers[accel_x_sig]['sample_rate']),
-                                                           start_datetime=self.devices[sleep_device_index].header['startdate'],
-                                                           nonwear = device_nonwear,
-                                                           z_abs_threshold=5, min_sleep_length=5)
+        self.sptw, z_angle, z_angle_diff, z_sample_rate = nwsleep.detect_sptw(
+            x_values=self.devices[sleep_device_index].signals[accel_x_sig],
+            y_values=self.devices[sleep_device_index].signals[accel_y_sig],
+            z_values=self.devices[sleep_device_index].signals[accel_z_sig],
+            sample_rate=round(self.devices[sleep_device_index].signal_headers[accel_x_sig]['sample_rate']),
+            start_datetime=self.devices[sleep_device_index].header['startdate'],
+            nonwear = device_nonwear)
 
         message(f"Detected {self.sptw.shape[0]} sleep period time windows", level='info', display=(not quiet), log=log)
-        message(f"Detected {self.sleep_bouts.shape[0]} sleep bouts", level='info', display=(not quiet), log=log)
 
-        message("Summarizing daily sleep analytics...", level='info', display=(not quiet), log=log)
+        sleep_t5a5 = nwsleep.detect_sleep_bouts(z_angle_diff=z_angle_diff, sptw=self.sptw,
+                                                      z_sample_rate=z_sample_rate,
+                                                      start_datetime=self.devices[sleep_device_index].header['startdate'],
+                                                      z_abs_threshold=5, min_sleep_length=5)
 
-        self.daily_sleep = nwsleep.sptw_stats(self.sptw, self.sleep_bouts, type='daily_long')
+        sleep_t5a5.insert(loc=0, column='bout_detect', value='t5a5')
+
+        message(f"Detected {sleep_t5a5.shape[0]} sleep bouts (t5a5)", level='info', display=(not quiet), log=log)
+
+        sleep_t8a4 = nwsleep.detect_sleep_bouts(z_angle_diff=z_angle_diff, sptw=self.sptw,
+                                                z_sample_rate=z_sample_rate,
+                                                start_datetime=self.devices[sleep_device_index].header['startdate'],
+                                                z_abs_threshold=4, min_sleep_length=8)
+
+        sleep_t8a4.insert(loc=0, column='bout_detect', value='t8a4')
+
+        message(f"Detected {sleep_t8a4.shape[0]} sleep bouts (t8a4)", level='info', display=(not quiet), log=log)
+
+        self.sleep_bouts = pd.concat([sleep_t5a5, sleep_t8a4])
+
+        daily_sleep_t5a5 = nwsleep.sptw_stats(self.sptw, sleep_t5a5, type='daily_long')
+        message(f"Summarized {daily_sleep_t5a5.shape[0]} days of sleep analytics (t5a5)...", level='info',
+                display=(not quiet), log=log)
+
+        daily_sleep_t8a4 = nwsleep.sptw_stats(self.sptw, sleep_t8a4, type='daily_long')
+        message(f"Summarized {daily_sleep_t8a4.shape[0]} days of sleep analytics (t8a4)...", level='info',
+                display=(not quiet), log=log)
+
+        daily_sleep_t5a5.insert(loc=0, column='bout_detect', value='t5a5')
+        daily_sleep_t8a4.insert(loc=0, column='bout_detect', value='t8a4')
+
+        self.daily_sleep = pd.concat([daily_sleep_t5a5, daily_sleep_t8a4])
 
         self.sptw = self.identify_df(self.sptw)
         self.sleep_bouts = self.identify_df(self.sleep_bouts)
         self.daily_sleep = self.identify_df(self.daily_sleep)
-
-        self.sptw.drop(['start_dp', 'end_dp'], axis='columns', inplace=True)
-        self.sleep_bouts.drop(['start_dp', 'end_dp'], axis='columns', inplace=True)
 
         if save:
 
