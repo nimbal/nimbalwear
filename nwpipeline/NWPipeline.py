@@ -8,7 +8,6 @@ import json
 
 from tqdm import tqdm
 import pandas as pd
-import numpy as np
 import nwdata
 import nwnonwear
 from nwpipeline import __version__
@@ -958,7 +957,7 @@ class NWCollection:
                                                       start_datetime=self.devices[sleep_device_index].header['startdate'],
                                                       z_abs_threshold=5, min_sleep_length=5)
 
-        sleep_t5a5.insert(loc=0, column='bout_detect', value='t5a5')
+        sleep_t5a5.insert(loc=2, column='bout_detect', value='t5a5')
 
         message(f"Detected {sleep_t5a5.shape[0]} sleep bouts (t5a5)", level='info', display=(not quiet), log=log)
 
@@ -967,7 +966,7 @@ class NWCollection:
                                                 start_datetime=self.devices[sleep_device_index].header['startdate'],
                                                 z_abs_threshold=4, min_sleep_length=8)
 
-        sleep_t8a4.insert(loc=0, column='bout_detect', value='t8a4')
+        sleep_t8a4.insert(loc=2, column='bout_detect', value='t8a4')
 
         message(f"Detected {sleep_t8a4.shape[0]} sleep bouts (t8a4)", level='info', display=(not quiet), log=log)
 
@@ -981,8 +980,8 @@ class NWCollection:
         message(f"Summarized {daily_sleep_t8a4.shape[0]} days of sleep analytics (t8a4)...", level='info',
                 display=(not quiet), log=log)
 
-        daily_sleep_t5a5.insert(loc=0, column='bout_detect', value='t5a5')
-        daily_sleep_t8a4.insert(loc=0, column='bout_detect', value='t8a4')
+        daily_sleep_t5a5.insert(loc=2, column='bout_detect', value='t5a5')
+        daily_sleep_t8a4.insert(loc=2, column='bout_detect', value='t8a4')
 
         self.daily_sleep = pd.concat([daily_sleep_t5a5, daily_sleep_t8a4])
 
