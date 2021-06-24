@@ -24,6 +24,7 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     packages=setuptools.find_packages(),
+    include_package_data=True,
     python_requires=">=3.6",
     install_requires=['tqdm', 'pandas',
                       'pyedflib@git+https://github.com/holgern/pyedflib@v0.1.22#egg=pyedflib',
