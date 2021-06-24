@@ -26,6 +26,9 @@ To include a specific release, replace `@latest` with the tag associated with th
 
 # Changes by version
 
+v0.7.1
+- update pyedflib for all required packages
+
 v0.7.0
 - add mechanism to add data dictionaries to output folders
 - ignore non-wear when detecting sleep period time windows (nwsleep v0.2.0)
