@@ -377,12 +377,6 @@
             "description": "end_time",
             "type": "",
             "values": ""
-        },
-        {
-            "column_label": "duration",
-            "description": "duration",
-            "type": "",
-            "values": ""
         }
     ],
     "sleep_bouts": [
@@ -431,12 +425,6 @@
         {
             "column_label": "end_time",
             "description": "end_time",
-            "type": "",
-            "values": ""
-        },
-        {
-            "column_label": "duration",
-            "description": "duration",
             "type": "",
             "values": ""
         }
