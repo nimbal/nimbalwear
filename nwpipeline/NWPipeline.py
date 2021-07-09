@@ -859,8 +859,20 @@ class NWCollection:
         # save bout times
         self.bout_times = wb.export_bouts()
         self.bout_times = self.identify_df(self.bout_times)
+
+        # save step times
         self.step_times = wb.export_steps()
+
+        # compensate for export_steps returning blank DataFrame if no steps
+        # TODO: Fix in nwgait to return columns
+        if self.step_times.empty:
+            self.step_times = pd.DataFrame(columns=['step_num', 'gait_bout_num', 'foot', 'avg_speed',
+                                                    'heel_strike_accel', 'heel_strike_time', 'mid_swing_accel',
+                                                    'mid_swing_time', 'step_length', 'step_state', 'step_time',
+                                                    'swing_start_accel', 'swing_start_time'])
+
         self.step_times = self.identify_df(self.step_times)
+
 
         message(f"Detected {self.bout_times.shape[0]} gait bouts", level='info', display=(not quiet), log=log)
         message(f"Detected {self.step_times.shape[0]} steps", level='info', display=(not quiet), log=log)
@@ -871,26 +883,22 @@ class NWCollection:
         self.daily_gait = self.identify_df(self.daily_gait)
 
         # adjusting gait parameters
-        bout_cols = ['study_code','subject_id','coll_id','gait_bout_num',
-            'start_timestamp','end_timestamp', 'number_steps']
+        bout_cols = ['study_code', 'subject_id', 'coll_id', 'gait_bout_num', 'start_timestamp', 'end_timestamp',
+                     'number_steps']
         self.bout_times = self.bout_times[bout_cols]
-        step_cols = ['study_code','subject_id','coll_id','step_num',
-            'gait_bout_num','foot','avg_speed','heel_strike_accel',
-            'heel_strike_time','mid_swing_accel','mid_swing_time','step_length',
-            'step_state','step_time','swing_start_accel','swing_start_time' ]
+
+        step_cols = ['study_code','subject_id','coll_id','step_num', 'gait_bout_num', 'foot', 'avg_speed',
+                     'heel_strike_accel', 'heel_strike_time', 'mid_swing_accel', 'mid_swing_time', 'step_length',
+                     'step_state', 'step_time', 'swing_start_accel', 'swing_start_time']
         self.step_times = self.step_times[step_cols]
 
         if save:
             # create all file path variables
-            bouts_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
-                                                 self.coll_id, "GAIT_BOUTS"]),
-                                       "csv"])
-            steps_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
-                                                 self.coll_id, "GAIT_STEPS"]),
-                                       "csv"])
-            daily_gait_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id,
-                                                 self.coll_id, "DAILY_GAIT"]),
-                                       "csv"])
+            bouts_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id, self.coll_id, "GAIT_BOUTS"]), "csv"])
+            steps_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id, self.coll_id, "GAIT_STEPS"]), "csv"])
+            daily_gait_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id, self.coll_id, "DAILY_GAIT"]),
+                                            "csv"])
+
             bouts_csv_path = os.path.join(self.dirs['gait_bouts'], bouts_csv_name)
             steps_csv_path = os.path.join(self.dirs['gait_steps'], steps_csv_name)
             daily_gait_csv_path = os.path.join(self.dirs['daily_gait'], daily_gait_csv_name)
