@@ -64,8 +64,8 @@ print("Wrangling")
 
 start_datetime = nwdevice.header['startdate']
 
-start_time = start_datetime+ dt.timedelta(hours=3)
-end_time = start_datetime + dt.timedelta(hours=27)
+start_time = start_datetime+ dt.timedelta(hours=23)
+end_time = start_datetime + dt.timedelta(hours=35)
 
 nwdevice.crop(new_start_time=start_time, new_end_time=end_time)
 
