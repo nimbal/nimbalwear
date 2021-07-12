@@ -293,7 +293,7 @@ class NWCollection:
 
         # process gait
         if single_stage in [None, 'gait']:
-            self.gait(save=True, quiet=quiet, log=log)
+            self.gait(axis=0, save=True, quiet=quiet, log=log, )
 
         # process sleep
         if single_stage in [None, 'sleep']:
@@ -808,7 +808,7 @@ class NWCollection:
         return True
 
     @coll_status
-    def gait(self, save=False, quiet=False, log=True, axis=0):
+    def gait(self, axis=0, save=False, quiet=False, log=True):
 
         # TODO: axis needs to be set based on orientation of device
 

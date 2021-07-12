@@ -1,6 +1,6 @@
 import nwpipeline as nwpl
 
-study_dir = '/Volumes/KIT_DATA/test-HANDDS'
+study_dir = r'W:\NiMBaLWEAR\OND06'
 
 test_nwpl = nwpl.NWPipeline(study_dir)
 
@@ -13,4 +13,4 @@ test_nwpl = nwpl.NWPipeline(study_dir)
 # print(subject_ids)
 # print(coll_ids)
 
-test_nwpl.run(single_stage='gait', overwrite_header=True, quiet=True, log=True)
+test_nwpl.run(overwrite_header=True, quiet=True, log=True)
