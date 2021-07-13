@@ -85,7 +85,7 @@ class NWPipeline:
                 df.to_csv(p, index=False)
 
     def run(self, subject_ids=None, coll_ids=None, single_stage=None, overwrite_header=False, min_crop_duration=3,
-            max_crop_time_to_eof=20, activity_dominant=False, sleep_dominant=False, quiet=False, log=True):
+            max_crop_time_to_eof=20, activity_dominant=False, sleep_dominant=False, gait_axis=1, quiet=False, log=True):
 
         logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', filename=self.log_file_path,
                             level=logging.INFO)
@@ -140,8 +140,8 @@ class NWPipeline:
                                         device_info=coll_device_list_df, subject_info=coll_subject_dict, dirs=self.dirs)
                     coll.process(single_stage=single_stage, overwrite_header=overwrite_header,
                                  min_crop_duration=min_crop_duration, max_crop_time_to_eof=max_crop_time_to_eof,
-                                 activity_dominant=activity_dominant, sleep_dominant=sleep_dominant, quiet=quiet,
-                                 log=log)
+                                 activity_dominant=activity_dominant, sleep_dominant=sleep_dominant, gait_axis=1,
+                                 quiet=quiet, log=log)
                 except:
                     tb = traceback.format_exc()
                     message(tb, level='error', display=(not quiet), log=log)
@@ -248,7 +248,7 @@ class NWCollection:
         return coll_status_wrapper
 
     def process(self, single_stage=None, overwrite_header=False, min_crop_duration=1, max_crop_time_to_eof=20,
-                activity_dominant=False, sleep_dominant=False, quiet=False, log=True):
+                activity_dominant=False, sleep_dominant=False, gait_axis=1, quiet=False, log=True):
         """Processes the collection
 
         Args:
@@ -293,7 +293,7 @@ class NWCollection:
 
         # process gait
         if single_stage in [None, 'gait']:
-            self.gait(axis=0, save=True, quiet=quiet, log=log, )
+            self.gait(axis=gait_axis, save=True, quiet=quiet, log=log, )
 
         # process sleep
         if single_stage in [None, 'sleep']:
@@ -808,7 +808,7 @@ class NWCollection:
         return True
 
     @coll_status
-    def gait(self, axis=0, save=False, quiet=False, log=True):
+    def gait(self, axis=1, save=False, quiet=False, log=True):
 
         # TODO: axis needs to be set based on orientation of device
 
