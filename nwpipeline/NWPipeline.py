@@ -995,7 +995,7 @@ class NWCollection:
                 display=(not quiet), log=log)
 
         daily_all_sleep_t8a4 = nwsleep.sptw_stats(self.sptw, sleep_t8a4, type='daily_long')
-        message(f"Summarized {daily_all_sleep_t8a4.shape[0]} days of sleep analytics (t8a4, daily_long)...", level='info',
+        message(f"Summarized {daily_all_sleep_t8a4.shape[0]} days of sleep analytics (t8a4, daily_all)...", level='info',
                 display=(not quiet), log=log)
 
         daily_long_sleep_t5a5.insert(loc=2, column='bout_detect', value='t5a5')
