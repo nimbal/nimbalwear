@@ -140,7 +140,7 @@ class NWPipeline:
                                         device_info=coll_device_list_df, subject_info=coll_subject_dict, dirs=self.dirs)
                     coll.process(single_stage=single_stage, overwrite_header=overwrite_header,
                                  min_crop_duration=min_crop_duration, max_crop_time_to_eof=max_crop_time_to_eof,
-                                 activity_dominant=activity_dominant, sleep_dominant=sleep_dominant, gait_axis=1,
+                                 activity_dominant=activity_dominant, sleep_dominant=sleep_dominant, gait_axis=gait_axis,
                                  quiet=quiet, log=log)
                 except:
                     tb = traceback.format_exc()
