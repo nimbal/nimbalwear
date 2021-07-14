@@ -26,6 +26,12 @@ To include a specific release, replace `@latest` with the tag associated with th
 
 # Changes by version
 
+v0.7.2
+- add option to select axis used to detect gait
+- bug fix: convert device locations to upper case when selecting devices
+- bug fix: add column names to steps table if none found (workaround)
+- bug fix: check for minimum usable data and candidate sptw and sleep bouts before continuing processing (nwsleep v0.2.2)
+
 v0.7.1
 - update pyedflib for all required packages
 
