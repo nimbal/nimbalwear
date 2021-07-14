@@ -28,6 +28,7 @@ To include a specific release, replace `@latest` with the tag associated with th
 
 v0.7.2
 - add option to select axis used to detect gait
+- add daily_all sleep stats output
 - bug fix: convert device locations to upper case when selecting devices
 - bug fix: add column names to steps table if none found (workaround)
 - bug fix: check for minimum usable data and candidate sptw and sleep bouts before continuing processing (nwsleep v0.2.2)
