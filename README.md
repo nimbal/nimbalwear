@@ -26,6 +26,9 @@ To include a specific release, replace `@latest` with the tag associated with th
 
 # Changes by version
 
+v0.8.0
+- add option to run daily sleep stats on all sptw that contain sleep (nwsleep v0.3.0)
+
 v0.7.2
 - add option to select axis used to detect gait
 - add daily_all sleep stats output
