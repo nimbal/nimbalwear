@@ -982,29 +982,18 @@ class NWCollection:
 
         self.sleep_bouts = pd.concat([sleep_t5a5, sleep_t8a4])
 
-        daily_long_sleep_t5a5 = nwsleep.sptw_stats(self.sptw, sleep_t5a5, type='daily_long')
-        message(f"Summarized {daily_long_sleep_t5a5.shape[0]} days of sleep analytics (t5a5, daily_long)...", level='info',
+        daily_sleep_t5a5 = nwsleep.sptw_stats(self.sptw, sleep_t5a5, type='daily', sptw_inc=['long', 'all', 'sleep'])
+        message(f"Summarized {daily_sleep_t5a5.shape[0]} days of sleep analytics (t5a5)...", level='info',
                 display=(not quiet), log=log)
 
-        daily_all_sleep_t5a5 = nwsleep.sptw_stats(self.sptw, sleep_t5a5, type='daily_all')
-        message(f"Summarized {daily_all_sleep_t5a5.shape[0]} days of sleep analytics (t5a5, daily_all)...", level='info',
+        daily_sleep_t8a4 = nwsleep.sptw_stats(self.sptw, sleep_t8a4, type='daily', sptw_inc=['long', 'all', 'sleep'])
+        message(f"Summarized {daily_sleep_t8a4.shape[0]} days of sleep analytics (t8a4)...", level='info',
                 display=(not quiet), log=log)
 
-        daily_long_sleep_t8a4 = nwsleep.sptw_stats(self.sptw, sleep_t8a4, type='daily_long')
-        message(f"Summarized {daily_long_sleep_t8a4.shape[0]} days of sleep analytics (t8a4, daily_long)...", level='info',
-                display=(not quiet), log=log)
+        daily_sleep_t5a5.insert(loc=2, column='bout_detect', value='t5a5')
+        daily_sleep_t8a4.insert(loc=2, column='bout_detect', value='t8a4')
 
-        daily_all_sleep_t8a4 = nwsleep.sptw_stats(self.sptw, sleep_t8a4, type='daily_all')
-        message(f"Summarized {daily_all_sleep_t8a4.shape[0]} days of sleep analytics (t8a4, daily_all)...", level='info',
-                display=(not quiet), log=log)
-
-        daily_long_sleep_t5a5.insert(loc=2, column='bout_detect', value='t5a5')
-        daily_all_sleep_t5a5.insert(loc=2, column='bout_detect', value='t5a5')
-        daily_long_sleep_t8a4.insert(loc=2, column='bout_detect', value='t8a4')
-        daily_all_sleep_t8a4.insert(loc=2, column='bout_detect', value='t8a4')
-
-        self.daily_sleep = pd.concat([daily_long_sleep_t5a5, daily_long_sleep_t8a4, daily_all_sleep_t5a5,
-                                      daily_all_sleep_t8a4])
+        self.daily_sleep = pd.concat([daily_sleep_t5a5, daily_sleep_t8a4])
 
         self.sptw = self.identify_df(self.sptw)
         self.sleep_bouts = self.identify_df(self.sleep_bouts)
