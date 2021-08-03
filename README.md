@@ -14,7 +14,7 @@ To install the latest release of nwpipeline directly from GitHub using pip, run 
 
 `pip install git+https://github.com/nimbal/nwpipeline#egg=nwpipeline`
 
-To install a specific release, replace `@v#.#.#` with the tag associated with that release. For example:
+To install a specific release, insert `@v#.#.#` after the repository name replacing with the tag associated with that release. For example:
 
 `pip install git+https://github.com/nimbal/nwpipeline@v1.0.0#egg=nwpipeline`
 
@@ -22,9 +22,9 @@ To install a specific release, replace `@v#.#.#` with the tag associated with th
 
 To include the latest release of nwpipeline as a dependency in your Python package, include the following line in `setup.py` or include the string within the list alongside your other dependencies:
 
-`install_requires=['nwpipeline@git+https://github.com/nimbal/nwpipeline@latest#egg=nwpipeline']`
+`install_requires=['nwpipeline@git+https://github.com/nimbal/nwpipeline@[version]#egg=nwpipeline']`
 
-To include a specific release, replace `@latest` with the tag associated with that release.
+To include a specific release, replace `[version]` with the tag associated with that release.
 
 # Changes by version
 
