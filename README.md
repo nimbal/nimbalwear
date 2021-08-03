@@ -12,9 +12,11 @@ This package is pre-release and should not be distributed outside the NiMBaLWear
 
 To install the latest release of nwpipeline directly from GitHub using pip, run the following line in terminal or console:
 
-`pip install git+https://github.com/nimbal/nwpipeline@latest#egg=nwpipeline`
+`pip install git+https://github.com/nimbal/nwpipeline#egg=nwpipeline`
 
-To install a specific release, replace `@latest` with the tag associated with that release. 
+To install a specific release, replace `@v#.#.#` with the tag associated with that release. For example:
+
+`pip install git+https://github.com/nimbal/nwpipeline@v1.0.0#egg=nwpipeline`
 
 # Package Dependency
 
