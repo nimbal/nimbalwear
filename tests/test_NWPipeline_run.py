@@ -1,7 +1,7 @@
 import nwpipeline as nwpl
 
 study_dir = r'W:\NiMBaLWEAR\test-HANDDS'
-subject_ids = ['070721']
+subject_ids = ['061621']
 
 test_nwpl = nwpl.NWPipeline(study_dir)
 
