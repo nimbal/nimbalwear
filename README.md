@@ -28,6 +28,13 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.9.0
+- updated to nwdata v0.7.0 to incorporate multiple changes
+  - convert to ndarray  before write with pyedflib (bug)
+  - handle Bittium Faros 360 and variable signals
+  - update device type codes
+- Modify device and sensor logic to match nwdata v0.7.0
+
 v0.8.0
 - add option to run daily sleep stats on all sptw that contain sleep (nwsleep v0.3.0)
 
