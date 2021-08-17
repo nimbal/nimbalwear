@@ -707,7 +707,10 @@ class NWCollection:
                 # search for associated signals in current device
                 sig_nums = []
                 for sig_label in self.sensors[key]:
-                    sig_nums.append(self.devices[index].get_signal_index(sig_label))
+                    sig_num = self.devices[index].get_signal_index(sig_label)
+
+                    if sig_num is not None:
+                        sig_nums.append(sig_num)
 
                 # if signal labels from that sensor are present then save as sensor file
                 if sig_nums:
