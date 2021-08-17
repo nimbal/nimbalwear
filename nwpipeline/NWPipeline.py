@@ -169,17 +169,6 @@ class NWCollection:
 
     # TODO: should gyroscope be included with accelerometer when separating signals?
 
-    # sensors_switch = {'GNOR': ['ACCELEROMETER', 'TEMPERATURE', 'LIGHT', 'BUTTON'],
-    #                   'AXV6': ['GYROSCOPE', 'ACCELEROMETER', 'LIGHT', 'TEMPERATURE'],
-    #                   'BF18': ['ACCELEROMETER', 'ECG'],
-    #                   'BF36': ['ACCELEROMETER', 'ECG', 'TEMPERATURE'],
-    #                   'NOWO': ['PLSOX']}
-    #
-    # sensor_channels_switch = {'GNAC': [[0, 1, 2], [3], [4], [5]],
-    #                           'AXV6': [[0, 1, 2], [3, 4, 5], [6], [7]],
-    #                           'BITF': [[1, 2, 3], [0]],
-    #                           'NONW': [[0, 1]]}
-
     sensors = {'accelerometer': ['Accelerometer x', 'Accelerometer y', 'Accelerometer z'],
                'gyroscope': ['Gyroscope x', 'Gyroscope y', 'Gyroscope z'],
                'ecg': ['ECG'],
@@ -724,7 +713,7 @@ class NWCollection:
                 if sig_nums:
 
                     sensor_edf_name = '.'.join(['_'.join([device_file_base, key.upper()]), 'edf'])
-                    sensor_path = os.path.join(self.dirs['sensor_edf'], device_type, key, sensor_edf_name)
+                    sensor_path = os.path.join(self.dirs['sensor_edf'], device_type, key.upper(), sensor_edf_name)
                     Path(os.path.dirname(sensor_path)).mkdir(parents=True, exist_ok=True)
 
                     message(f"Saving {sensor_path}", level='info', display=(not quiet), log=log)
