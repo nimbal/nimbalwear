@@ -34,6 +34,7 @@ v0.9.0
   - handle Bittium Faros 360 and variable signals
   - update device type codes
 - Modify device and sensor logic to match nwdata v0.7.0
+- bug fix: axis selection during gait detection (nwgait v0.1.4)
 
 v0.8.0
 - add option to run daily sleep stats on all sptw that contain sleep (nwsleep v0.3.0)
