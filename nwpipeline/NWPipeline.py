@@ -169,15 +169,24 @@ class NWCollection:
 
     # TODO: should gyroscope be included with accelerometer when separating signals?
 
-    sensors_switch = {'GNAC': ['ACCELEROMETER', 'TEMPERATURE', 'LIGHT', 'BUTTON'],
-                      'AXV6': ['GYROSCOPE', 'ACCELEROMETER', 'LIGHT', 'TEMPERATURE'],
-                      'BITF': ['ACCELEROMETER', 'ECG'],
-                      'NONW': ['PLSOX']}
+    # sensors_switch = {'GNOR': ['ACCELEROMETER', 'TEMPERATURE', 'LIGHT', 'BUTTON'],
+    #                   'AXV6': ['GYROSCOPE', 'ACCELEROMETER', 'LIGHT', 'TEMPERATURE'],
+    #                   'BF18': ['ACCELEROMETER', 'ECG'],
+    #                   'BF36': ['ACCELEROMETER', 'ECG', 'TEMPERATURE'],
+    #                   'NOWO': ['PLSOX']}
+    #
+    # sensor_channels_switch = {'GNAC': [[0, 1, 2], [3], [4], [5]],
+    #                           'AXV6': [[0, 1, 2], [3, 4, 5], [6], [7]],
+    #                           'BITF': [[1, 2, 3], [0]],
+    #                           'NONW': [[0, 1]]}
 
-    sensor_channels_switch = {'GNAC': [[0, 1, 2], [3], [4], [5]],
-                              'AXV6': [[0, 1, 2], [3, 4, 5], [6], [7]],
-                              'BITF': [[1, 2, 3], [0]],
-                              'NONW': [[0, 1]]}
+    sensors = {'accelerometer': ['Accelerometer x', 'Accelerometer y', 'Accelerometer z'],
+               'gyroscope': ['Gyroscope x', 'Gyroscope y', 'Gyroscope z'],
+               'ecg': ['ECG'],
+               'plsox': ['Pulse', 'SpO2'],
+               'temperature': ['Temperature'],
+               'light': ['Light'],
+               'button': ['Button']}
 
     device_locations = {'left_ankle': ['LA', 'LEFTANKLE', 'LANKLE'],
                         'left_wrist': ['LW', 'LEFTWRIST', 'LWRIST'],
@@ -336,10 +345,11 @@ class NWCollection:
         message("", level='info', display=(not quiet), log=log)
 
         import_switch = {'EDF': lambda: device_data.import_edf(device_file_path, quiet=quiet),
-                         'GNAC': lambda: device_data.import_gnac(device_file_path, correct_drift=True, quiet=quiet),
-                         'AXV6': lambda: device_data.import_axiv(device_file_path, resample=True, quiet=quiet),
-                         'BITF': lambda: device_data.import_bitf(device_file_path),
-                         'NONW': lambda: device_data.import_nonw(device_file_path, quiet=quiet)}
+                         'GNOR': lambda: device_data.import_geneactiv(device_file_path, correct_drift=True, quiet=quiet),
+                         'AXV6': lambda: device_data.import_axivity(device_file_path, resample=True, quiet=quiet),
+                         'BF18': lambda: device_data.import_bittium(device_file_path),
+                         'BF36': lambda: device_data.import_bittium(device_file_path),
+                         'NOWO': lambda: device_data.import_nonw(device_file_path, quiet=quiet)}
 
         self.devices = []
 
@@ -407,7 +417,6 @@ class NWCollection:
                                          device_id]
                                          if len(device_data.header['equipment'].split('_')) > 1
                                          else [False, '', device_id]),
-
                            'device_location': [(device_data.header['recording_additional'] == device_location),
                                                device_data.header['recording_additional'],
                                                device_location]}
@@ -431,8 +440,6 @@ class NWCollection:
                 device_data.header['recording_additional'] = device_location
 
             if single_stage in [None, 'read'] and save:
-
-                # TODO: option to rename files (or maybe not even an option, just do it)
 
                 # create all file path variables
                 standard_device_path = os.path.join(self.dirs['standard_device_edf'], device_type, device_edf_name)
@@ -473,7 +480,7 @@ class NWCollection:
 
             # TODO: Add nonwear detection for other devices
 
-            if not device_type in ['AXV6', 'GNAC']:
+            if not device_type in ['AXV6', 'GNOR']:
                 message(f"Cannot detect non-wear for {device_type}_{device_location}",
                         level='info', display=(not quiet), log=log)
                 message("", level='info', display=(not quiet), log=log)
@@ -703,31 +710,26 @@ class NWCollection:
             device_type = row['device_type']
             device_location = row['device_location']
 
-            # TODO: check that all device types in list are valid before running
+            device_file_base = '_'.join([study_code, subject_id, coll_id, device_type, device_location])
 
-            # evaluate device type cases
-            sensors = self.sensors_switch.get(device_type, lambda: 'Invalid')
-            sensor_channels = self.sensor_channels_switch.get(device_type, lambda: 'Invalid')
+            # loop through supported sensor types
+            for key in tqdm(self.sensors, leave=False, desc="Separating sensors"):
 
-            # create all file path variables
-            device_file_base = device_edf_name = '_'.join([study_code, subject_id, coll_id, device_type, device_location])
-            sensor_edf_names = ['.'.join(['_'.join([device_file_base, sensor]), 'edf']) for sensor in sensors]
+                # search for associated signals in current device
+                sig_nums = []
+                for sig_label in self.sensors[key]:
+                    sig_nums.append(self.devices[index].get_signal_index(sig_label))
 
-            sensor_paths = [os.path.join(self.dirs['sensor_edf'], device_type, sensors[sen], sensor_edf_names[sen])
-                            for sen in range(len(sensors))]
+                # if signal labels from that sensor are present then save as sensor file
+                if sig_nums:
 
-            # check that all folders exist for data output files
-            for sensor_path in sensor_paths:
-                Path(os.path.dirname(sensor_path)).mkdir(parents=True, exist_ok=True)
+                    sensor_edf_name = '.'.join(['_'.join([device_file_base, key.upper()]), 'edf'])
+                    sensor_path = os.path.join(self.dirs['sensor_edf'], device_type, key, sensor_edf_name)
+                    Path(os.path.dirname(sensor_path)).mkdir(parents=True, exist_ok=True)
 
-            for sen in tqdm(range(len(sensor_paths)), leave=False, desc="Separating sensors"):
+                    message(f"Saving {sensor_path}", level='info', display=(not quiet), log=log)
 
-                sen_path = sensor_paths[sen]
-                sen_channels = sensor_channels[sen]
-
-                message(f"Saving {sen_path}", level='info', display=(not quiet), log=log)
-
-                self.devices[index].export_edf(file_path=sen_path, sig_nums_out=sen_channels)
+                    self.devices[index].export_edf(file_path=sensor_path, sig_nums_out=sig_nums)
 
             message("", level='info', display=(not quiet), log=log)
 
@@ -1044,7 +1046,7 @@ class NWCollection:
         device_info_copy['device_location'] = [x.upper() for x in device_info_copy['device_location']]
 
         # select eligible device types and locations
-        activity_device_types = ['GNAC', 'AXV6']
+        activity_device_types = ['GNOR', 'AXV6']
         activity_locations = self.device_locations['right_wrist'] + self.device_locations['left_wrist']
 
         # get index of all eligible devices
@@ -1104,7 +1106,7 @@ class NWCollection:
         device_info_copy['device_location'] = [x.upper() for x in device_info_copy['device_location']]
 
         # select eligible device types and locations
-        gait_device_types = ['GNAC', 'AXV6']
+        gait_device_types = ['GNOR', 'AXV6']
         r_gait_locations = self.device_locations['right_ankle']
         l_gait_locations = self.device_locations['left_ankle']
 
@@ -1130,7 +1132,7 @@ class NWCollection:
         device_info_copy['device_location'] = [x.upper() for x in device_info_copy['device_location']]
 
         # select eligible device types and locations
-        sleep_device_types = ['GNAC', 'AXV6']
+        sleep_device_types = ['GNOR', 'AXV6']
         sleep_locations = self.device_locations['right_wrist'] + self.device_locations['left_wrist']
 
         # get index of all eligible devices
