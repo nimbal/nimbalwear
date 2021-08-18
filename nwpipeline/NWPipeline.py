@@ -54,7 +54,7 @@ class NWPipeline:
         # pipeline data files
         self.device_info_path = os.path.join(self.dirs['meta'], 'devices.csv')
         self.subject_info_path = os.path.join(self.dirs['meta'], 'subjects.csv')
-        self.log_file_path = os.path.join(self.dirs['logs'], "processing.log")
+        self.log_file_path = os.path.join(self.dirs['logs'], 'processing.log')
 
         with open(os.path.join(Path(__file__).parent.absolute(),'data_dicts.json'), 'r') as f:
             self.data_dicts = json.load(f)
@@ -84,8 +84,22 @@ class NWPipeline:
                 p = os.path.join(value, f'{key}_dict.csv')
                 df.to_csv(p, index=False)
 
-    def run(self, subject_ids=None, coll_ids=None, single_stage=None, overwrite_header=False, min_crop_duration=3,
+    def run(self, collections=None, single_stage=None, overwrite_header=False, min_crop_duration=3,
             max_crop_time_to_eof=20, activity_dominant=False, sleep_dominant=False, gait_axis=1, quiet=False, log=True):
+        '''
+
+        :param collections: list of tuples (subject_id, coll_id), default is None which will run all collections
+        :param single_stage:
+        :param overwrite_header:
+        :param min_crop_duration:
+        :param max_crop_time_to_eof:
+        :param activity_dominant:
+        :param sleep_dominant:
+        :param gait_axis:
+        :param quiet:
+        :param log:
+        :return:
+        '''
 
         logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', filename=self.log_file_path,
                             level=logging.INFO)
@@ -95,60 +109,67 @@ class NWPipeline:
                 level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
-        # if no subject_ids passed then do all
-        if subject_ids is None:
-            subject_ids = self.get_subject_ids()
+        # get all unique collections if none provided
+        collections = self.get_collections() if collections is None else collections
 
-        # if no coll_ids passed then do all
-        if coll_ids is None:
-            coll_ids = self.get_coll_ids()
+        # TODO: ensure collections is a list of tuples
 
         message(f"Version: {__version__}", level='info', display=(not quiet), log=log)
         message(f"Study: {self.study_code}", level='info', display=(not quiet), log=log)
-        message(f"Subjects: {subject_ids}", level='info', display=(not quiet), log=log)
-        message(f"Collections: {coll_ids}", level='info', display=(not quiet), log=log)
+        message(f"Collections (Subject, Collection): {collections}", level='info', display=(not quiet), log=log)
+
         if single_stage is not None:
             message(f"Single stage: {single_stage}", level='info', display=(not quiet), log=log)
         if not isinstance(self.subject_info, pd.DataFrame):
             message("Missing subjects info file in meta folder `subjects.csv`", level='warning', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
-        for subject_id in tqdm(subject_ids, desc="Processing subjects", leave=True):
+        for collection in tqdm(collections, desc="Processing subjects", leave=True):
 
-            for coll_id in tqdm(coll_ids, desc="Processing collections", leave=False):
+            subject_id = collection[0]
+            coll_id = collection[1]
 
-                message("", level='info', display=(not quiet), log=log)
-                message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not quiet),
-                        log=log)
-                message("", level='info', display=(not quiet), log=log)
-                
-                try:
-                    # get devices for this collection from device_list
-                    coll_device_list_df = self.device_info.loc[(self.device_info['study_code'] == self.study_code) &
-                                                               (self.device_info['subject_id'] == subject_id) &
-                                                               (self.device_info['coll_id'] == coll_id)]
-                    coll_device_list_df.reset_index(inplace=True, drop=True)
+            message("", level='info', display=(not quiet), log=log)
+            message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not quiet),
+                    log=log)
+            message("", level='info', display=(not quiet), log=log)
 
-                    coll_subject_dict = {}
-                    if isinstance(self.subject_info, pd.DataFrame):
-                        coll_subject_df = self.subject_info.loc[(self.subject_info['study_code'] == self.study_code) &
-                                                                    (self.subject_info['subject_id'] == subject_id)]
-                        coll_subject_dict = coll_subject_df.iloc[0].to_dict() if coll_subject_df.shape[0] > 0 else {}
-    
-                    # construct collection class and process
-                    coll = NWCollection(study_code=self.study_code, subject_id=subject_id, coll_id=coll_id,
-                                        device_info=coll_device_list_df, subject_info=coll_subject_dict, dirs=self.dirs)
-                    coll.process(single_stage=single_stage, overwrite_header=overwrite_header,
-                                 min_crop_duration=min_crop_duration, max_crop_time_to_eof=max_crop_time_to_eof,
-                                 activity_dominant=activity_dominant, sleep_dominant=sleep_dominant, gait_axis=gait_axis,
-                                 quiet=quiet, log=log)
-                except:
-                    tb = traceback.format_exc()
-                    message(tb, level='error', display=(not quiet), log=log)
+            try:
+                # get devices for this collection from device_list
+                coll_device_list_df = self.device_info.loc[(self.device_info['study_code'] == self.study_code) &
+                                                           (self.device_info['subject_id'] == subject_id) &
+                                                           (self.device_info['coll_id'] == coll_id)]
+                coll_device_list_df.reset_index(inplace=True, drop=True)
 
-                del coll
+                coll_subject_dict = {}
+                if isinstance(self.subject_info, pd.DataFrame):
+                    coll_subject_df = self.subject_info.loc[(self.subject_info['study_code'] == self.study_code) &
+                                                                (self.subject_info['subject_id'] == subject_id)]
+                    coll_subject_dict = coll_subject_df.iloc[0].to_dict() if coll_subject_df.shape[0] > 0 else {}
+
+                # construct collection class and process
+                coll = NWCollection(study_code=self.study_code, subject_id=subject_id, coll_id=coll_id,
+                                    device_info=coll_device_list_df, subject_info=coll_subject_dict, dirs=self.dirs)
+                coll.process(single_stage=single_stage, overwrite_header=overwrite_header,
+                             min_crop_duration=min_crop_duration, max_crop_time_to_eof=max_crop_time_to_eof,
+                             activity_dominant=activity_dominant, sleep_dominant=sleep_dominant, gait_axis=gait_axis,
+                             quiet=quiet, log=log)
+            except:
+                tb = traceback.format_exc()
+                message(tb, level='error', display=(not quiet), log=log)
+
+            del coll
 
         message("---- End ----------------------------------------------\n", level='info', display=(not quiet), log=log)
+
+    def get_collections(self):
+
+        collections = [(row['subject_id'], row['coll_id']) for i, row in self.device_info.iterrows()]
+
+        collections = list(set(collections))
+        collections.sort()
+
+        return collections
 
     def get_subject_ids(self):
 
