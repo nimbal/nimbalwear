@@ -723,11 +723,11 @@ class NWCollection:
 
                 # write cropped device data as edf
                 message(f"Saving {cropped_device_path}", level='info', display=(not quiet), log=log)
-                self.devices[index].export_edf(file_path=cropped_device_path)
+                self.devices[index].export_edf(file_path=cropped_device_path, quiet=quiet)
 
                 # write nonwear times with cropped nonwear removed
                 message(f"Saving {nonwear_csv_path}", level='info', display=(not quiet), log=log)
-                self.nonwear_times.to_csv(nonwear_csv_path, index=False)
+                self.nonwear_times.to_csv(nonwear_csv_path, index=False, quiet=quiet)
 
             message("", level='info', display=(not quiet), log=log)
 
