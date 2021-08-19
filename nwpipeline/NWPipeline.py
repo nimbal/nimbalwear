@@ -641,60 +641,68 @@ class NWCollection:
 
             last_nonwear = pd.DataFrame()
 
+            # if there is nonwear data for any devices in this collection
             if not self.nonwear_times.empty:
 
-                # get last device nonwear period
+                # get nonwear indices for current device
                 nonwear_idx = self.nonwear_times.index[(self.nonwear_times['study_code'] == study_code) &
                                                        (self.nonwear_times['subject_id'] == subject_id) &
                                                        (self.nonwear_times['coll_id'] == coll_id) &
                                                        (self.nonwear_times['device_type'] == device_type) &
                                                        (self.nonwear_times['device_location'] == device_location)]
                 nonwear_idx = nonwear_idx.tolist()
-                last_nonwear_idx = nonwear_idx[-1]
-                last_nonwear = self.nonwear_times.loc[last_nonwear_idx]
 
-            # get time info from device data
-            start_time = self.devices[index].header['startdate']
-            samples = len(self.devices[index].signals[0])
-            sample_rate = self.devices[index].signal_headers[0]['sample_rate']
-            duration = dt.timedelta(seconds=samples / sample_rate)
-            end_time = start_time + duration
+                # if there is nonwear data for current device
+                if len(nonwear_idx):
 
-            nonwear_duration = dt.timedelta(minutes=0)
-            nonwear_time_to_eof = dt.timedelta(minutes=max_time_to_eof + 1)
+                    # get last nonwear period for current device
+                    last_nonwear_idx = nonwear_idx[-1]
+                    last_nonwear = self.nonwear_times.loc[last_nonwear_idx]
 
-            if not last_nonwear.empty:
-                # get duration and time to end of file of last nonwear
-                nonwear_duration = last_nonwear['end_time'] - last_nonwear['start_time']
-                nonwear_time_to_eof = end_time - last_nonwear['end_time']
+                    # get time info from device data
+                    start_time = self.devices[index].header['startdate']
+                    samples = len(self.devices[index].signals[0])
+                    sample_rate = self.devices[index].signal_headers[0]['sample_rate']
+                    duration = dt.timedelta(seconds=samples / sample_rate)
+                    end_time = start_time + duration
+
+                    # get duration and time to end of file of last nonwear
+                    nonwear_duration = last_nonwear['end_time'] - last_nonwear['start_time']
+                    nonwear_time_to_eof = end_time - last_nonwear['end_time']
+
+                    # only crop if last nonwear ends within 20 minutes of end of file
+                    early_removal = ((nonwear_duration >= dt.timedelta(minutes=min_duration)) &
+                                    (nonwear_time_to_eof <= dt.timedelta(minutes=max_time_to_eof)))
+
+                    #if removed early then crop
+                    if early_removal:
+
+                        # set new file end time to which to crop
+                        new_start_time = start_time
+                        new_end_time = last_nonwear['start_time']
+
+                        crop_duration = end_time - new_end_time
+
+                        message(f"Cropping {crop_duration} after final removal of {device_type} {device_location}",
+                                level='info', display=(not quiet), log=log)
+
+                        self.devices[index].crop(new_start_time, new_end_time)
+
+                        # remove last non-wear from data frame
+                        self.nonwear_times.drop(index=last_nonwear_idx, inplace=True)
+
+                    else:
+
+                        message(f"No final removal of {device_type} {device_location} detected", level='info',
+                                display=(not quiet), log=log)
+
+                else:
+                    message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for device",
+                            level='warning', display=(not quiet), log=log)
+
             else:
-                message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data",
+                message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for collection",
                         level='warning', display=(not quiet), log=log)
-
-            # only crop if last nonwear ends within 20 minutes of end of file
-            is_cropped = ((nonwear_duration >= dt.timedelta(minutes=min_duration)) &
-                          (nonwear_time_to_eof <= dt.timedelta(minutes=max_time_to_eof)))
-
-            if is_cropped:
-
-                # set new file end time to which to crop
-                new_start_time = start_time
-                new_end_time = last_nonwear['start_time']
-
-                crop_duration = end_time - new_end_time
-
-                message(f"Cropping {crop_duration} after final removal of {device_type} {device_location}",
-                        level='info', display=(not quiet), log=log)
-
-                self.devices[index].crop(new_start_time, new_end_time)
-
-                # remove last non-wear from data frame
-                self.nonwear_times.drop(index=last_nonwear_idx, inplace=True)
-
-            else:
-
-                message(f"No final removal of {device_type} {device_location} detected", level='info',
-                        display=(not quiet), log=log)
 
 
             if save:
