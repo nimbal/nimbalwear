@@ -28,6 +28,11 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.10.0
+- modify collection loop to only perform collections included in device list
+- create cropped non-wear time file
+- bug fix: file duration calculation while cropping (nwdata v0.7.1)
+
 v0.9.0
 - updated to nwdata v0.7.0 to incorporate multiple changes
   - convert to ndarray  before write with pyedflib (bug)
