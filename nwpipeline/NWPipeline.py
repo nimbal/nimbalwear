@@ -37,6 +37,7 @@ class NWPipeline:
                      'analyzed': 'analyzed',
                      'nonwear': os.path.join('analyzed', 'nonwear'),
                      'standard_nonwear_times': os.path.join('analyzed', 'nonwear', 'standard_nonwear_times'),
+                     'cropped_nonwear_times': os.path.join('analyzed', 'nonwear', 'cropped_nonwear_times'),
                      'activity': os.path.join('analyzed', 'activity'),
                      'epoch_activity': os.path.join('analyzed', 'activity', 'epoch_activity'),
                      'daily_activity': os.path.join('analyzed', 'activity', 'daily_activity'),
@@ -124,7 +125,7 @@ class NWPipeline:
             message("Missing subjects info file in meta folder `subjects.csv`", level='warning', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
-        for collection in tqdm(collections, desc="Processing subjects", leave=True):
+        for collection in tqdm(collections, desc="Processing collections", leave=True):
 
             subject_id = collection[0]
             coll_id = collection[1]
@@ -619,12 +620,12 @@ class NWCollection:
     @coll_status
     def crop(self, save=False, quiet=False, min_duration=1, max_time_to_eof=20, log=True):
 
-        message("Cropping final nonwear...", level='info', display=(not quiet), log=log)
+        message("Detecting final device removal...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
         # crop final nonwear from all device data
         for index, row in tqdm(self.device_info.iterrows(), total=self.device_info.shape[0], leave=False,
-                               desc='Cropping final nonwear'):
+                               desc='Detecting final device removal'):
 
             # get info from device list
             study_code = row['study_code']
@@ -643,16 +644,20 @@ class NWCollection:
             if not self.nonwear_times.empty:
 
                 # get last device nonwear period
-                last_nonwear = self.nonwear_times.loc[(self.nonwear_times['study_code'] == study_code) &
-                                                      (self.nonwear_times['subject_id'] == subject_id) &
-                                                      (self.nonwear_times['coll_id'] == coll_id) &
-                                                      (self.nonwear_times['device_type'] == device_type) &
-                                                      (self.nonwear_times['device_location'] == device_location)][-1:]
+                nonwear_idx = self.nonwear_times.index[(self.nonwear_times['study_code'] == study_code) &
+                                                       (self.nonwear_times['subject_id'] == subject_id) &
+                                                       (self.nonwear_times['coll_id'] == coll_id) &
+                                                       (self.nonwear_times['device_type'] == device_type) &
+                                                       (self.nonwear_times['device_location'] == device_location)]
+                nonwear_idx = nonwear_idx.tolist()
+                last_nonwear_idx = nonwear_idx[-1]
+                last_nonwear = self.nonwear_times.loc[last_nonwear_idx]
 
             # get time info from device data
             start_time = self.devices[index].header['startdate']
-            duration = dt.timedelta(
-                seconds=len(self.devices[index].signals[0]) / self.devices[index].signal_headers[0]['sample_rate'])
+            samples = len(self.devices[index].signals[0])
+            sample_rate = self.devices[index].signal_headers[0]['sample_rate']
+            duration = dt.timedelta(seconds=samples / sample_rate)
             end_time = start_time + duration
 
             nonwear_duration = dt.timedelta(minutes=0)
@@ -660,8 +665,8 @@ class NWCollection:
 
             if not last_nonwear.empty:
                 # get duration and time to end of file of last nonwear
-                nonwear_duration = last_nonwear['end_time'].item() - last_nonwear['start_time'].item()
-                nonwear_time_to_eof = end_time - last_nonwear['end_time'].item()
+                nonwear_duration = last_nonwear['end_time'] - last_nonwear['start_time']
+                nonwear_time_to_eof = end_time - last_nonwear['end_time']
             else:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data",
                         level='warning', display=(not quiet), log=log)
@@ -670,32 +675,51 @@ class NWCollection:
             is_cropped = ((nonwear_duration >= dt.timedelta(minutes=min_duration)) &
                           (nonwear_time_to_eof <= dt.timedelta(minutes=max_time_to_eof)))
 
-            # set new file end time to which to crop
-            new_start_time = start_time
-            new_end_time = last_nonwear['start_time'].item() if is_cropped else end_time
+            if is_cropped:
 
-            crop_duration = end_time - new_end_time
+                # set new file end time to which to crop
+                new_start_time = start_time
+                new_end_time = last_nonwear['start_time']
 
-            message(f"Cropping {crop_duration} from {device_type} {device_location}",
-                    level='info', display=(not quiet), log=log)
+                crop_duration = end_time - new_end_time
 
-            self.devices[index].crop(new_start_time, new_end_time)
+                message(f"Cropping {crop_duration} after final removal of {device_type} {device_location}",
+                        level='info', display=(not quiet), log=log)
+
+                self.devices[index].crop(new_start_time, new_end_time)
+
+                # remove last non-wear from data frame
+                self.nonwear_times.drop(index=last_nonwear_idx, inplace=True)
+
+            else:
+
+                message(f"No final removal of {device_type} {device_location} detected", level='info',
+                        display=(not quiet), log=log)
+
 
             if save:
 
                 # create all file path variables
                 device_edf_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location]),
                                             "edf"])
+                nonwear_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
+                                                       "NONWEAR"]),
+                                             "csv"])
 
                 cropped_device_path = os.path.join(self.dirs['cropped_device_edf'], device_type, device_edf_name)
+                nonwear_csv_path = os.path.join(self.dirs['cropped_nonwear_times'], device_type, nonwear_csv_name)
 
                 # check that all folders exist for data output files
                 Path(os.path.dirname(cropped_device_path)).mkdir(parents=True, exist_ok=True)
-
-                message(f"Saving {cropped_device_path}", level='info', display=(not quiet), log=log)
+                Path(os.path.dirname(nonwear_csv_path)).mkdir(parents=True, exist_ok=True)
 
                 # write cropped device data as edf
+                message(f"Saving {cropped_device_path}", level='info', display=(not quiet), log=log)
                 self.devices[index].export_edf(file_path=cropped_device_path)
+
+                # write nonwear times with cropped nonwear removed
+                message(f"Saving {nonwear_csv_path}", level='info', display=(not quiet), log=log)
+                self.nonwear_times.to_csv(nonwear_csv_path, index=False)
 
             message("", level='info', display=(not quiet), log=log)
 
