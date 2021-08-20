@@ -85,7 +85,7 @@ class NWPipeline:
                 p = os.path.join(value, f'{key}_dict.csv')
                 df.to_csv(p, index=False)
 
-    def run(self, collections=None, single_stage=None, overwrite_header=False, min_crop_duration=3,
+    def run(self, collections=None, single_stage=None, overwrite_header=True, min_crop_duration=3,
             max_crop_time_to_eof=20, activity_dominant=False, sleep_dominant=False, gait_axis=1, quiet=False, log=True):
         '''
 
@@ -233,7 +233,7 @@ class NWCollection:
             # the keys are the same as the function names
             coll_status = {
                 'nwcollection_id': f'{self.subject_id}_{self.coll_id}',
-                'read': '',
+                'convert': '',
                 'nonwear': '',
                 'crop': '',
                 'save_sensors': '',
@@ -283,7 +283,11 @@ class NWCollection:
                                   sleep_dominant=sleep_dominant, quiet=quiet, log=log)
 
         # read data from all devices in collection
-        self.read(single_stage=single_stage, overwrite_header=overwrite_header, save=True, quiet=quiet, log=log)
+        self.read(single_stage=single_stage, overwrite_header=overwrite_header, quiet=quiet, log=log)
+
+        # convert to edf
+        if single_stage in [None, 'convert']:
+            self.convert(quiet=quiet, log=log)
 
         # data integrity ??
 
@@ -350,8 +354,8 @@ class NWCollection:
 
         return True
 
-    @coll_status
-    def read(self, single_stage=None, overwrite_header=False, save=False, quiet=False, log=True):
+    def read(self, single_stage=None, overwrite_header=False, quiet=False, log=True):
+
         message("Reading device data from files...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
@@ -378,7 +382,7 @@ class NWCollection:
             device_edf_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location]),
                                         "edf"])
 
-            if single_stage in [None, 'read']:
+            if single_stage in [None, 'convert']:
 
                 device_file_path = os.path.join(self.dirs['raw'], device_type, device_file_name)
                 import_func = import_switch.get(device_type, lambda: 'Invalid')
@@ -450,22 +454,42 @@ class NWCollection:
                 device_data.header['equipment'] = '_'.join([device_type, device_id])
                 device_data.header['recording_additional'] = device_location
 
-            if single_stage in [None, 'read'] and save:
-
-                # create all file path variables
-                standard_device_path = os.path.join(self.dirs['standard_device_edf'], device_type, device_edf_name)
-
-                # check that all folders exist for data output files
-                Path(os.path.dirname(standard_device_path)).mkdir(parents=True, exist_ok=True)
-
-                message(f"Saving {standard_device_path}", level='info', display=(not quiet), log=log)
-
-                # write device data as edf
-                device_data.export_edf(file_path=standard_device_path)
-
             message("", level='info', display=(not quiet), log=log)
 
             self.devices.append(device_data)
+
+        return True
+
+    @coll_status
+    def convert(self, quiet=False, log=True):
+
+        message("Converting device data to EDF...", level='info', display=(not quiet), log=log)
+        message("", level='info', display=(not quiet), log=log)
+
+        # read in all data files for one subject
+        for index, row in tqdm(self.device_info.iterrows(), total=self.device_info.shape[0], leave=False,
+                               desc='Converting device data to EDF'):
+
+            study_code = row['study_code']
+            subject_id = row['subject_id']
+            coll_id = row['coll_id']
+            device_type = row['device_type']
+            device_location = row['device_location']
+            device_edf_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location]),
+                                        "edf"])
+
+            # create all file path variables
+            standard_device_path = os.path.join(self.dirs['standard_device_edf'], device_type, device_edf_name)
+
+            # check that all folders exist for data output files
+            Path(os.path.dirname(standard_device_path)).mkdir(parents=True, exist_ok=True)
+
+            message(f"Saving {standard_device_path}", level='info', display=(not quiet), log=log)
+
+            # write device data as edf
+            self.devices[index].export_edf(file_path=standard_device_path, quiet=quiet)
+
+            message("", level='info', display=(not quiet), log=log)
 
         return True
 
@@ -639,8 +663,6 @@ class NWCollection:
                         level='warning', display=(not quiet), log=log)
                 continue
 
-            last_nonwear = pd.DataFrame()
-
             # if there is nonwear data for any devices in this collection
             if not self.nonwear_times.empty:
 
@@ -704,7 +726,6 @@ class NWCollection:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for collection",
                         level='warning', display=(not quiet), log=log)
 
-
             if save:
 
                 # create all file path variables
@@ -727,7 +748,7 @@ class NWCollection:
 
                 # write nonwear times with cropped nonwear removed
                 message(f"Saving {nonwear_csv_path}", level='info', display=(not quiet), log=log)
-                self.nonwear_times.to_csv(nonwear_csv_path, index=False, quiet=quiet)
+                self.nonwear_times.to_csv(nonwear_csv_path, index=False)
 
             message("", level='info', display=(not quiet), log=log)
 
@@ -774,7 +795,7 @@ class NWCollection:
 
                     message(f"Saving {sensor_path}", level='info', display=(not quiet), log=log)
 
-                    self.devices[index].export_edf(file_path=sensor_path, sig_nums_out=sig_nums)
+                    self.devices[index].export_edf(file_path=sensor_path, sig_nums_out=sig_nums, quiet=quiet)
 
             message("", level='info', display=(not quiet), log=log)
 
