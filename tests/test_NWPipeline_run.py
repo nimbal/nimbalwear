@@ -1,8 +1,8 @@
 import nwpipeline as nwpl
 
 study_dir = '/Volumes/KIT_DATA/test-HANDDS'
-collections = [('060821', '01')]
-single_stage = 'crop'
+collections = None
+single_stage = None
 
 test_nwpl = nwpl.NWPipeline(study_dir)
 

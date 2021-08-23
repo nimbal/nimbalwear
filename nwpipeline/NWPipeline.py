@@ -1,4 +1,5 @@
 import os
+import shutil
 import datetime as dt
 from pathlib import Path
 import logging
@@ -21,43 +22,32 @@ class NWPipeline:
     def __init__(self, study_dir):
 
         # initialize folder structure
-        self.study_dir = os.path.abspath(study_dir)
+        self.study_dir = Path(study_dir)
+        settings_path = self.study_dir / 'pipeline/settings.json'
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if not settings_path.exists():
+            settings_src = Path(__file__).parent.absolute() / 'settings.json'
+            shutil.copy(settings_src, settings_path)
 
         # get study code
-        self.study_code = os.path.basename(self.study_dir)
+        self.study_code = self.study_dir.name
 
-        self.dirs = {'study': '',
-                     'meta': 'meta',
-                     'logs': os.path.join('meta', 'logs'),
-                     'raw': 'raw',
-                     'processed': 'processed',
-                     'standard_device_edf': os.path.join('processed', 'standard_device_edf'),
-                     'cropped_device_edf': os.path.join('processed', 'cropped_device_edf'),
-                     'sensor_edf': os.path.join('processed', 'sensor_edf'),
-                     'analyzed': 'analyzed',
-                     'nonwear': os.path.join('analyzed', 'nonwear'),
-                     'standard_nonwear_times': os.path.join('analyzed', 'nonwear', 'standard_nonwear_times'),
-                     'cropped_nonwear_times': os.path.join('analyzed', 'nonwear', 'cropped_nonwear_times'),
-                     'activity': os.path.join('analyzed', 'activity'),
-                     'epoch_activity': os.path.join('analyzed', 'activity', 'epoch_activity'),
-                     'daily_activity': os.path.join('analyzed', 'activity', 'daily_activity'),
-                     'gait': os.path.join('analyzed', 'gait'),
-                     'gait_steps': os.path.join('analyzed', 'gait', 'gait_steps'),
-                     'gait_bouts': os.path.join('analyzed', 'gait', 'gait_bouts'),
-                     'daily_gait': os.path.join('analyzed', 'gait', 'daily_gait'),
-                     'sleep': os.path.join('analyzed', 'sleep'),
-                     'sptw': os.path.join('analyzed', 'sleep', 'sptw'),
-                     'sleep_bouts': os.path.join('analyzed', 'sleep', 'sleep_bouts'),
-                     'daily_sleep': os.path.join('analyzed', 'sleep', 'daily_sleep')}
+        # read json file
+        with open(self.study_dir / 'pipeline/settings.json', 'r') as f:
+            settings_json = json.load(f)
+        # get dirs
 
-        self.dirs = {key: os.path.join(self.study_dir, value) for key, value in self.dirs.items()}
+        self.dirs = settings_json['pipeline']['dirs']
+
+        self.dirs = {key: self.study_dir / value for key, value in self.dirs.items()}
 
         # pipeline data files
-        self.device_info_path = os.path.join(self.dirs['meta'], 'devices.csv')
-        self.subject_info_path = os.path.join(self.dirs['meta'], 'subjects.csv')
-        self.log_file_path = os.path.join(self.dirs['logs'], 'processing.log')
+        self.device_info_path = self.dirs['pipeline'] / 'devices.csv'
+        self.subject_info_path = self.dirs['pipeline'] / 'subjects.csv'
+        self.log_file_path = self.dirs['logs'] / 'processing.log'
 
-        with open(os.path.join(Path(__file__).parent.absolute(),'data_dicts.json'), 'r') as f:
+        with open(Path(__file__).parent.absolute() /'data_dicts.json', 'r') as f:
             self.data_dicts = json.load(f)
 
         # TODO: check for required files (raw data, device_list)
@@ -66,7 +56,7 @@ class NWPipeline:
         self.device_info = pd.read_csv(self.device_info_path, dtype=str).fillna('')
 
         # read subject level info
-        if os.path.exists(self.subject_info_path):
+        if self.subject_info_path.exists():
             self.subject_info = pd.read_csv(self.subject_info_path, dtype=str).fillna('')
         else:
             self.subject_info = None
@@ -82,7 +72,7 @@ class NWPipeline:
             # add data dictionary
             if key in self.data_dicts:
                 df = pd.DataFrame(self.data_dicts[key])
-                p = os.path.join(value, f'{key}_dict.csv')
+                p = value / f'{key}_dict.csv'
                 df.to_csv(p, index=False)
 
     def run(self, collections=None, single_stage=None, overwrite_header=True, min_crop_duration=3,
@@ -224,7 +214,7 @@ class NWCollection:
 
         self.subject_info = subject_info if subject_info else {'dominant_hand': 'right'}
 
-        self.status_path = os.path.join(self.dirs['meta'], 'status.csv')
+        self.status_path = self.dirs['pipeline'] / 'status.csv'
 
     def coll_status(f):
         @wraps(f)
@@ -242,7 +232,7 @@ class NWCollection:
                 'sleep': ''
             }
 
-            status_df = pd.read_csv(self.status_path) if os.path.exists(self.status_path) \
+            status_df = pd.read_csv(self.status_path) if self.status_path.exists() \
                 else pd.DataFrame(columns=coll_status.keys())
 
             if coll_status['nwcollection_id'] in status_df['nwcollection_id'].values:
@@ -384,24 +374,23 @@ class NWCollection:
 
             if single_stage in [None, 'convert']:
 
-                device_file_path = os.path.join(self.dirs['raw'], device_type, device_file_name)
+                device_file_path = self.dirs['device_raw'] / device_file_name
                 import_func = import_switch.get(device_type, lambda: 'Invalid')
 
             elif single_stage in ['nonwear', 'crop']:
 
-                device_file_path = os.path.join(self.dirs['standard_device_edf'], device_type, device_edf_name)
+                device_file_path = self.dirs['device_edf_standard'] / device_edf_name
                 import_func = import_switch.get('EDF', lambda: 'Invalid')
 
             else:
 
-                device_file_path = os.path.join(self.dirs['cropped_device_edf'], device_type, device_edf_name)
+                device_file_path = self.dirs['device_edf_cropped'] / device_edf_name
                 import_func = import_switch.get('EDF', lambda: 'Invalid')
 
             # check that data file exists
-            if not os.path.isfile(device_file_path):
-                message(
-                    f"{subject_id}_{coll_id}_{device_type}_{device_location}: {device_file_path} does not exist",
-                    level='warning', display=(not quiet), log=log)
+            if not device_file_path.exists():
+                message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: {device_file_path} does not exist",
+                        level='warning', display=(not quiet), log=log)
                 self.devices.append(None)
                 continue
 
@@ -479,10 +468,10 @@ class NWCollection:
                                         "edf"])
 
             # create all file path variables
-            standard_device_path = os.path.join(self.dirs['standard_device_edf'], device_type, device_edf_name)
+            standard_device_path = self.dirs['device_edf_standard'] / device_edf_name
 
             # check that all folders exist for data output files
-            Path(os.path.dirname(standard_device_path)).mkdir(parents=True, exist_ok=True)
+            standard_device_path.parent.mkdir(parents=True, exist_ok=True)
 
             message(f"Saving {standard_device_path}", level='info', display=(not quiet), log=log)
 
@@ -584,9 +573,9 @@ class NWCollection:
                 nonwear_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
                                                        "NONWEAR"]),
                                              "csv"])
-                nonwear_csv_path = os.path.join(self.dirs['standard_nonwear_times'], device_type, nonwear_csv_name)
+                nonwear_csv_path = self.dirs['nonwear_bouts_standard'] / nonwear_csv_name
 
-                Path(os.path.dirname(nonwear_csv_path)).mkdir(parents=True, exist_ok=True)
+                nonwear_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
                 message(f"Saving {nonwear_csv_path}", level='info', display=(not quiet), log=log)
 
@@ -618,7 +607,7 @@ class NWCollection:
             nonwear_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id,
                                                    device_type, device_location, "NONWEAR"]),
                                          "csv"])
-            nonwear_csv_path = os.path.join(self.dirs['standard_nonwear_times'], device_type, nonwear_csv_name)
+            nonwear_csv_path = self.dirs['standard_nonwear_times'] / nonwear_csv_name
 
             if not os.path.isfile(nonwear_csv_path):
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: {nonwear_csv_path} does not exist",
@@ -735,12 +724,12 @@ class NWCollection:
                                                        "NONWEAR"]),
                                              "csv"])
 
-                cropped_device_path = os.path.join(self.dirs['cropped_device_edf'], device_type, device_edf_name)
-                nonwear_csv_path = os.path.join(self.dirs['cropped_nonwear_times'], device_type, nonwear_csv_name)
+                cropped_device_path = self.dirs['device_edf_cropped'] / device_edf_name
+                nonwear_csv_path = self.dirs['nonwear_bouts_cropped'] / nonwear_csv_name
 
                 # check that all folders exist for data output files
-                Path(os.path.dirname(cropped_device_path)).mkdir(parents=True, exist_ok=True)
-                Path(os.path.dirname(nonwear_csv_path)).mkdir(parents=True, exist_ok=True)
+                cropped_device_path.parent.mkdir(parents=True, exist_ok=True)
+                nonwear_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
                 # write cropped device data as edf
                 message(f"Saving {cropped_device_path}", level='info', display=(not quiet), log=log)
@@ -790,8 +779,8 @@ class NWCollection:
                 if sig_nums:
 
                     sensor_edf_name = '.'.join(['_'.join([device_file_base, key.upper()]), 'edf'])
-                    sensor_path = os.path.join(self.dirs['sensor_edf'], device_type, key.upper(), sensor_edf_name)
-                    Path(os.path.dirname(sensor_path)).mkdir(parents=True, exist_ok=True)
+                    sensor_path = self.dirs['sensor_edf'] / sensor_edf_name
+                    sensor_path.parent.mkdir(parents=True, exist_ok=True)
 
                     message(f"Saving {sensor_path}", level='info', display=(not quiet), log=log)
 
@@ -859,11 +848,11 @@ class NWCollection:
                                                           self.coll_id, "DAILY_ACTIVITY"]),
                                                 "csv"])
 
-            epoch_activity_csv_path = os.path.join(self.dirs['epoch_activity'], epoch_activity_csv_name)
-            daily_activity_csv_path = os.path.join(self.dirs['daily_activity'], daily_activity_csv_name)
+            epoch_activity_csv_path = self.dirs['activity_epoch'] / epoch_activity_csv_name
+            daily_activity_csv_path = self.dirs['activity_daily'] / daily_activity_csv_name
 
-            Path(os.path.dirname(epoch_activity_csv_path)).mkdir(parents=True, exist_ok=True)
-            Path(os.path.dirname(daily_activity_csv_path)).mkdir(parents=True, exist_ok=True)
+            epoch_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
+            daily_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
             message(f"Saving {epoch_activity_csv_path}", level='info', display=(not quiet), log=log)
             self.epoch_activity.to_csv(epoch_activity_csv_path, index=False)
@@ -967,12 +956,12 @@ class NWCollection:
             # create all file path variables
             bouts_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id, self.coll_id, "GAIT_BOUTS"]), "csv"])
             steps_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id, self.coll_id, "GAIT_STEPS"]), "csv"])
-            daily_gait_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id, self.coll_id, "DAILY_GAIT"]),
+            daily_gait_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id, self.coll_id, "GAIT_DAILY"]),
                                             "csv"])
 
-            bouts_csv_path = os.path.join(self.dirs['gait_bouts'], bouts_csv_name)
-            steps_csv_path = os.path.join(self.dirs['gait_steps'], steps_csv_name)
-            daily_gait_csv_path = os.path.join(self.dirs['daily_gait'], daily_gait_csv_name)
+            bouts_csv_path = self.dirs['gait_bouts'] / bouts_csv_name
+            steps_csv_path = self.dirs['gait_steps'] / steps_csv_name
+            daily_gait_csv_path = self.dirs['gait_daily'] / daily_gait_csv_name
 
             message(f"Saving {bouts_csv_path}", level='info', display=(not quiet), log=log)
             self.bout_times.to_csv(bouts_csv_path, index=False)
@@ -1077,13 +1066,13 @@ class NWCollection:
             daily_sleep_csv_name = '.'.join(['_'.join([self.study_code, self.subject_id, self.coll_id, "DAILY_SLEEP"]),
                                              "csv"])
 
-            sptw_csv_path = os.path.join(self.dirs['sptw'], sptw_csv_name)
-            sleep_bouts_csv_path = os.path.join(self.dirs['sleep_bouts'], sleep_bouts_csv_name)
-            daily_sleep_csv_path = os.path.join(self.dirs['daily_sleep'], daily_sleep_csv_name)
+            sptw_csv_path = self.dirs['sleep_sptw'] / sptw_csv_name
+            sleep_bouts_csv_path = self.dirs['sleep_bouts'] / sleep_bouts_csv_name
+            daily_sleep_csv_path = self.dirs['sleep_daily'] / daily_sleep_csv_name
 
-            Path(os.path.dirname(sptw_csv_path)).mkdir(parents=True, exist_ok=True)
-            Path(os.path.dirname(sleep_bouts_csv_path)).mkdir(parents=True, exist_ok=True)
-            Path(os.path.dirname(daily_sleep_csv_path)).mkdir(parents=True, exist_ok=True)
+            sptw_csv_path.parent.mkdir(parents=True, exist_ok=True)
+            sleep_bouts_csv_path.parent.mkdir(parents=True, exist_ok=True)
+            daily_sleep_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
             message(f"Saving {sptw_csv_path}", level='info', display=(not quiet), log=log)
             self.sptw.to_csv(sptw_csv_path, index=False)

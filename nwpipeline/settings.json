@@ -1,0 +1,38 @@
+{
+  "pipeline": {
+    "dirs": {
+      "pipeline": "pipeline",
+      "logs": "pipeline/logs",
+      "device_raw": "wearables/raw",
+      "device_edf_standard": "wearables/device_edf_standard",
+      "device_edf_cropped": "wearables/device_edf_cropped",
+      "sensor_edf": "wearables/sensor_edf",
+      "nonwear_bouts_standard": "analytics/nonwear/bouts_standard",
+      "nonwear_bouts_cropped": "analytics/nonwear/bouts_cropped",
+      "activity_epoch": "analytics/activity/epoch",
+      "activity_daily": "analytics/activity/daily",
+      "gait_steps": "analytics/gait/steps",
+      "gait_bouts": "analytics/gait/bouts",
+      "gait_daily": "analytics/gait/daily",
+      "sleep_sptw": "analytics/sleep/sptw",
+      "sleep_bouts": "analytics/sleep/bouts",
+      "sleep_daily": "analytics/sleep/daily"
+    }
+  },
+  "read": {
+    "overwrite_header": "True"
+  },
+  "crop": {
+    "min_duration": "3",
+    "max_time_to_eof": "20"
+  },
+  "activity": {
+    "dominant": "False"
+  },
+  "sleep": {
+    "dominant": "False"
+  },
+  "gait": {
+    "axis": "1"
+  }
+}
