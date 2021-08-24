@@ -189,10 +189,10 @@ class NWCollection:
                'light': ['Light'],
                'button': ['Button']}
 
-    device_locations = {'left_ankle': ['LA', 'LEFTANKLE', 'LANKLE'],
-                        'left_wrist': ['LW', 'LEFTWRIST', 'LWRIST'],
-                        'right_wrist': ['RW', 'RIGHTWRIST', 'RWRIST'],
-                        'right_ankle': ['RA', 'RIGHTANKLE', 'RANKLE']}
+    device_locations = {'lankle': ["LA", "LEFTANKLE", "LANKLE"],
+                        'lwrist': ["LW", "LEFTWRIST", "LWRIST"],
+                        'rwrist': ["RW", "RIGHTWRIST", "RWRIST"],
+                        'rankle': ["RA", "RIGHTANKLE", "RANKLE"]}
 
     devices = []
     nonwear_times = pd.DataFrame()
@@ -349,6 +349,7 @@ class NWCollection:
         message("Reading device data from files...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
+        # TODO: move to json or make autodetect?
         import_switch = {'EDF': lambda: device_data.import_edf(device_file_path, quiet=quiet),
                          'GNOR': lambda: device_data.import_geneactiv(device_file_path, correct_drift=True, quiet=quiet),
                          'AXV6': lambda: device_data.import_axivity(device_file_path, resample=True, quiet=quiet),
@@ -1102,7 +1103,7 @@ class NWCollection:
 
         # select eligible device types and locations
         activity_device_types = ['GNOR', 'AXV6']
-        activity_locations = self.device_locations['right_wrist'] + self.device_locations['left_wrist']
+        activity_locations = self.device_locations['rwrist'] + self.device_locations['lwrist']
 
         # get index of all eligible devices
         activity_device_index = device_info_copy.loc[(device_info_copy['device_type'].isin(activity_device_types)) &
@@ -1116,9 +1117,9 @@ class NWCollection:
 
                 # select dominant or non-dominant based on argument
                 if dominant:
-                    wrist = 'right_wrist' if self.subject_info['dominant_hand'] == 'right' else 'left_wrist'
+                    wrist = 'rwrist' if self.subject_info['dominant_hand'] == 'right' else 'lwrist'
                 else:
-                    wrist = 'left_wrist' if self.subject_info['dominant_hand'] == 'right' else 'right_wrist'
+                    wrist = 'lwrist' if self.subject_info['dominant_hand'] == 'right' else 'rwrist'
 
                 # select devices at locations based on dominance
                 activity_locations = self.device_locations[wrist]
@@ -1132,7 +1133,7 @@ class NWCollection:
 
                 # if no eligible devices, go back and take first one from list of all eligible
                 elif len(activity_device_index) < 1:
-                    activity_locations = self.device_locations['right_wrist'] + self.device_locations['left_wrist']
+                    activity_locations = self.device_locations['rwrist'] + self.device_locations['lwrist']
                     activity_device_index = device_info_copy.loc[
                         (device_info_copy['device_type'].isin(activity_device_types)) &
                         (device_info_copy['device_location'].isin(activity_locations))].index.values.tolist()
@@ -1147,7 +1148,7 @@ class NWCollection:
 
             # if dominant hand info is available we will determine dominance
             if self.subject_info['dominant_hand']:
-                dominant_wrist = self.subject_info['dominant_hand'] + '_wrist'
+                dominant_wrist = self.subject_info['dominant_hand'][0] + 'wrist'
                 dominant = device_info_copy.loc[activity_device_index]['device_location'].item() in \
                            self.device_locations[dominant_wrist]
 
@@ -1162,8 +1163,8 @@ class NWCollection:
 
         # select eligible device types and locations
         gait_device_types = ['GNOR', 'AXV6']
-        r_gait_locations = self.device_locations['right_ankle']
-        l_gait_locations = self.device_locations['left_ankle']
+        r_gait_locations = self.device_locations['rankle']
+        l_gait_locations = self.device_locations['lankle']
 
         # get index of all eligible devices
         r_gait_device_index = device_info_copy.loc[(device_info_copy['device_type'].isin(gait_device_types)) &
@@ -1188,7 +1189,7 @@ class NWCollection:
 
         # select eligible device types and locations
         sleep_device_types = ['GNOR', 'AXV6']
-        sleep_locations = self.device_locations['right_wrist'] + self.device_locations['left_wrist']
+        sleep_locations = self.device_locations['rwrist'] + self.device_locations['lwrist']
 
         # get index of all eligible devices
         sleep_device_index = device_info_copy.loc[(device_info_copy['device_type'].isin(sleep_device_types)) &
@@ -1202,9 +1203,9 @@ class NWCollection:
 
                 # select dominant or non-dominant based on argument
                 if dominant:
-                    wrist = 'right_wrist' if self.subject_info['dominant_hand'] == 'right' else 'left_wrist'
+                    wrist = 'rwrist' if self.subject_info['dominant_hand'] == 'right' else 'lwrist'
                 else:
-                    wrist = 'left_wrist' if self.subject_info['dominant_hand'] == 'right' else 'right_wrist'
+                    wrist = 'lwrist' if self.subject_info['dominant_hand'] == 'right' else 'rwrist'
 
                 # select devices at locations based on dominance
                 sleep_locations = self.device_locations[wrist]
@@ -1217,7 +1218,7 @@ class NWCollection:
 
                 # if no eligible devices, go back and take first one from list of all eligible
                 elif len(sleep_device_index) < 1:
-                    sleep_locations = self.device_locations['right_wrist'] + self.device_locations['left_wrist']
+                    sleep_locations = self.device_locations['rwrist'] + self.device_locations['lwrist']
                     sleep_device_index = device_info_copy.loc[(device_info_copy['device_type'].isin(sleep_device_types)) &
                                                               (device_info_copy['device_location'].isin(sleep_locations))].index.values.tolist()
                     sleep_device_index = [sleep_device_index[0]]
@@ -1231,7 +1232,7 @@ class NWCollection:
 
             # if dominant hand info is available we will determine dominance
             if self.subject_info['dominant_hand']:
-                dominant_wrist = self.subject_info['dominant_hand'] + '_wrist'
+                dominant_wrist = self.subject_info['dominant_hand'][0] + 'wrist'
                 dominant = device_info_copy.loc[sleep_device_index]['device_location'].item() in self.device_locations[dominant_wrist]
 
             # if no dominant hand info available, assume dominant argument is correct

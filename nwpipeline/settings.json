@@ -17,22 +17,75 @@
       "sleep_sptw": "analytics/sleep/sptw",
       "sleep_bouts": "analytics/sleep/bouts",
       "sleep_daily": "analytics/sleep/daily"
+    },
+    "stages": ["convert", "nonwear", "crop", "save_sensors", "activity", "gait", "sleep"]
+  },
+  "collection": {
+    "sensors": {
+      "accelerometer": {
+        "signals": ["Accelerometer x", "Accelerometer y", "Accelerometer z"]
+      },
+      "gyroscope": {
+        "signals": ["Gyroscope x", "Gyroscope y", "Gyroscope z"]
+      },
+      "ecg": {
+        "signals": ["ECG"]
+      },
+      "plsox": {
+        "signals": ["Pulse", "SpO2"]
+      },
+      "temperature": {
+        "signals": ["Temperature"]
+      },
+      "light": {
+        "signals": ["Light"]
+      },
+      "button": {
+        "signals": ["Button"]
+      }
+    },
+    "device_locations": {
+      "lankle": {
+        "aliases": ["LA", "LEFTANKLE", "LANKLE"]
+      },
+      "lwrist": {
+        "aliases": ["LW", "LEFTWRIST", "LWRIST"]
+      },
+      "rwrist": {
+        "aliases": ["RW", "RIGHTWRIST", "RWRIST"]
+      },
+      "rankle": {
+        "aliases": ["RA", "RIGHTANKLE", "RANKLE"]
+      },
+      "chest": {
+        "aliases": ["CHEST"]
+      }
     }
   },
-  "read": {
-    "overwrite_header": "True"
-  },
-  "crop": {
-    "min_duration": "3",
-    "max_time_to_eof": "20"
-  },
-  "activity": {
-    "dominant": "False"
-  },
-  "sleep": {
-    "dominant": "False"
-  },
-  "gait": {
-    "axis": "1"
+  "modules": {
+    "read": {
+      "overwrite_header": "True"
+    },
+    "convert": {},
+    "nonwear": {
+      "save": "True"
+    },
+    "crop": {
+      "min_duration": "3",
+      "max_time_to_eof": "20",
+      "save": "True"
+    },
+    "activity": {
+      "dominant": "False",
+      "save": "True"
+    },
+    "sleep": {
+      "dominant": "False",
+      "save": "True"
+    },
+    "gait": {
+      "axis": "1",
+      "save": "True"
+    }
   }
 }
