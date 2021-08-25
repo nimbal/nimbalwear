@@ -28,6 +28,12 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.11.0
+- reorganized Pipeline and Collection classes
+- moved many settings to settings.json file
+- read and convert split so convert can be tracked by status
+- bug fix: quiet variable is passed to edf export function
+
 v0.10.0
 - modify collection loop to only perform collections included in device list
 - create cropped non-wear time file
