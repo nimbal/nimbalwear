@@ -21,6 +21,9 @@ class Pipeline:
 
     def __init__(self, study_dir):
 
+        self.quiet = False
+        self.log = True
+
         # initialize folder structure
         self.study_dir = Path(study_dir)
         settings_path = self.study_dir / 'pipeline/settings.json'
@@ -51,7 +54,7 @@ class Pipeline:
         self.device_locations = settings_json['pipeline']['device_locations']
         self.module_settings = settings_json['modules']
 
-        with open(Path(__file__).parent.absolute() /'data_dicts.json', 'r') as f:
+        with open(Path(__file__).parent.absolute() / 'data_dicts.json', 'r') as f:
             self.data_dicts = json.load(f)
 
         # TODO: check for required files (raw data, device_list)
@@ -121,54 +124,49 @@ class Pipeline:
 
         return coll_status_wrapper
 
-    def run(self, collections=None, single_stage=None, quiet=False, log=True):
-        '''
+    def run(self, collections=None, single_stage=None):
+        """
 
         :param collections: list of tuples (subject_id, coll_id), default is None which will run all collections
         :param single_stage:
-        :param overwrite_header:
-        :param min_crop_duration:
-        :param max_crop_time_to_eof:
-        :param activity_dominant:
-        :param sleep_dominant:
-        :param gait_axis:
-        :param quiet:
-        :param log:
+
         :return:
-        '''
+        """
 
         logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', filename=self.log_file_path,
                             level=logging.INFO)
 
-        message("\n\n", level='info', display=(not quiet), log=log)
+        message("\n\n", level='info', display=(not self.quiet), log=self.log)
         message(f"---- Start processing pipeline ----------------------------------------------",
-                level='info', display=(not quiet), log=log)
-        message("", level='info', display=(not quiet), log=log)
+                level='info', display=(not self.quiet), log=self.log)
+        message("", level='info', display=(not self.quiet), log=self.log)
 
         # get all unique collections if none provided
         collections = self.get_collections() if collections is None else collections
 
         # TODO: ensure collections is a list of tuples
 
-        message(f"Version: {__version__}", level='info', display=(not quiet), log=log)
-        message(f"Study: {self.study_code}", level='info', display=(not quiet), log=log)
-        message(f"Collections (Subject, Collection): {collections}", level='info', display=(not quiet), log=log)
+        message(f"Version: {__version__}", level='info', display=(not self.quiet), log=self.log)
+        message(f"Study: {self.study_code}", level='info', display=(not self.quiet), log=self.log)
+        message(f"Collections (Subject, Collection): {collections}", level='info', display=(not self.quiet),
+                log=self.log)
 
         if single_stage is not None:
-            message(f"Single stage: {single_stage}", level='info', display=(not quiet), log=log)
+            message(f"Single stage: {single_stage}", level='info', display=(not self.quiet), log=self.log)
         if not isinstance(self.subject_info, pd.DataFrame):
-            message("Missing subjects info file in meta folder `subjects.csv`", level='warning', display=(not quiet), log=log)
-        message("", level='info', display=(not quiet), log=log)
+            message("Missing subjects info file in meta folder `subjects.csv`", level='warning',
+                    display=(not self.quiet), log=self.log)
+        message("", level='info', display=(not self.quiet), log=self.log)
 
         for collection in tqdm(collections, desc="Processing collections", leave=True):
 
             subject_id = collection[0]
             coll_id = collection[1]
 
-            message("", level='info', display=(not quiet), log=log)
-            message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not quiet),
-                    log=log)
-            message("", level='info', display=(not quiet), log=log)
+            message("", level='info', display=(not self.quiet), log=self.log)
+            message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not self.quiet),
+                    log=self.log)
+            message("", level='info', display=(not self.quiet), log=self.log)
 
             try:
                 # get devices for this collection from device_list
@@ -180,7 +178,7 @@ class Pipeline:
                 coll_subject_dict = {}
                 if isinstance(self.subject_info, pd.DataFrame):
                     coll_subject_df = self.subject_info.loc[(self.subject_info['study_code'] == self.study_code) &
-                                                                (self.subject_info['subject_id'] == subject_id)]
+                                                            (self.subject_info['subject_id'] == subject_id)]
                     coll_subject_dict = coll_subject_df.iloc[0].to_dict() if coll_subject_df.shape[0] > 0 else {}
 
                 # construct collection class and process
@@ -189,21 +187,23 @@ class Pipeline:
                 coll.device_info = coll_device_list_df
                 coll.subject_info = coll_subject_dict
 
-                coll = self.process_collection(coll=coll, single_stage=single_stage, quiet=quiet, log=log)
+                coll = self.process_collection(coll=coll, single_stage=single_stage)
 
             except:
                 tb = traceback.format_exc()
-                message(tb, level='error', display=(not quiet), log=log)
+                message(tb, level='error', display=(not self.quiet), log=self.log)
 
             del coll
 
-        message("---- End ----------------------------------------------\n", level='info', display=(not quiet), log=log)
+        message("---- End ----------------------------------------------\n", level='info', display=(not self.quiet),
+                log=self.log)
 
-    def process_collection(self, coll, single_stage=None, quiet=False, log=True):
+    def process_collection(self, coll, single_stage=None):
 
         """Processes the collection
 
         Args:
+            coll:
             single_stage (str): None, 'read', 'nonwear', 'crop', 'save_sensors', 'activity', 'gait', 'sleep, 'posture'
             ...
         Returns:
@@ -211,14 +211,14 @@ class Pipeline:
         """
 
         if single_stage in ['activity', 'gait', 'sleep']:
-            coll = self.required_devices(coll=coll, single_stage=single_stage, quiet=quiet, log=log)
+            coll = self.required_devices(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
         # read data from all devices in collection
-        coll = self.read(coll=coll, single_stage=single_stage, quiet=quiet, log=log)
+        coll = self.read(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
         # convert to edf
         if single_stage in [None, 'convert']:
-            coll = self.convert(coll=coll, quiet=quiet, log=log)
+            coll = self.convert(coll=coll, quiet=self.quiet, log=self.log)
 
         # data integrity ??
 
@@ -226,44 +226,45 @@ class Pipeline:
 
         # process nonwear for all devices
         if single_stage in [None, 'nonwear']:
-            coll = self.nonwear(coll=coll, quiet=quiet, log=log)
+            coll = self.nonwear(coll=coll, quiet=self.quiet, log=self.log)
 
         if single_stage in ['crop', 'sleep']:
-            coll = self.read_nonwear(coll=coll, quiet=quiet, log=log)
+            coll = self.read_nonwear(coll=coll, quiet=self.quiet, log=self.log)
 
         # crop final nonwear
         if single_stage in [None, 'crop']:
-            coll = self.crop(coll=coll, quiet=quiet, log=log)
+            coll = self.crop(coll=coll, quiet=self.quiet, log=self.log)
 
         # save sensor edf files
         if single_stage in [None, 'save_sensors']:
-            coll = self.save_sensors(coll=coll, quiet=quiet, log=log)
+            coll = self.save_sensors(coll=coll, quiet=self.quiet, log=self.log)
 
         # process posture
 
         # process activity levels
         if single_stage in [None, 'activity']:
-            coll = self.activity(coll=coll, quiet=quiet, log=log)
+            coll = self.activity(coll=coll, quiet=self.quiet, log=self.log)
 
         # process gait
         if single_stage in [None, 'gait']:
-            coll = self.gait(coll=coll, quiet=quiet, log=log, )
+            coll = self.gait(coll=coll, quiet=self.quiet, log=self.log, )
 
         # process sleep
         if single_stage in [None, 'sleep']:
-            coll = self.sleep(coll=coll, quiet=quiet, log=log)
+            coll = self.sleep(coll=coll, quiet=self.quiet, log=self.log)
 
         return coll
 
     def required_devices(self, coll, single_stage, quiet=False, log=True):
-        ''' Select only required devices for single stage processing.
+        """ Select only required devices for single stage processing.
 
+        :param coll:
         :param single_stage:
         :param quiet:
         :param log:
         :return:
 
-        '''
+        """
 
         device_index = []
 
@@ -289,9 +290,12 @@ class Pipeline:
         message("Reading device data from files...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
+        overwrite_header = self.module_settings['read']['overwrite_header']
+
         # TODO: move to json or make autodetect?
         import_switch = {'EDF': lambda: device_data.import_edf(device_file_path, quiet=quiet),
-                         'GNOR': lambda: device_data.import_geneactiv(device_file_path, correct_drift=True, quiet=quiet),
+                         'GNOR': lambda: device_data.import_geneactiv(device_file_path, correct_drift=True,
+                                                                      quiet=quiet),
                          'AXV6': lambda: device_data.import_axivity(device_file_path, resample=True, quiet=quiet),
                          'BF18': lambda: device_data.import_bittium(device_file_path, quiet=quiet),
                          'BF36': lambda: device_data.import_bittium(device_file_path, quiet=quiet),
@@ -374,9 +378,7 @@ class Pipeline:
                             level='warning', display=(not quiet), log=log)
                     mismatch = True
 
-
-
-            if mismatch and self.module_settings['read']['overwrite_header']:
+            if mismatch and overwrite_header:
 
                 message("Overwriting header from device list", level='info', display=(not quiet), log=log)
 
@@ -449,7 +451,7 @@ class Pipeline:
 
             # TODO: Add nonwear detection for other devices
 
-            if not device_type in ['AXV6', 'GNOR']:
+            if device_type not in ['AXV6', 'GNOR']:
                 message(f"Cannot detect non-wear for {device_type}_{device_location}",
                         level='info', display=(not quiet), log=log)
                 message("", level='info', display=(not quiet), log=log)
@@ -776,7 +778,7 @@ class Pipeline:
                                          sample_rate=coll.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
                                          epoch_length=epoch_length, dominant=dominant, quiet=quiet)
 
-        coll.epoch_activity = self.identify_df(coll.epoch_activity)
+        coll.epoch_activity = self.identify_df(coll, coll.epoch_activity)
 
         #total_activity = nwactivity.sum_total_activity(epoch_intensity=epoch_intensity, epoch_length=epoch_length, quiet=quiet)
 
@@ -784,7 +786,7 @@ class Pipeline:
         coll.daily_activity = nwactivity.sum_daily_activity(epoch_intensity=coll.epoch_activity['intensity'], epoch_length=epoch_length,
                                             start_datetime=coll.devices[activity_device_index].header['startdate'], quiet=quiet)
 
-        coll.daily_activity = self.identify_df(coll.daily_activity)
+        coll.daily_activity = self.identify_df(coll, coll.daily_activity)
 
         # TODO: more detailed log info about what was done, epochs, days, intensities?
         # TODO: info about algortihm and settings, device used, dominant vs non-dominant, in log, methods, or data table
@@ -872,7 +874,7 @@ class Pipeline:
 
         # save bout times
         coll.bout_times = wb.export_bouts()
-        coll.bout_times = self.identify_df(coll.bout_times)
+        coll.bout_times = self.identify_df(coll, coll.bout_times)
 
         # save step times
         coll.step_times = wb.export_steps()
@@ -885,7 +887,7 @@ class Pipeline:
                                                     'mid_swing_time', 'step_length', 'step_state', 'step_time',
                                                     'swing_start_accel', 'swing_start_time'])
 
-        coll.step_times = self.identify_df(coll.step_times)
+        coll.step_times = self.identify_df(coll, coll.step_times)
 
 
         message(f"Detected {coll.bout_times.shape[0]} gait bouts", level='info', display=(not quiet), log=log)
@@ -894,7 +896,7 @@ class Pipeline:
         message("Summarizing daily gait analytics...", level='info', display=(not quiet), log=log)
 
         coll.daily_gait = nwgait.WalkingBouts.daily_gait(coll.bout_times)
-        coll.daily_gait = self.identify_df(coll.daily_gait)
+        coll.daily_gait = self.identify_df(coll, coll.daily_gait)
 
         # adjusting gait parameters
         bout_cols = ['study_code', 'subject_id', 'coll_id', 'gait_bout_num', 'start_timestamp', 'end_timestamp',
@@ -1009,9 +1011,9 @@ class Pipeline:
 
         coll.daily_sleep = pd.concat([daily_sleep_t5a5, daily_sleep_t8a4])
 
-        coll.sptw = self.identify_df(coll.sptw)
-        coll.sleep_bouts = self.identify_df(coll.sleep_bouts)
-        coll.daily_sleep = self.identify_df(coll.daily_sleep)
+        coll.sptw = self.identify_df(coll, coll.sptw)
+        coll.sleep_bouts = self.identify_df(coll, coll.sleep_bouts)
+        coll.daily_sleep = self.identify_df(coll, coll.daily_sleep)
 
         if save:
 
@@ -1189,10 +1191,10 @@ class Pipeline:
 
         return sleep_device_index, dominant
 
-    def identify_df(self, df):
+    def identify_df(self, coll, df):
         df.insert(loc=0, column='study_code', value=self.study_code)
-        df.insert(loc=1, column='subject_id', value=self.subject_id)
-        df.insert(loc=2, column='coll_id', value=self.coll_id)
+        df.insert(loc=1, column='subject_id', value=coll.subject_id)
+        df.insert(loc=2, column='coll_id', value=coll.coll_id)
         return df
 
     def get_collections(self):
