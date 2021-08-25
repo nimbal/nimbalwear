@@ -163,9 +163,6 @@ class Pipeline:
 
         for collection in tqdm(collections, desc="Processing collections", leave=True):
 
-            print(self.subject_info)
-            print(self.device_info)
-
             subject_id = collection[0]
             coll_id = collection[1]
 
