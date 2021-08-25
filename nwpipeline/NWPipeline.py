@@ -193,7 +193,7 @@ class Pipeline:
 
                 #self.process_collection(coll=coll, single_stage=single_stage)
 
-                print(coll.device_info)
+                print(coll_subject_df)
                 print(coll.subject_info)
 
             except:
