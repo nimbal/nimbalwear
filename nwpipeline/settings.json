@@ -62,28 +62,28 @@
   },
   "modules": {
     "read": {
-      "overwrite_header": "True"
+      "overwrite_header": true
     },
     "convert": {},
     "nonwear": {
-      "save": "True"
+      "save": true
     },
     "crop": {
-      "min_duration": "3",
-      "max_time_to_eof": "20",
-      "save": "True"
+      "min_duration": 3,
+      "max_time_to_eof": 20,
+      "save": true
     },
     "activity": {
-      "dominant": "False",
-      "save": "True"
+      "dominant": false,
+      "save": true
     },
     "sleep": {
-      "dominant": "False",
-      "save": "True"
+      "dominant": false,
+      "save": true
     },
     "gait": {
-      "axis": "1",
-      "save": "True"
+      "axis": null,
+      "save": true
     }
   }
 }

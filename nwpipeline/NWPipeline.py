@@ -49,6 +49,7 @@ class Pipeline:
         self.stages = settings_json['pipeline']['stages']
         self.sensors = settings_json['pipeline']['sensors']
         self.device_locations = settings_json['pipeline']['device_locations']
+        self.module_settings = settings_json['modules']
 
         with open(Path(__file__).parent.absolute() /'data_dicts.json', 'r') as f:
             self.data_dicts = json.load(f)
@@ -120,8 +121,7 @@ class Pipeline:
 
         return coll_status_wrapper
 
-    def run(self, collections=None, single_stage=None, overwrite_header=True, min_crop_duration=3,
-            max_crop_time_to_eof=20, activity_dominant=False, sleep_dominant=False, gait_axis=1, quiet=False, log=True):
+    def run(self, collections=None, single_stage=None, quiet=False, log=True):
         '''
 
         :param collections: list of tuples (subject_id, coll_id), default is None which will run all collections
@@ -189,11 +189,7 @@ class Pipeline:
                 coll.device_info = coll_device_list_df
                 coll.subject_info = coll_subject_dict
 
-                coll = self.process_collection(coll=coll, single_stage=single_stage, overwrite_header=overwrite_header,
-                                               min_crop_duration=min_crop_duration,
-                                               max_crop_time_to_eof=max_crop_time_to_eof,
-                                               activity_dominant=activity_dominant, sleep_dominant=sleep_dominant,
-                                               gait_axis=gait_axis, quiet=quiet, log=log)
+                coll = self.process_collection(coll=coll, single_stage=single_stage, quiet=quiet, log=log)
 
             except:
                 tb = traceback.format_exc()
@@ -203,8 +199,7 @@ class Pipeline:
 
         message("---- End ----------------------------------------------\n", level='info', display=(not quiet), log=log)
 
-    def process_collection(self, coll, single_stage=None, overwrite_header=False, min_crop_duration=1, max_crop_time_to_eof=20,
-                activity_dominant=False, sleep_dominant=False, gait_axis=None, quiet=False, log=True):
+    def process_collection(self, coll, single_stage=None, quiet=False, log=True):
 
         """Processes the collection
 
@@ -216,11 +211,10 @@ class Pipeline:
         """
 
         if single_stage in ['activity', 'gait', 'sleep']:
-            coll = self.required_devices(coll=coll, single_stage=single_stage, activity_dominant=activity_dominant,
-                                         sleep_dominant=sleep_dominant, quiet=quiet, log=log)
+            coll = self.required_devices(coll=coll, single_stage=single_stage, quiet=quiet, log=log)
 
         # read data from all devices in collection
-        coll = self.read(coll=coll, single_stage=single_stage, overwrite_header=overwrite_header, quiet=quiet, log=log)
+        coll = self.read(coll=coll, single_stage=single_stage, quiet=quiet, log=log)
 
         # convert to edf
         if single_stage in [None, 'convert']:
@@ -232,15 +226,14 @@ class Pipeline:
 
         # process nonwear for all devices
         if single_stage in [None, 'nonwear']:
-            coll = self.nonwear(coll=coll, save=True, quiet=quiet, log=log)
+            coll = self.nonwear(coll=coll, quiet=quiet, log=log)
 
         if single_stage in ['crop', 'sleep']:
             coll = self.read_nonwear(coll=coll, quiet=quiet, log=log)
 
         # crop final nonwear
         if single_stage in [None, 'crop']:
-            coll = self.crop(coll=coll, save=True, min_duration=min_crop_duration, max_time_to_eof=max_crop_time_to_eof,
-                             quiet=quiet, log=log)
+            coll = self.crop(coll=coll, quiet=quiet, log=log)
 
         # save sensor edf files
         if single_stage in [None, 'save_sensors']:
@@ -250,19 +243,19 @@ class Pipeline:
 
         # process activity levels
         if single_stage in [None, 'activity']:
-            coll = self.activity(coll=coll, dominant=activity_dominant, save=True, quiet=quiet, log=log)
+            coll = self.activity(coll=coll, quiet=quiet, log=log)
 
         # process gait
         if single_stage in [None, 'gait']:
-            coll = self.gait(coll=coll, axis=gait_axis, save=True, quiet=quiet, log=log, )
+            coll = self.gait(coll=coll, quiet=quiet, log=log, )
 
         # process sleep
         if single_stage in [None, 'sleep']:
-            coll = self.sleep(coll=coll, dominant=sleep_dominant, save=True, quiet=quiet, log=log)
+            coll = self.sleep(coll=coll, quiet=quiet, log=log)
 
         return coll
 
-    def required_devices(self, coll, single_stage, activity_dominant=False, sleep_dominant=False, quiet=False, log=True):
+    def required_devices(self, coll, single_stage, quiet=False, log=True):
         ''' Select only required devices for single stage processing.
 
         :param single_stage:
@@ -275,13 +268,13 @@ class Pipeline:
         device_index = []
 
         if single_stage == 'activity':
-            activity_device_index, activity_dominant = self.select_activity_device(coll=coll, dominant=activity_dominant)
+            activity_device_index, activity_dominant = self.select_activity_device(coll=coll)
             device_index += activity_device_index
         elif single_stage == 'gait':
             r_gait_device_index, l_gait_device_index = self.select_gait_device(coll=coll)
             device_index += r_gait_device_index + l_gait_device_index
         elif single_stage == 'sleep':
-            sleep_device_index, sleep_dominant = self.select_sleep_device(coll=coll, dominant=sleep_dominant)
+            sleep_device_index, sleep_dominant = self.select_sleep_device(coll=coll)
             device_index += sleep_device_index
 
         device_index = list(set(device_index))
@@ -291,7 +284,7 @@ class Pipeline:
 
         return coll
 
-    def read(self, coll, single_stage=None, overwrite_header=False, quiet=False, log=True):
+    def read(self, coll, single_stage=None, quiet=False, log=True):
 
         message("Reading device data from files...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
@@ -302,7 +295,7 @@ class Pipeline:
                          'AXV6': lambda: device_data.import_axivity(device_file_path, resample=True, quiet=quiet),
                          'BF18': lambda: device_data.import_bittium(device_file_path, quiet=quiet),
                          'BF36': lambda: device_data.import_bittium(device_file_path, quiet=quiet),
-                         'NOWO': lambda: device_data.import_nonw(device_file_path, quiet=quiet)}
+                         'NOWO': lambda: device_data.import_nonin(device_file_path, quiet=quiet)}
 
         coll.devices = []
 
@@ -381,7 +374,9 @@ class Pipeline:
                             level='warning', display=(not quiet), log=log)
                     mismatch = True
 
-            if mismatch and overwrite_header:
+
+
+            if mismatch and self.module_settings['read']['overwrite_header']:
 
                 message("Overwriting header from device list", level='info', display=(not quiet), log=log)
 
@@ -431,11 +426,13 @@ class Pipeline:
         return coll
 
     @coll_status
-    def nonwear(self, coll, save=False, quiet=False, log=True):
+    def nonwear(self, coll, quiet=False, log=True):
 
         # process nonwear for all devices
         message("Detecting non-wear...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
+
+        save = self.module_settings['nonwear']['save']
 
         coll.nonwear_times = pd.DataFrame()
 
@@ -579,10 +576,14 @@ class Pipeline:
         return coll
 
     @coll_status
-    def crop(self, coll, save=False, quiet=False, min_duration=1, max_time_to_eof=20, log=True):
+    def crop(self, coll, quiet=False, log=True):
 
         message("Detecting final device removal...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
+
+        min_duration = self.module_settings['crop']['min_duration']
+        max_time_to_eof = self.module_settings['crop']['max_time_to_eof']
+        save = self.module_settings['crop']['save']
 
         # crop final nonwear from all device data
         for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
@@ -739,16 +740,18 @@ class Pipeline:
         return coll
 
     @coll_status
-    def activity(self, coll, dominant=False, save=False, quiet=False, log=True):
+    def activity(self, coll, quiet=False, log=True):
 
         message("Calculating activity levels...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
+
+        save = self.module_settings['activity']['save']
 
         coll.epoch_activity = pd.DataFrame()
 
         epoch_length = 15
 
-        activity_device_index, dominant = self.select_activity_device(dominant=dominant)
+        activity_device_index, dominant = self.select_activity_device(coll=coll)
 
         if len(activity_device_index) == 0:
             raise NWException(f"{coll.subject_id}_{coll.coll_id}: Wrist device not found in device list")
@@ -813,14 +816,17 @@ class Pipeline:
         return coll
 
     @coll_status
-    def gait(self, coll, axis=None, save=False, quiet=False, log=True):
+    def gait(self, coll, quiet=False, log=True):
 
         # TODO: axis needs to be set based on orientation of device
 
         message("Detecting steps and walking bouts...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
 
-        r_gait_device_index, l_gait_device_index = self.select_gait_device()
+        axis = self.module_settings['gait']['axis']
+        save = self.module_settings['gait']['save']
+
+        r_gait_device_index, l_gait_device_index = self.select_gait_device(coll=coll)
 
         if not (l_gait_device_index or r_gait_device_index):
             raise NWException(f'{coll.subject_id}_{coll.coll_id}: No left or right ankle device found in device list')
@@ -925,16 +931,18 @@ class Pipeline:
         return coll
 
     @coll_status
-    def sleep(self, coll, dominant=False, save=False, quiet=False, log=True):
+    def sleep(self, coll, quiet=False, log=True):
 
         message("Analyzing sleep...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
+
+        save = self.module_settings['sleep']['save']
 
         coll.sptw = pd.DataFrame()
         coll.sleep_bouts = pd.DataFrame()
         coll.daily_sleep = pd.DataFrame()
 
-        sleep_device_index, dominant = self.select_sleep_device(dominant=dominant)
+        sleep_device_index, dominant = self.select_sleep_device(coll=coll)
 
         if len(sleep_device_index) == 0:
             raise NWException(f"{coll.subject_id}_{coll.coll_id}: Wrist device not found in device list")
