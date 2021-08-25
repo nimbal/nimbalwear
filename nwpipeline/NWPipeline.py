@@ -124,7 +124,7 @@ class Pipeline:
 
         return coll_status_wrapper
 
-    def run(self, collections=None, single_stage=None):
+    def run(self, collections=None, single_stage=None, quiet=False, log=True):
         """
 
         :param collections: list of tuples (subject_id, coll_id), default is None which will run all collections
@@ -132,6 +132,9 @@ class Pipeline:
 
         :return:
         """
+
+        self.quiet = quiet
+        self.log = log
 
         logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', filename=self.log_file_path,
                             level=logging.INFO)
@@ -187,7 +190,7 @@ class Pipeline:
                 coll.device_info = coll_device_list_df
                 coll.subject_info = coll_subject_dict
 
-                coll = self.process_collection(coll=coll, single_stage=single_stage)
+                self.process_collection(coll=coll, single_stage=single_stage)
 
             except:
                 tb = traceback.format_exc()
@@ -211,14 +214,14 @@ class Pipeline:
         """
 
         if single_stage in ['activity', 'gait', 'sleep']:
-            coll = self.required_devices(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
+            self.required_devices(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
         # read data from all devices in collection
-        coll = self.read(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
+        self.read(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
         # convert to edf
         if single_stage in [None, 'convert']:
-            coll = self.convert(coll=coll, quiet=self.quiet, log=self.log)
+            self.convert(coll=coll, quiet=self.quiet, log=self.log)
 
         # data integrity ??
 
@@ -226,34 +229,34 @@ class Pipeline:
 
         # process nonwear for all devices
         if single_stage in [None, 'nonwear']:
-            coll = self.nonwear(coll=coll, quiet=self.quiet, log=self.log)
+            self.nonwear(coll=coll, quiet=self.quiet, log=self.log)
 
         if single_stage in ['crop', 'sleep']:
-            coll = self.read_nonwear(coll=coll, quiet=self.quiet, log=self.log)
+            self.read_nonwear(coll=coll, quiet=self.quiet, log=self.log)
 
         # crop final nonwear
         if single_stage in [None, 'crop']:
-            coll = self.crop(coll=coll, quiet=self.quiet, log=self.log)
+            self.crop(coll=coll, quiet=self.quiet, log=self.log)
 
         # save sensor edf files
         if single_stage in [None, 'save_sensors']:
-            coll = self.save_sensors(coll=coll, quiet=self.quiet, log=self.log)
+            self.save_sensors(coll=coll, quiet=self.quiet, log=self.log)
 
         # process posture
 
         # process activity levels
         if single_stage in [None, 'activity']:
-            coll = self.activity(coll=coll, quiet=self.quiet, log=self.log)
+            self.activity(coll=coll, quiet=self.quiet, log=self.log)
 
         # process gait
         if single_stage in [None, 'gait']:
-            coll = self.gait(coll=coll, quiet=self.quiet, log=self.log, )
+            self.gait(coll=coll, quiet=self.quiet, log=self.log, )
 
         # process sleep
         if single_stage in [None, 'sleep']:
-            coll = self.sleep(coll=coll, quiet=self.quiet, log=self.log)
+            self.sleep(coll=coll, quiet=self.quiet, log=self.log)
 
-        return coll
+        return True
 
     def required_devices(self, coll, single_stage, quiet=False, log=True):
         """ Select only required devices for single stage processing.
