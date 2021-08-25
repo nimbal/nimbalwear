@@ -185,6 +185,7 @@ class Pipeline:
                 if isinstance(self.subject_info, pd.DataFrame):
                     coll_subject_df = self.subject_info.loc[(self.subject_info['study_code'] == self.study_code) &
                                                             (self.subject_info['subject_id'] == subject_id)]
+                    coll_subject_df.reset_index(inplace=True, drop=True)
                     coll_subject_dict = coll_subject_df.iloc[0].to_dict() if coll_subject_df.shape[0] > 0 else {}
 
                 # construct collection class and process
