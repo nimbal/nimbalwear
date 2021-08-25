@@ -1049,9 +1049,11 @@ class Pipeline:
 
         return coll
 
-    def select_activity_device(self, coll, dominant=False):
+    def select_activity_device(self, coll):
 
         # select which device to use for activity level
+
+        dominant = self.module_settings['activity']['dominant']
 
         device_info_copy = coll.device_info.copy()
         device_info_copy['device_location'] = [x.upper() for x in device_info_copy['device_location']]
@@ -1068,7 +1070,7 @@ class Pipeline:
         if len(activity_device_index) > 1:
 
             # if dominant hand is info is available we will choose based on dominant argument
-            if coll.subject_info['dominant_hand']:
+            if 'dominant_hand' in coll.subject_info.keys():
 
                 # select dominant or non-dominant based on argument
                 if dominant:
@@ -1102,7 +1104,7 @@ class Pipeline:
         elif len(activity_device_index) == 1:
 
             # if dominant hand info is available we will determine dominance
-            if coll.subject_info['dominant_hand']:
+            if 'dominant_hand' in coll.subject_info.keys():
                 dominant_wrist = coll.subject_info['dominant_hand'][0] + 'wrist'
                 dominant = device_info_copy.loc[activity_device_index]['device_location'].item() in \
                            self.device_locations[dominant_wrist]['aliases']
@@ -1136,9 +1138,12 @@ class Pipeline:
 
         return r_gait_device_index, l_gait_device_index
 
-    def select_sleep_device(self, coll, dominant=False):
+    def select_sleep_device(self, coll):
 
         # select which device to use for activity level
+
+        dominant = self.module_settings['sleep']['dominant']
+
         device_info_copy = coll.device_info.copy()
         device_info_copy['device_location'] = [x.upper() for x in device_info_copy['device_location']]
 
@@ -1154,7 +1159,7 @@ class Pipeline:
         if len(sleep_device_index) > 1:
 
             # if dominant hand is info is available we will choose based on dominant argument
-            if coll.subject_info['dominant_hand']:
+            if 'dominant_hand' in coll.subject_info.keys():
 
                 # select dominant or non-dominant based on argument
                 if dominant:
@@ -1186,7 +1191,7 @@ class Pipeline:
         elif len(sleep_device_index) == 1:
 
             # if dominant hand info is available we will determine dominance
-            if coll.subject_info['dominant_hand']:
+            if 'dominant_hand' in coll.subject_info.keys():
                 dominant_wrist = coll.subject_info['dominant_hand'][0] + 'wrist'
                 dominant = device_info_copy.loc[sleep_device_index]['device_location'].item() in self.device_locations[dominant_wrist]['aliases']
 
