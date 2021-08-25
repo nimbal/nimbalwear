@@ -190,7 +190,9 @@ class Pipeline:
                 coll.device_info = coll_device_list_df
                 coll.subject_info = coll_subject_dict
 
-                self.process_collection(coll=coll, single_stage=single_stage)
+                #self.process_collection(coll=coll, single_stage=single_stage)
+
+                print(coll.subject_info)
 
             except:
                 tb = traceback.format_exc()
