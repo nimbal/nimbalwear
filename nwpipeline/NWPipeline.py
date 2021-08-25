@@ -166,6 +166,8 @@ class Pipeline:
             subject_id = collection[0]
             coll_id = collection[1]
 
+            print(self.subject_info)
+
             message("", level='info', display=(not self.quiet), log=self.log)
             message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not self.quiet),
                     log=self.log)
