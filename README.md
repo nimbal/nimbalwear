@@ -32,6 +32,7 @@ v0.11.0
 - reorganized Pipeline and Collection classes
 - moved many settings to settings.json file
 - read and convert split so convert can be tracked by status
+- update to nwdata v0.7.2
 - bug fix: quiet variable is passed to edf export function
 
 v0.10.0
