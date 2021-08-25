@@ -166,8 +166,6 @@ class Pipeline:
             subject_id = collection[0]
             coll_id = collection[1]
 
-            print(self.subject_info)
-
             message("", level='info', display=(not self.quiet), log=self.log)
             message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not self.quiet),
                     log=self.log)
@@ -193,10 +191,7 @@ class Pipeline:
                 coll.device_info = coll_device_list_df
                 coll.subject_info = coll_subject_dict
 
-                #self.process_collection(coll=coll, single_stage=single_stage)
-
-                print(coll_subject_df)
-                print(coll.subject_info)
+                self.process_collection(coll=coll, single_stage=single_stage)
 
             except:
                 tb = traceback.format_exc()
