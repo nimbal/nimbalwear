@@ -65,7 +65,8 @@ def window_annotator(data_array=(), sample_f=1, start_time=None, flags=()):
     return pd.DataFrame(annots)
 
 
-""" -------------------------------------------------- SAMPLE RUN --------------------------------------------------"""
+"""
+#  ------------------------------------------------------ SAMPLE RUN --------------------------------------------------
 
 # Import using pyedflib
 file = pyedflib.EdfReader(f"O:/OBI/ONDRI@Home/Device Validation Protocols/Bittium Faros/Data Files/OmegaSnap/008_OmegaSnap.EDF")
@@ -80,7 +81,8 @@ file.close()
 # Defining what events to flag in what colour
 flag = [Flag("Walking", "Walk", "green"), Flag("Nonwear", "Nonwear", 'grey')]
 
-""" ------------------------------------------------ FUNCTION CALL -------------------------------------------------"""
+# ----------------------------------------------------- FUNCTION CALL -------------------------------------------------
 
-# annots = window_annotator(data_array=acc, sample_f=25, start_time=start_stamp, flags=flag)
-# annots.to_csv("C:/Users/ksweber/Desktop/Test_Annotations.csv", index=False)  # csv in working directory
+annots = window_annotator(data_array=acc, sample_f=25, start_time=start_stamp, flags=flag)
+annots.to_csv("C:/Users/ksweber/Desktop/Test_Annotations.csv", index=False)  # csv in working directory
+"""
