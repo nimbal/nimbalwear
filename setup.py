@@ -30,6 +30,6 @@ setuptools.setup(
                       'nwdata@git+https://github.com/nimbal/nwdata@v0.7.2#egg=nwdata',
                       'nwnonwear@git+https://github.com/nimbal/nwnonwear@v0.1.2#egg=nwnonwear',
                       'nwactivity@git+https://github.com/nimbal/nwactivity@v0.1.3#egg=nwactivity',
-                      'nwgait@git+https://github.com/nimbal/nwgait@v0.2.0#egg=nwgait',
+                      'nwgait@git+https://github.com/nimbal/nwgait@v0.3.0#egg=nwgait',
                       'nwsleep@git+https://github.com/nimbal/nwsleep@v0.3.0#egg=nwsleep'],
 )

@@ -1,8 +1,8 @@
 import nwpipeline as nwpl
 
-study_dir = '/Volumes/KIT_DATA/test-HANDDS'
-collections = None
-single_stage = None
+study_dir = 'w:/NiMBaLWEAR/test-HANDDS'
+collections = [('060821','01')]
+single_stage = 'gait'
 
 test_nwpl = nwpl.Pipeline(study_dir)
 
