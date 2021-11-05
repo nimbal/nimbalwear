@@ -900,7 +900,8 @@ class Pipeline:
 
 
         message(f"Detected {coll.bout_times.shape[0]} gait bouts", level='info', display=(not quiet), log=log)
-        message(f"Detected {coll.step_times.shape[0]} steps", level='info', display=(not quiet), log=log)
+        message(f"Detected {coll.step_times[coll.step_times['step_state'] == 'success'].shape[0]} steps",
+                level='info', display=(not quiet), log=log)
 
         message("Summarizing daily gait analytics...", level='info', display=(not quiet), log=log)
 
@@ -921,18 +922,24 @@ class Pipeline:
             # create all file path variables
             bouts_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "GAIT_BOUTS"]), "csv"])
             steps_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "GAIT_STEPS"]), "csv"])
+            steps_rej_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "GAIT_STEPS_REJ"]),
+                                           "csv"])
             daily_gait_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "GAIT_DAILY"]),
                                             "csv"])
 
             bouts_csv_path = self.dirs['gait_bouts'] / bouts_csv_name
             steps_csv_path = self.dirs['gait_steps'] / steps_csv_name
+            steps_rej_csv_path = self.dirs['gait_steps'] / steps_rej_csv_name
             daily_gait_csv_path = self.dirs['gait_daily'] / daily_gait_csv_name
 
             message(f"Saving {bouts_csv_path}", level='info', display=(not quiet), log=log)
             coll.bout_times.to_csv(bouts_csv_path, index=False)
 
             message(f"Saving {steps_csv_path}", level='info', display=(not quiet), log=log)
-            coll.step_times.to_csv(steps_csv_path, index=False)
+            coll.step_times[coll.step_times['step_state'] == 'success'].to_csv(steps_csv_path, index=False)
+
+            message(f"Saving {steps_rej_csv_path}", level='info', display=(not quiet), log=log)
+            coll.step_times[coll.step_times['step_state'] != 'success'].to_csv(steps_rej_csv_path, index=False)
 
             message(f"Saving {daily_gait_csv_path}", level='info', display=(not quiet), log=log)
             coll.daily_gait.to_csv(daily_gait_csv_path, index=False)

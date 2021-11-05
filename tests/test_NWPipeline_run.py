@@ -2,7 +2,7 @@ import nwpipeline as nwpl
 
 study_dir = 'w:/NiMBaLWEAR/dev-OND09'
 collections = [('0001','01')]
-single_stage = 'crop'
+single_stage = 'gait'
 
 test_nwpl = nwpl.Pipeline(study_dir)
 

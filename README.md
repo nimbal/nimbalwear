@@ -28,6 +28,11 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.11.1
+- create separate file for rejected steps
+- bug fix: only include single device in cropped nonwear csv
+- bug fix: report correct steps detected in log file
+
 v0.11.0
 - reorganized Pipeline and Collection classes
 - moved many settings to settings.json file
