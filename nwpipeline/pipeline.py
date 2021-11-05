@@ -233,7 +233,7 @@ class Pipeline:
             self.nonwear(coll=coll, quiet=self.quiet, log=self.log)
 
         if single_stage in ['crop', 'sleep']:
-            self.read_nonwear(coll=coll, quiet=self.quiet, log=self.log)
+            self.read_nonwear(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
         # crop final nonwear
         if single_stage in [None, 'crop']:
@@ -536,11 +536,16 @@ class Pipeline:
 
         return coll
 
-    def read_nonwear(self, coll, quiet=False, log=True):
+    def read_nonwear(self, coll, single_stage, quiet=False, log=True):
 
         # read nonwear data for all devices
         message("Reading non-wear data from files...", level='info', display=(not quiet), log=log)
         message("", level='info', display=(not quiet), log=log)
+
+        if single_stage == 'crop':
+            nonwear_csv_dir = self.dirs['nonwear_bouts_standard']
+        else:
+            nonwear_csv_dir = self.dirs['nonwear_bouts_cropped']
 
         coll.nonwear_times = pd.DataFrame()
 
@@ -558,7 +563,7 @@ class Pipeline:
             nonwear_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id,
                                                    device_type, device_location, "NONWEAR"]),
                                          "csv"])
-            nonwear_csv_path = self.dirs['standard_nonwear_times'] / nonwear_csv_name
+            nonwear_csv_path = nonwear_csv_dir / nonwear_csv_name
 
             if not os.path.isfile(nonwear_csv_path):
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: {nonwear_csv_path} does not exist",
@@ -692,7 +697,7 @@ class Pipeline:
 
                 # write nonwear times with cropped nonwear removed
                 message(f"Saving {nonwear_csv_path}", level='info', display=(not quiet), log=log)
-                coll.nonwear_times.to_csv(nonwear_csv_path, index=False)
+                coll.nonwear_times[coll.nonwear_times.index.isin(nonwear_idx)].to_csv(nonwear_csv_path, index=False)
 
             message("", level='info', display=(not quiet), log=log)
 
