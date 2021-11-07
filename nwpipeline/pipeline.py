@@ -136,13 +136,17 @@ class Pipeline:
         self.quiet = quiet
         self.log = log
 
+        loglevel = logging.INFO
+
         fileh = logging.FileHandler(self.log_file_path, 'a')
         formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
         fileh.setFormatter(formatter)
+        fileh.setLevel(loglevel)
 
         logger = logging.getLogger()  # root logger
         for hdlr in logger.handlers[:]:  # remove all old handlers
             logger.removeHandler(hdlr)
+        logger.setLevel(loglevel)
         logger.addHandler(fileh)
 
         message("\n\n", level='info', display=(not self.quiet), log=self.log)
