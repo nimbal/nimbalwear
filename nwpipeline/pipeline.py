@@ -136,8 +136,14 @@ class Pipeline:
         self.quiet = quiet
         self.log = log
 
-        logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', filename=self.log_file_path,
-                            level=logging.INFO)
+        fileh = logging.FileHandler(self.log_file_path, 'a')
+        formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
+        fileh.setFormatter(formatter)
+
+        log = logging.getLogger()  # root logger
+        for hdlr in log.handlers[:]:  # remove all old handlers
+            log.removeHandler(hdlr)
+        log.addHandler(fileh)
 
         message("\n\n", level='info', display=(not self.quiet), log=self.log)
         message(f"---- Start processing pipeline ----------------------------------------------",
