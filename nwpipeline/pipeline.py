@@ -140,10 +140,10 @@ class Pipeline:
         formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
         fileh.setFormatter(formatter)
 
-        log = logging.getLogger()  # root logger
-        for hdlr in log.handlers[:]:  # remove all old handlers
-            log.removeHandler(hdlr)
-        log.addHandler(fileh)
+        logger = logging.getLogger()  # root logger
+        for hdlr in logger.handlers[:]:  # remove all old handlers
+            logger.removeHandler(hdlr)
+        logger.addHandler(fileh)
 
         message("\n\n", level='info', display=(not self.quiet), log=self.log)
         message(f"---- Start processing pipeline ----------------------------------------------",
