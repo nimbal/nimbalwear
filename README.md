@@ -32,6 +32,7 @@ v0.11.1
 - create separate file for rejected steps
 - bug fix: only include single device in cropped nonwear csv
 - bug fix: report correct steps detected in log file
+- bug fix: do not allow sleep and nonwear to overlap (nwsleep v0.3.1)
 
 v0.11.0
 - reorganized Pipeline and Collection classes
