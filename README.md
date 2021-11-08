@@ -33,7 +33,7 @@ v0.11.1
 - bug fix: only include single device in cropped nonwear csv
 - bug fix: report correct steps detected in log file
 - bug fix: do not allow sleep and nonwear to overlap (nwsleep v0.3.1)
-- bug fix: proper log file is updated when using app as long as only one study is processed at a time
+- bug fix: dedicated logger based on study code
 
 v0.11.0
 - reorganized Pipeline and Collection classes
