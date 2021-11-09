@@ -28,6 +28,10 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.12.0
+- asdfasdf
+
+
 v0.11.1
 - create separate file for rejected steps
 - bug fix: only include single device in cropped nonwear csv
