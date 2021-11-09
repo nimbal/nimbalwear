@@ -678,7 +678,7 @@ class Pipeline:
                         message(f"Cropping {crop_duration} after final removal of {device_type} {device_location}",
                                 level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
-                        coll.devices[index].crop(new_start_time, new_end_time)
+                        coll.devices[index].crop(new_start_time, new_end_time, inplace=True)
 
                         # remove last non-wear from data frame
                         coll.nonwear_times.drop(index=last_nonwear_idx, inplace=True)
