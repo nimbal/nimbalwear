@@ -28,6 +28,9 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.13.0
+- gyro step detection for gait
+
 v0.12.0
 - nwdata v0.8.0 update
   - add option to crop NWData inplace
@@ -35,8 +38,7 @@ v0.12.0
   - add rotate_z method to rotate accelerometer and gyroscope data around z axis
   - adjust Bittium accelerometer signals to g instead of mg
   - restructure NWData header
-
-
+  
 v0.11.1
 - create separate file for rejected steps
 - bug fix: only include single device in cropped nonwear csv
