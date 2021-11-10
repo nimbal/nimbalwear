@@ -1,8 +1,8 @@
 import nwpipeline as nwpl
 
 study_dir = 'w:/NiMBaLWEAR/dev-OND09'
-collections = [('0007','01')]
-single_stage = 'sleep'
+collections = [('0008','01')]
+single_stage = None
 
 test_nwpl = nwpl.Pipeline(study_dir)
 
