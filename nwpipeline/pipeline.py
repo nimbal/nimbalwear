@@ -339,6 +339,8 @@ class Pipeline:
                 device_file_path = self.dirs['device_raw'] / device_file_name
                 import_func = import_switch.get(device_type, lambda: 'Invalid')
 
+                #TODO: Rotate GENEActiv 90 deg if location is ankle
+
             elif single_stage in ['nonwear', 'crop']:
 
                 device_file_path = self.dirs['device_edf_standard'] / device_edf_name
@@ -367,25 +369,23 @@ class Pipeline:
             mismatch = False
 
             # check header against device list info
-            header_comp = {'study_code': [(device_data.header['admincode'] == study_code),
-                                          device_data.header['admincode'],
+            header_comp = {'study_code': [(device_data.header['study_code'] == study_code),
+                                          device_data.header['study_code'],
                                           coll.study_code],
-                           'subject_id': [(device_data.header['patientcode'] == subject_id),
-                                          device_data.header['patientcode'],
+                           'subject_id': [(device_data.header['subject_id'] == subject_id),
+                                          device_data.header['subject_id'],
                                           subject_id],
-                           'coll_id': [(device_data.header['patient_additional'] == coll_id),
-                                       device_data.header['patient_additional'],
+                           'coll_id': [(device_data.header['coll_id'] == coll_id),
+                                       device_data.header['coll_id'],
                                        coll_id],
-                           'device_type': [(device_data.header['equipment'].split('_')[0] == device_type),
-                                           device_data.header['equipment'].split('_')[0],
+                           'device_type': [(device_data.header['device_type'] == device_type),
+                                           device_data.header['device_type'],
                                            device_type],
-                           'device_id': ([(device_data.header['equipment'].split('_')[1] == device_id),
-                                         device_data.header['equipment'].split('_')[1],
-                                         device_id]
-                                         if len(device_data.header['equipment'].split('_')) > 1
-                                         else [False, '', device_id]),
-                           'device_location': [(device_data.header['recording_additional'] == device_location),
-                                               device_data.header['recording_additional'],
+                           'device_id': [(device_data.header['device_id'] == device_id),
+                                         device_data.header['device_id'],
+                                         device_id],
+                           'device_location': [(device_data.header['device_location'] == device_location),
+                                               device_data.header['device_location'],
                                                device_location]}
 
             # generate message if any mismatches
@@ -401,11 +401,12 @@ class Pipeline:
                 message("Overwriting header from device list", level='info', display=(not quiet), log=log,
                         logger_name=self.study_code)
 
-                device_data.header['admincode'] = study_code
-                device_data.header['patientcode'] = subject_id
-                device_data.header['patient_additional'] = coll_id
-                device_data.header['equipment'] = '_'.join([device_type, device_id])
-                device_data.header['recording_additional'] = device_location
+                device_data.header['study_code'] = study_code
+                device_data.header['subject_id'] = subject_id
+                device_data.header['coll_id'] = coll_id
+                device_data.header['device_type'] = device_type
+                device_data.header['device_id'] = device_id
+                device_data.header['device_location'] = device_location
 
             message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
@@ -508,7 +509,7 @@ class Pipeline:
                     level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
             # convert datapoints to times
-            start_date = coll.devices[index].header['startdate']
+            start_date = coll.devices[index].header['start_datetime']
             sample_rate = coll.devices[index].signal_headers[accel_x_sig]['sample_rate']
 
             start_times = []
@@ -652,7 +653,7 @@ class Pipeline:
                     last_nonwear = coll.nonwear_times.loc[last_nonwear_idx]
 
                     # get time info from device data
-                    start_time = coll.devices[index].header['startdate']
+                    start_time = coll.devices[index].header['start_datetime']
                     samples = len(coll.devices[index].signals[0])
                     sample_rate = coll.devices[index].signal_headers[0]['sample_rate']
                     duration = dt.timedelta(seconds=samples / sample_rate)
@@ -823,7 +824,7 @@ class Pipeline:
         coll.daily_activity = \
             nwactivity.sum_daily_activity(epoch_intensity=coll.epoch_activity['intensity'],
                                           epoch_length=epoch_length,
-                                          start_datetime=coll.devices[activity_device_index].header['startdate'],
+                                          start_datetime=coll.devices[activity_device_index].header['start_datetime'],
                                           quiet=quiet)
 
         coll.daily_activity = self.identify_df(coll, coll.daily_activity)
@@ -898,7 +899,7 @@ class Pipeline:
         l_obj = nwgait.AccelReader.sig_init(raw_x=coll.devices[l_gait_device_index].signals[l_accel_x_sig],
             raw_y=coll.devices[l_gait_device_index].signals[l_accel_y_sig],
             raw_z=coll.devices[l_gait_device_index].signals[l_accel_z_sig],
-            startdate = coll.devices[l_gait_device_index].header['startdate'],
+            startdate = coll.devices[l_gait_device_index].header['start_datetime'],
             freq=coll.devices[l_gait_device_index].signal_headers[l_accel_x_sig]['sample_rate'])
 
         r_accel_x_sig = coll.devices[r_gait_device_index].get_signal_index('Accelerometer x')
@@ -908,7 +909,7 @@ class Pipeline:
         r_obj = nwgait.AccelReader.sig_init(raw_x=coll.devices[r_gait_device_index].signals[r_accel_x_sig],
             raw_y=coll.devices[r_gait_device_index].signals[r_accel_y_sig],
             raw_z=coll.devices[r_gait_device_index].signals[r_accel_z_sig],
-            startdate = coll.devices[r_gait_device_index].header['startdate'],
+            startdate = coll.devices[r_gait_device_index].header['start_datetime'],
             freq=coll.devices[r_gait_device_index].signal_headers[r_accel_x_sig]['sample_rate'])
 
         # run gait algorithm to find bouts
@@ -1027,7 +1028,7 @@ class Pipeline:
             y_values=coll.devices[sleep_device_index].signals[accel_y_sig],
             z_values=coll.devices[sleep_device_index].signals[accel_z_sig],
             sample_rate=round(coll.devices[sleep_device_index].signal_headers[accel_x_sig]['sample_rate']),
-            start_datetime=coll.devices[sleep_device_index].header['startdate'],
+            start_datetime=coll.devices[sleep_device_index].header['start_datetime'],
             nonwear = device_nonwear)
 
         message(f"Detected {coll.sptw.shape[0]} sleep period time windows", level='info', display=(not quiet), log=log,
@@ -1035,7 +1036,7 @@ class Pipeline:
 
         sleep_t5a5 = nwsleep.detect_sleep_bouts(z_angle_diff=z_angle_diff, sptw=coll.sptw,
                                                       z_sample_rate=z_sample_rate,
-                                                      start_datetime=coll.devices[sleep_device_index].header['startdate'],
+                                                      start_datetime=coll.devices[sleep_device_index].header['start_datetime'],
                                                       z_abs_threshold=5, min_sleep_length=5)
 
         sleep_t5a5.insert(loc=2, column='bout_detect', value='t5a5')
@@ -1045,7 +1046,7 @@ class Pipeline:
 
         sleep_t8a4 = nwsleep.detect_sleep_bouts(z_angle_diff=z_angle_diff, sptw=coll.sptw,
                                                 z_sample_rate=z_sample_rate,
-                                                start_datetime=coll.devices[sleep_device_index].header['startdate'],
+                                                start_datetime=coll.devices[sleep_device_index].header['start_datetime'],
                                                 z_abs_threshold=4, min_sleep_length=8)
 
         sleep_t8a4.insert(loc=2, column='bout_detect', value='t8a4')

@@ -29,7 +29,12 @@ To include a specific release, replace `[version]` with the tag associated with 
 # Changes by version
 
 v0.12.0
-- asdfasdf
+- nwdata v0.8.0 update
+  - add option to crop NWData inplace
+  - add read_header method to CWAFile
+  - add rotate_z method to rotate accelerometer and gyroscope data around z axis
+  - adjust Bittium accelerometer signals to g instead of mg
+  - restructure NWData header
 
 
 v0.11.1
