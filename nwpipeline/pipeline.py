@@ -460,12 +460,13 @@ class Pipeline:
                 logger_name=self.study_code)
         message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
-        ref_device_type = coll.device_info[0]['device_type']
-        ref_device_location = coll.device_info[0]['device_location']
+        ref_device_type = coll.device_info.iloc[0]['device_type']
+        ref_device_location = coll.device_info.iloc[0]['device_location']
 
         for idx, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0],
                              desc="Synchronizing devices", leave=False):
 
+            study_code = row['study_code']
             subject_id = row['subject_id']
             coll_id = row['coll_id']
             device_type = row['device_type']
@@ -485,7 +486,7 @@ class Pipeline:
 
                 # check if synnc_at_config is true and give warning and set to false if config_ate after start_date
                 if sync_at_config:
-                    if self.devices[0].header['config_datetime'] > self.devices[0].header['start_datetime']:
+                    if coll.devices[0].header['config_datetime'] > coll.devices[0].header['start_datetime']:
 
                         sync_at_config = False
 
@@ -502,6 +503,32 @@ class Pipeline:
 
                 message(f"Synchronized {device_type} {device_location} to {ref_device_type} {ref_device_location} at {syncs.shape[0]} sync points",
                         level='info', display=(not quiet), log=log, logger_name=self.study_code)
+
+
+                if self.module_settings['sync']['save']:
+
+                    # create all file path variables
+                    syncs_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
+                                                         "SYNC_LOC"]),
+                                               "csv"])
+                    segments_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
+                                                            "SYNC_SEG"]),
+                                                  "csv"])
+
+                    syncs_csv_path = self.dirs['sync'] / syncs_csv_name
+                    segments_csv_path = self.dirs['sync'] / segments_csv_name
+
+                    syncs_csv_path.parent.mkdir(parents=True, exist_ok=True)
+                    segments_csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+                    message(f"Saving {syncs_csv_path}", level='info', display=(not quiet), log=log,
+                            logger_name=self.study_code)
+                    syncs.to_csv(syncs_csv_path, index=False)
+
+                    message(f"Saving {segments_csv_path}", level='info', display=(not quiet), log=log,
+                            logger_name=self.study_code)
+                    segments.to_csv(segments_csv_path, index=False)
+
                 message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
         return coll

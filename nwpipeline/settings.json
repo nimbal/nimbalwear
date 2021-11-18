@@ -69,7 +69,8 @@
     },
     "sync": {
       "type": "flip",
-      "sync_at_config": true
+      "sync_at_config": true,
+      "save": true
     },
     "nonwear": {
       "save": true
