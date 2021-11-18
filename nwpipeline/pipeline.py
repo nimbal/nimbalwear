@@ -235,7 +235,7 @@ class Pipeline:
 
         # convert to edf
         if single_stage in [None, 'convert']:
-            self.convert(coll=coll, quiet=self.quiet, log=self.log)
+            self.convert(coll=coll, sync=sync_devices, quiet=self.quiet, log=self.log)
 
         # data integrity ??
 
@@ -418,11 +418,15 @@ class Pipeline:
     @coll_status
     def convert(self, coll, quiet=False, log=True):
 
+        if self.module_settings['convert']['sync']:
+
+            coll = self.sync(coll, quiet=quiet, log=log)
+
         message("Converting device data to EDF...", level='info', display=(not quiet), log=log,
                 logger_name=self.study_code)
         message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
-        # read in all data files for one subject
+        # save all device data to edf
         for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
                                desc='Converting device data to EDF'):
 
@@ -449,6 +453,59 @@ class Pipeline:
             message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
         return coll
+
+    def sync(self, coll, quiet=False, log=True):
+
+        message("Synchronizing device data...", level='info', display=(not quiet), log=log,
+                logger_name=self.study_code)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+
+        ref_device_type = coll.device_info[0]['device_type']
+        ref_device_location = coll.device_info[0]['device_location']
+
+        for idx, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0],
+                             desc="Synchronizing devices", leave=False):
+
+            subject_id = row['subject_id']
+            coll_id = row['coll_id']
+            device_type = row['device_type']
+            device_location = row['device_location']
+
+
+            if idx > 0:
+
+                # set signal_ds to downsample to somewhere between 5-11 Hz for sync detection if possible
+                freq = coll.devices[idx].signal_headers['sample_rate']
+                try:
+                    ds_index = [freq % x for x in range(5, 12)].index(0)
+                except ValueError:
+                    ds_index = freq - 5
+                signal_ds = round(freq / (5 + ds_index))
+
+                sync_at_config = self.module_settings['sync']['sync_at_config']
+
+                # check if synnc_at_config is true and give warning and set to false if config_ate after start_date
+                if sync_at_config:
+                    if self.devices[0].header['config_datetime'] > self.devices[0].header['start_datetime']:
+
+                        sync_at_config = False
+
+                        message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: Invalid config time, could not add as sync time",
+                                    level='warning', display=(not quiet), log=log, logger_name=self.study_code)
+
+
+                syncs, segments = coll.devices[idx].sync(ref=coll.devices[0],
+                                                         sig_labels=tuple(self.sensors['accelerometer']['signals']),
+                                                         type=self.module_settings['sync']['type'],
+                                                         sync_at_config=self.module_settings['sync']['sync_at_config'],
+                                                         signal_ds=signal_ds)
+
+
+                message(f"Synchronized {device_type} {device_location} to {ref_device_type} {ref_device_location} at {syncs.shape[0]} sync points",
+                        level='info', display=(not quiet), log=log, logger_name=self.study_code)
+
+        return coll
+
 
     @coll_status
     def nonwear(self, coll, quiet=False, log=True):

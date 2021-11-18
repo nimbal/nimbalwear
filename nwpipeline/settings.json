@@ -64,7 +64,13 @@
     "read": {
       "overwrite_header": true
     },
-    "convert": {},
+    "convert": {
+      "sync": true
+    },
+    "sync": {
+      "type": "flip",
+      "sync_at_config": true
+    },
     "nonwear": {
       "save": true
     },

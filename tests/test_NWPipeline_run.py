@@ -1,8 +1,8 @@
 import nwpipeline as nwpl
 
 study_dir = 'w:/NiMBaLWEAR/dev-OND09'
-collections = [('0008','01')]
-single_stage = 'gait'
+collections = [('0001','01'), ('0007','01'), ('0008','01'), ('0005','01'), ('0006','01')]
+single_stage = 'convert'
 
 test_nwpl = nwpl.Pipeline(study_dir)
 
