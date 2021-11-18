@@ -474,8 +474,10 @@ class Pipeline:
 
             if idx > 0:
 
+                accel_idx = coll.devices[idx].get_signal_index[self.sensors['accelerometer']['signals'][0]]
+
                 # set signal_ds to downsample to somewhere between 5-11 Hz for sync detection if possible
-                freq = coll.devices[idx].signal_headers['sample_rate']
+                freq = coll.devices[idx].signal_headers[accel_idx]['sample_rate']
                 try:
                     ds_index = [freq % x for x in range(5, 12)].index(0)
                 except ValueError:
