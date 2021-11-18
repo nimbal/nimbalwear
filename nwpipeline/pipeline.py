@@ -235,7 +235,7 @@ class Pipeline:
 
         # convert to edf
         if single_stage in [None, 'convert']:
-            self.convert(coll=coll, sync=sync_devices, quiet=self.quiet, log=self.log)
+            self.convert(coll=coll, quiet=self.quiet, log=self.log)
 
         # data integrity ??
 
@@ -471,7 +471,6 @@ class Pipeline:
             device_type = row['device_type']
             device_location = row['device_location']
 
-
             if idx > 0:
 
                 # set signal_ds to downsample to somewhere between 5-11 Hz for sync detection if possible
@@ -503,6 +502,7 @@ class Pipeline:
 
                 message(f"Synchronized {device_type} {device_location} to {ref_device_type} {ref_device_location} at {syncs.shape[0]} sync points",
                         level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
         return coll
 
