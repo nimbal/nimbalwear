@@ -1043,31 +1043,31 @@ class Pipeline:
                                     sample_freq=coll.devices[device_idx].signal_headers[gyro_z_idx]['sample_rate'],
                                     timestamps=times, break_sec=2, bout_steps=3, start_ind=idxs[0], end_ind=idxs[1])
 
-        coll.step_times, coll.bout_times, peak_heights = sgp
+        coll.gait_step_times, coll.gait_bout_times, peak_heights = sgp
 
-        coll.bout_times = self.identify_df(coll, coll.bout_times)
+        coll.gait_bout_times = self.identify_df(coll, coll.gait_bout_times)
 
         # nnot sure if this is necessary in this version
         # TODO: Fix in nwgait to return columns
-        if coll.step_times.empty:
-            coll.step_times = pd.DataFrame(columns=['Step', 'Step_index', 'Bout_number', 'Peak_times'])
+        if coll.gait_step_times.empty:
+            coll.gait_step_times = pd.DataFrame(columns=['Step', 'Step_index', 'Bout_number', 'Peak_times'])
 
-        coll.step_times = self.identify_df(coll, coll.step_times)
+        coll.gait_step_times = self.identify_df(coll, coll.gait_step_times)
 
-        message(f"Detected {coll.bout_times.shape[0]} gait bouts", level='info', display=(not quiet), log=log,
+        message(f"Detected {coll.gait_bout_times.shape[0]} gait bouts", level='info', display=(not quiet), log=log,
                 logger_name=self.study_code)
 
-        message(f"Detected {coll.step_times.shape[0]} steps",
+        message(f"Detected {coll.gait_step_times.shape[0]} steps",
                 level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
         message("Summarizing daily gait analytics...", level='info', display=(not quiet), log=log,
                 logger_name=self.study_code)
 
-        coll.daily_gait = nwgait.gait_stats(coll.bout_times, single_leg=True)
-        coll.daily_gait = self.identify_df(coll, coll.daily_gait)
+        coll.gait_daily = nwgait.gait_stats(coll.gait_bout_times, single_leg=True)
+        coll.gait_daily = self.identify_df(coll, coll.gait_daily)
 
         # adjusting gait parameters
-        coll.bout_times.rename(columns={'Bout_number': 'gait_bout_num',
+        coll.gait_bout_times.rename(columns={'Bout_number': 'gait_bout_num',
                                         'Step_count': 'step_count',
                                         'Start_time': 'start_timestamp',
                                         'End_time': 'end_timestamp',
@@ -1076,15 +1076,15 @@ class Pipeline:
                                inplace=True)
         bout_cols = ['study_code', 'subject_id', 'coll_id', 'gait_bout_num', 'start_timestamp', 'end_timestamp',
                      'step_count']
-        coll.bout_times = coll.bout_times[bout_cols]
+        coll.gait_bout_times = coll.gait_bout_times[bout_cols]
 
-        coll.step_times.rename(columns={'Step': 'step_num',
+        coll.gait_step_times.rename(columns={'Step': 'step_num',
                                         'Step_index': 'step_idx',
                                         'Bout_number': 'gait_bout_num',
                                         'Peak_times': 'step_time'},
                                inplace=True)
         step_cols = ['study_code','subject_id','coll_id','step_num', 'gait_bout_num', 'step_idx', 'step_time']
-        coll.step_times = coll.step_times[step_cols]
+        coll.gait_step_times = coll.gait_step_times[step_cols]
 
         if save:
             # create all file path variables
@@ -1101,10 +1101,10 @@ class Pipeline:
             daily_gait_csv_path = self.dirs['gait_daily'] / daily_gait_csv_name
 
             message(f"Saving {bouts_csv_path}", level='info', display=(not quiet), log=log, logger_name=self.study_code)
-            coll.bout_times.to_csv(bouts_csv_path, index=False)
+            coll.gait_bout_times.to_csv(bouts_csv_path, index=False)
 
             message(f"Saving {steps_csv_path}", level='info', display=(not quiet), log=log, logger_name=self.study_code)
-            coll.step_times.to_csv(steps_csv_path, index=False)
+            coll.gait_step_times.to_csv(steps_csv_path, index=False)
 
             # message(f"Saving {steps_rej_csv_path}", level='info', display=(not quiet), log=log,
             #         logger_name=self.study_code)
@@ -1112,7 +1112,7 @@ class Pipeline:
 
             message(f"Saving {daily_gait_csv_path}", level='info', display=(not quiet), log=log,
                     logger_name=self.study_code)
-            coll.daily_gait.to_csv(daily_gait_csv_path, index=False)
+            coll.gait_daily.to_csv(daily_gait_csv_path, index=False)
 
         message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
