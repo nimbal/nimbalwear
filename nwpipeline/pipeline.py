@@ -13,7 +13,7 @@ import nwdata
 import nwnonwear
 from nwpipeline import __version__
 import nwgait
-import nwactivity
+from nwactivity import activity_wrist_avm, activity_stats
 import nwsleep
 
 
@@ -872,7 +872,7 @@ class Pipeline:
 
         save = self.module_settings['activity']['save']
 
-        coll.epoch_activity = pd.DataFrame()
+        coll.activity_epochs = pd.DataFrame()
 
         epoch_length = 15
 
@@ -894,27 +894,26 @@ class Pipeline:
         message(f"Calculating {epoch_length}-second epoch activity...", level='info', display=(not quiet), log=log,
                 logger_name=self.study_code)
 
-        # TODO: need to allow variable epoch_length and dominant?
-        coll.epoch_activity = \
-            nwactivity.calc_wrist_powell(x=coll.devices[activity_device_index].signals[accel_x_sig],
-                                         y=coll.devices[activity_device_index].signals[accel_y_sig],
-                                         z=coll.devices[activity_device_index].signals[accel_z_sig],
-                                         sample_rate=coll.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
-                                         epoch_length=epoch_length, dominant=dominant, quiet=quiet)
+        # TODO: set to test if we get same result as before for Powell non-dominant
+        e, b = activity_wrist_avm(x=coll.devices[activity_device_index].signals[accel_x_sig],
+                                  y=coll.devices[activity_device_index].signals[accel_y_sig],
+                                  z=coll.devices[activity_device_index].signals[accel_z_sig],
+                                  sample_rate=coll.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
+                                  cutpoint='Powell',
+                                  epoch_length=epoch_length, dominant=False, quiet=quiet)
 
-        coll.epoch_activity = self.identify_df(coll, coll.epoch_activity)
+        coll.activity_epochs = e
+        coll.activity_bouts = b
+
+        coll.activity_epochs = self.identify_df(coll, coll.activity_epochs)
 
         #total_activity = nwactivity.sum_total_activity(epoch_intensity=epoch_intensity, epoch_length=epoch_length, quiet=quiet)
 
         message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log,
                 logger_name=self.study_code)
-        coll.daily_activity = \
-            nwactivity.sum_daily_activity(epoch_intensity=coll.epoch_activity['intensity'],
-                                          epoch_length=epoch_length,
-                                          start_datetime=coll.devices[activity_device_index].header['start_datetime'],
-                                          quiet=quiet)
+        coll.activity_daily = activity_stats(coll.activity_bouts, quiet=quiet)
 
-        coll.daily_activity = self.identify_df(coll, coll.daily_activity)
+        coll.activity_daily = self.identify_df(coll, coll.activity_daily)
 
         # TODO: more detailed log info about what was done, epochs, days, intensities?
         # TODO: info about algortihm and settings, device used, dominant vs non-dominant, in log, methods, or data table
@@ -923,25 +922,34 @@ class Pipeline:
 
             # create all file path variables
             epoch_activity_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id,
-                                                          coll.coll_id, "EPOCH_ACTIVITY"]),
+                                                          coll.coll_id, "ACTIVITY_EPOCHS"]),
+                                                "csv"])
+            bouts_activity_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id,
+                                                          coll.coll_id, "ACTIVITY_BOUTS"]),
                                                 "csv"])
             daily_activity_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id,
-                                                          coll.coll_id, "DAILY_ACTIVITY"]),
+                                                          coll.coll_id, "ACTIVITY_DAILY"]),
                                                 "csv"])
 
-            epoch_activity_csv_path = self.dirs['activity_epoch'] / epoch_activity_csv_name
+            epoch_activity_csv_path = self.dirs['activity_epochs'] / epoch_activity_csv_name
+            bouts_activity_csv_path = self.dirs['activity_bouts'] / bouts_activity_csv_name
             daily_activity_csv_path = self.dirs['activity_daily'] / daily_activity_csv_name
 
             epoch_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
+            bouts_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
             daily_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
             message(f"Saving {epoch_activity_csv_path}", level='info', display=(not quiet), log=log,
                     logger_name=self.study_code)
-            coll.epoch_activity.to_csv(epoch_activity_csv_path, index=False)
+            coll.activity_epochs.to_csv(epoch_activity_csv_path, index=False)
+
+            message(f"Saving {bouts_activity_csv_path}", level='info', display=(not quiet), log=log,
+                    logger_name=self.study_code)
+            coll.activity_bouts.to_csv(bouts_activity_csv_path, index=False)
 
             message(f"Saving {daily_activity_csv_path}", level='info', display=(not quiet), log=log,
                     logger_name=self.study_code)
-            coll.daily_activity.to_csv(daily_activity_csv_path, index=False)
+            coll.activity_daily.to_csv(daily_activity_csv_path, index=False)
 
         message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
