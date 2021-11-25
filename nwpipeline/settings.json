@@ -7,6 +7,7 @@
       "device_edf_standard": "wearables/device_edf_standard",
       "device_edf_cropped": "wearables/device_edf_cropped",
       "sensor_edf": "wearables/sensor_edf",
+      "sync": "analytics/sync",
       "nonwear_bouts_standard": "analytics/nonwear/bouts_standard",
       "nonwear_bouts_cropped": "analytics/nonwear/bouts_cropped",
       "activity_epochs": "analytics/activity/epochs",
@@ -83,6 +84,18 @@
     },
     "activity": {
       "dominant": false,
+      "cutpoints": [
+        {
+          "min_age": 0,
+          "max_age": 64,
+          "type": "Powell"
+        },
+        {
+          "min_age": 65,
+          "max_age": 999,
+          "type": "Fraysse"
+        }
+      ],
       "save": true
     },
     "sleep": {
