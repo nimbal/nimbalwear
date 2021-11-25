@@ -1242,6 +1242,7 @@ class Pipeline:
         # select which device to use for activity level
 
         dominant = self.module_settings['activity']['dominant']
+        dominant_hand = coll.subject_info['dominant_hand'].lower()
 
         device_info_copy = coll.device_info.copy()
         device_info_copy['device_location'] = [x.upper() for x in device_info_copy['device_location']]
@@ -1258,13 +1259,13 @@ class Pipeline:
         if len(activity_device_index) > 1:
 
             # if dominant hand is info is available we will choose based on dominant argument
-            if coll.subject_info['dominant_hand'] in ['right', 'left']:
+            if dominant_hand in ['right', 'left']:
 
                 # select dominant or non-dominant based on argument
                 if dominant:
-                    wrist = 'rwrist' if coll.subject_info['dominant_hand'] == 'right' else 'lwrist'
+                    wrist = 'rwrist' if dominant_hand == 'right' else 'lwrist'
                 else:
-                    wrist = 'lwrist' if coll.subject_info['dominant_hand'] == 'right' else 'rwrist'
+                    wrist = 'lwrist' if dominant_hand == 'right' else 'rwrist'
 
                 # select devices at locations based on dominance
                 activity_locations = self.device_locations[wrist]['aliases']
@@ -1292,8 +1293,8 @@ class Pipeline:
         elif len(activity_device_index) == 1:
 
             # if dominant hand info is available we will determine dominance
-            if coll.subject_info['dominant_hand'] in ['right', 'left']:
-                dominant_wrist = coll.subject_info['dominant_hand'][0] + 'wrist'
+            if dominant_hand in ['right', 'left']:
+                dominant_wrist = dominant_hand[0] + 'wrist'
                 dominant = device_info_copy.loc[activity_device_index]['device_location'].item() in \
                            self.device_locations[dominant_wrist]['aliases']
 
@@ -1331,6 +1332,7 @@ class Pipeline:
         # select which device to use for activity level
 
         dominant = self.module_settings['sleep']['dominant']
+        dominant_hand = coll.subject_info['dominant_hand'].lower()
 
         device_info_copy = coll.device_info.copy()
         device_info_copy['device_location'] = [x.upper() for x in device_info_copy['device_location']]
@@ -1347,13 +1349,13 @@ class Pipeline:
         if len(sleep_device_index) > 1:
 
             # if dominant hand is info is available we will choose based on dominant argument
-            if coll.subject_info['dominant_hand'] in ['right', 'left']:
+            if dominant_hand in ['right', 'left']:
 
                 # select dominant or non-dominant based on argument
                 if dominant:
-                    wrist = 'rwrist' if coll.subject_info['dominant_hand'] == 'right' else 'lwrist'
+                    wrist = 'rwrist' if dominant_hand == 'right' else 'lwrist'
                 else:
-                    wrist = 'lwrist' if coll.subject_info['dominant_hand'] == 'right' else 'rwrist'
+                    wrist = 'lwrist' if dominant_hand == 'right' else 'rwrist'
 
                 # select devices at locations based on dominance
                 sleep_locations = self.device_locations[wrist]['aliases']
@@ -1379,8 +1381,8 @@ class Pipeline:
         elif len(sleep_device_index) == 1:
 
             # if dominant hand info is available we will determine dominance
-            if coll.subject_info['dominant_hand'] in ['right', 'left']:
-                dominant_wrist = coll.subject_info['dominant_hand'][0] + 'wrist'
+            if dominant_hand in ['right', 'left']:
+                dominant_wrist = dominant_hand[0] + 'wrist'
                 dominant = device_info_copy.loc[sleep_device_index]['device_location'].item() in self.device_locations[dominant_wrist]['aliases']
 
             # if no dominant hand info available, assume dominant argument is correct
