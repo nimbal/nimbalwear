@@ -28,6 +28,11 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.14.0
+- add option to synchronize devices on convert (nwdata v0.9.0)
+- select activity cutpoints based on age (nwactivty v0.2.0)
+- bug fix: dominant hand from subjects.csv no longer case sensitive
+
 v0.13.0
 - gyro step detection for gait
 
