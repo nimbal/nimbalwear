@@ -894,24 +894,44 @@ class Pipeline:
         message(f"Calculating {epoch_length}-second epoch activity...", level='info', display=(not quiet), log=log,
                 logger_name=self.study_code)
 
-        # TODO: set to test if we get same result as before for Powell non-dominant
+
+        cutpoint_ages = pd.DataFrame(self.module_settings['activty']['cutpoints'])
+
+        cutpoint = cutpoint_ages['type'].loc[(cutpoint_ages['min_age'] <= coll.subject_info['age'])
+                                             & (cutpoint_ages['max_age'] >= coll.subject_info['age'])].item()
+
         e, b = activity_wrist_avm(x=coll.devices[activity_device_index].signals[accel_x_sig],
                                   y=coll.devices[activity_device_index].signals[accel_y_sig],
                                   z=coll.devices[activity_device_index].signals[accel_z_sig],
                                   sample_rate=coll.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
-                                  cutpoint='Powell',
-                                  epoch_length=epoch_length, dominant=False, quiet=quiet)
+                                  cutpoint=cutpoint, epoch_length=epoch_length, dominant=dominant, quiet=quiet)
 
         coll.activity_epochs = e
         coll.activity_bouts = b
 
-        coll.activity_epochs = self.identify_df(coll, coll.activity_epochs)
+        coll.activity_epochs.insert(loc=1, column='device_location',
+                                    value=coll.devices[activity_device_index].header['device_location'])
+        coll.activity_epochs.insert(loc=2, column='dominant_hand', value=dominant)
+        coll.activity_epochs.insert(loc=3, column='cutpoint_type', value=cutpoint)
 
-        #total_activity = nwactivity.sum_total_activity(epoch_intensity=epoch_intensity, epoch_length=epoch_length, quiet=quiet)
+        coll.activity_bouts.insert(loc=1, column='device_location',
+                                    value=coll.devices[activity_device_index].header['device_location'])
+        coll.activity_bouts.insert(loc=2, column='dominant_hand', value=dominant)
+        coll.activity_bouts.insert(loc=3, column='cutpoint_type', value=cutpoint)
+
+        coll.activity_epochs = self.identify_df(coll, coll.activity_epochs)
+        coll.activity_bouts = self.identify_df(coll, coll.activity_bouts)
+
 
         message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log,
                 logger_name=self.study_code)
         coll.activity_daily = activity_stats(coll.activity_bouts, quiet=quiet)
+
+        coll.activity_daily.insert(loc=2, column='device_location',
+                                    value=coll.devices[activity_device_index].header['device_location'])
+        coll.activity_daily.insert(loc=3, column='dominant_hand', value=dominant)
+        coll.activity_daily.insert(loc=4, column='cutpoint_type', value=cutpoint)
+        coll.activity_daily.insert(loc=5, column='type', value='daily')
 
         coll.activity_daily = self.identify_df(coll, coll.activity_daily)
 
