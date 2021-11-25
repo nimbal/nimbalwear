@@ -895,19 +895,26 @@ class Pipeline:
                 logger_name=self.study_code)
 
 
-        cutpoint_ages = pd.DataFrame(self.module_settings['activty']['cutpoints'])
+        cutpoint_ages = pd.DataFrame(self.module_settings['activity']['cutpoints'])
 
-        cutpoint = cutpoint_ages['type'].loc[(cutpoint_ages['min_age'] <= coll.subject_info['age'])
-                                             & (cutpoint_ages['max_age'] >= coll.subject_info['age'])].item()
+        subject_age = int(coll.subject_info['age'])
+
+        cutpoint = cutpoint_ages['type'].loc[(cutpoint_ages['min_age'] <= subject_age)
+                                             & (cutpoint_ages['max_age'] >=subject_age)].item()
 
         e, b = activity_wrist_avm(x=coll.devices[activity_device_index].signals[accel_x_sig],
                                   y=coll.devices[activity_device_index].signals[accel_y_sig],
                                   z=coll.devices[activity_device_index].signals[accel_z_sig],
                                   sample_rate=coll.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
-                                  cutpoint=cutpoint, epoch_length=epoch_length, dominant=dominant, quiet=quiet)
+                                  start_datetime=coll.devices[activity_device_index].header['start_datetime'],
+                                  epoch_length=epoch_length, cutpoint=cutpoint, dominant=dominant, quiet=quiet)
 
         coll.activity_epochs = e
         coll.activity_bouts = b
+
+        message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log,
+                logger_name=self.study_code)
+        coll.activity_daily = activity_stats(coll.activity_bouts, quiet=quiet)
 
         coll.activity_epochs.insert(loc=1, column='device_location',
                                     value=coll.devices[activity_device_index].header['device_location'])
@@ -922,10 +929,6 @@ class Pipeline:
         coll.activity_epochs = self.identify_df(coll, coll.activity_epochs)
         coll.activity_bouts = self.identify_df(coll, coll.activity_bouts)
 
-
-        message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
-        coll.activity_daily = activity_stats(coll.activity_bouts, quiet=quiet)
 
         coll.activity_daily.insert(loc=2, column='device_location',
                                     value=coll.devices[activity_device_index].header['device_location'])
