@@ -84,6 +84,7 @@
     },
     "activity": {
       "dominant": false,
+      "lowpass": 20,
       "cutpoints": [
         {
           "min_age": 0,

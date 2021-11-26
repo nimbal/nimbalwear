@@ -898,6 +898,7 @@ class Pipeline:
         cutpoint_ages = pd.DataFrame(self.module_settings['activity']['cutpoints'])
 
         subject_age = int(coll.subject_info['age'])
+        lowpass = int(self.module_settings['activity']['lowpass'])
 
         cutpoint = cutpoint_ages['type'].loc[(cutpoint_ages['min_age'] <= subject_age)
                                              & (cutpoint_ages['max_age'] >=subject_age)].item()
@@ -907,7 +908,8 @@ class Pipeline:
                                   z=coll.devices[activity_device_index].signals[accel_z_sig],
                                   sample_rate=coll.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
                                   start_datetime=coll.devices[activity_device_index].header['start_datetime'],
-                                  epoch_length=epoch_length, cutpoint=cutpoint, dominant=dominant, quiet=quiet)
+                                  lowpass=lowpass, epoch_length=epoch_length, cutpoint=cutpoint, dominant=dominant,
+                                  quiet=quiet)
 
         coll.activity_epochs = e
         coll.activity_bouts = b
