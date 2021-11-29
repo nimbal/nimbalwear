@@ -20,7 +20,7 @@
       "sleep_bouts": "analytics/sleep/bouts",
       "sleep_daily": "analytics/sleep/daily"
     },
-    "stages": ["convert", "nonwear", "crop", "save_sensors", "activity", "gait", "sleep"],
+    "stages": ["convert", "nonwear", "crop", "save_sensors", "gait", "sleep", "activity"],
     "sensors": {
       "accelerometer": {
         "signals": ["Accelerometer x", "Accelerometer y", "Accelerometer z"]

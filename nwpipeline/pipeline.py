@@ -245,8 +245,11 @@ class Pipeline:
         if single_stage in [None, 'nonwear']:
             self.nonwear(coll=coll, quiet=self.quiet, log=self.log)
 
-        if single_stage in ['crop', 'sleep']:
+        if single_stage in ['crop', 'sleep', 'activity']:
             self.read_nonwear(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
+
+        if single_stage in ['activity']:
+            self.read_sleep(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
         # crop final nonwear
         if single_stage in [None, 'crop']:
@@ -258,10 +261,6 @@ class Pipeline:
 
         # process posture
 
-        # process activity levels
-        if single_stage in [None, 'activity']:
-            self.activity(coll=coll, quiet=self.quiet, log=self.log)
-
         # process gait
         if single_stage in [None, 'gait']:
             self.gait(coll=coll, quiet=self.quiet, log=self.log, )
@@ -269,6 +268,10 @@ class Pipeline:
         # process sleep
         if single_stage in [None, 'sleep']:
             self.sleep(coll=coll, quiet=self.quiet, log=self.log)
+
+        # process activity levels
+        if single_stage in [None, 'activity']:
+            self.activity(coll=coll, quiet=self.quiet, log=self.log)
 
         return True
 
@@ -864,123 +867,6 @@ class Pipeline:
         return coll
 
     @coll_status
-    def activity(self, coll, quiet=False, log=True):
-
-        message("Calculating activity levels...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
-
-        save = self.module_settings['activity']['save']
-
-        coll.activity_epochs = pd.DataFrame()
-
-        epoch_length = 15
-
-        activity_device_index, dominant = self.select_activity_device(coll=coll)
-
-        if len(activity_device_index) == 0:
-            raise NWException(f"{coll.subject_id}_{coll.coll_id}: Wrist device not found in device list")
-
-        activity_device_index = activity_device_index[0]
-
-        # checks to see if files exist
-        if not coll.devices[activity_device_index]:
-            raise NWException(f'{coll.subject_id}_{coll.coll_id}: Wrist device data is missing')
-
-        accel_x_sig = coll.devices[activity_device_index].get_signal_index('Accelerometer x')
-        accel_y_sig = coll.devices[activity_device_index].get_signal_index('Accelerometer y')
-        accel_z_sig = coll.devices[activity_device_index].get_signal_index('Accelerometer z')
-
-        message(f"Calculating {epoch_length}-second epoch activity...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
-
-
-        cutpoint_ages = pd.DataFrame(self.module_settings['activity']['cutpoints'])
-
-        subject_age = int(coll.subject_info['age'])
-        lowpass = int(self.module_settings['activity']['lowpass'])
-
-        cutpoint = cutpoint_ages['type'].loc[(cutpoint_ages['min_age'] <= subject_age)
-                                             & (cutpoint_ages['max_age'] >=subject_age)].item()
-
-        e, b = activity_wrist_avm(x=coll.devices[activity_device_index].signals[accel_x_sig],
-                                  y=coll.devices[activity_device_index].signals[accel_y_sig],
-                                  z=coll.devices[activity_device_index].signals[accel_z_sig],
-                                  sample_rate=coll.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
-                                  start_datetime=coll.devices[activity_device_index].header['start_datetime'],
-                                  lowpass=lowpass, epoch_length=epoch_length, cutpoint=cutpoint, dominant=dominant,
-                                  quiet=quiet)
-
-        coll.activity_epochs = e
-        coll.activity_bouts = b
-
-        message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
-        coll.activity_daily = activity_stats(coll.activity_bouts, quiet=quiet)
-
-        coll.activity_epochs.insert(loc=1, column='device_location',
-                                    value=coll.devices[activity_device_index].header['device_location'])
-        coll.activity_epochs.insert(loc=2, column='dominant_hand', value=dominant)
-        coll.activity_epochs.insert(loc=3, column='cutpoint_type', value=cutpoint)
-
-        coll.activity_bouts.insert(loc=1, column='device_location',
-                                    value=coll.devices[activity_device_index].header['device_location'])
-        coll.activity_bouts.insert(loc=2, column='dominant_hand', value=dominant)
-        coll.activity_bouts.insert(loc=3, column='cutpoint_type', value=cutpoint)
-
-        coll.activity_epochs = self.identify_df(coll, coll.activity_epochs)
-        coll.activity_bouts = self.identify_df(coll, coll.activity_bouts)
-
-
-        coll.activity_daily.insert(loc=2, column='device_location',
-                                    value=coll.devices[activity_device_index].header['device_location'])
-        coll.activity_daily.insert(loc=3, column='dominant_hand', value=dominant)
-        coll.activity_daily.insert(loc=4, column='cutpoint_type', value=cutpoint)
-        coll.activity_daily.insert(loc=5, column='type', value='daily')
-
-        coll.activity_daily = self.identify_df(coll, coll.activity_daily)
-
-        # TODO: more detailed log info about what was done, epochs, days, intensities?
-        # TODO: info about algortihm and settings, device used, dominant vs non-dominant, in log, methods, or data table
-
-        if save:
-
-            # create all file path variables
-            epoch_activity_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id,
-                                                          coll.coll_id, "ACTIVITY_EPOCHS"]),
-                                                "csv"])
-            bouts_activity_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id,
-                                                          coll.coll_id, "ACTIVITY_BOUTS"]),
-                                                "csv"])
-            daily_activity_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id,
-                                                          coll.coll_id, "ACTIVITY_DAILY"]),
-                                                "csv"])
-
-            epoch_activity_csv_path = self.dirs['activity_epochs'] / epoch_activity_csv_name
-            bouts_activity_csv_path = self.dirs['activity_bouts'] / bouts_activity_csv_name
-            daily_activity_csv_path = self.dirs['activity_daily'] / daily_activity_csv_name
-
-            epoch_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
-            bouts_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
-            daily_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
-
-            message(f"Saving {epoch_activity_csv_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
-            coll.activity_epochs.to_csv(epoch_activity_csv_path, index=False)
-
-            message(f"Saving {bouts_activity_csv_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
-            coll.activity_bouts.to_csv(bouts_activity_csv_path, index=False)
-
-            message(f"Saving {daily_activity_csv_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
-            coll.activity_daily.to_csv(daily_activity_csv_path, index=False)
-
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
-
-        return coll
-
-    @coll_status
     def gait(self, coll, quiet=False, log=True):
 
         # TODO: axis needs to be set based on orientation of device
@@ -1265,6 +1151,182 @@ class Pipeline:
             message(f"Saving {daily_sleep_csv_path}", level='info', display=(not quiet), log=log,
                     logger_name=self.study_code)
             coll.daily_sleep.to_csv(daily_sleep_csv_path, index=False)
+
+        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+
+        return coll
+
+    def read_sleep(self, coll, single_stage, quiet=False, log=True):
+
+        # read nonwear data for all devices
+        message("Reading sleep data from files...", level='info', display=(not quiet), log=log,
+                logger_name=self.study_code)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+
+        sptw_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "SPTW"]), "csv"])
+        sleep_bouts_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "SLEEP_BOUTS"]),
+                                         "csv"])
+
+        sptw_csv_path = self.dirs['sleep_sptw'] / sptw_csv_name
+        sleep_bouts_csv_path = self.dirs['sleep_bouts'] / sleep_bouts_csv_name
+
+        coll.sptw = pd.DataFrame()
+        coll.sleep_bouts = pd.DataFrame()
+
+        if os.path.isfile(sptw_csv_path):
+
+            message(f"Reading {sptw_csv_path}", level='info', display=(not quiet), log=log,
+                    logger_name=self.study_code)
+
+            # read nonwear csv file
+            coll.sptw = pd.read_csv(sptw_csv_path, dtype=str)
+            coll.sptw['start_time'] = pd.to_datetime(coll.sptw['start_time'], format='%Y-%m-%d %H:%M:%S')
+            coll.sptw['end_time'] = pd.to_datetime(coll.sptw['end_time'], format='%Y-%m-%d %H:%M:%S')
+
+
+        else:
+            message(f"{coll.subject_id}_{coll.coll_id}: {sptw_csv_path} does not exist",
+                    level='warning', display=(not quiet), log=log, logger_name=self.study_code)
+            message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+
+        if os.path.isfile(sleep_bouts_csv_path):
+
+            message(f"Reading {sleep_bouts_csv_path}", level='info', display=(not quiet), log=log,
+                    logger_name=self.study_code)
+
+            # read nonwear csv file
+            coll.sleep_bouts = pd.read_csv(sleep_bouts_csv_path, dtype=str)
+            coll.sleep_bouts['start_time'] = pd.to_datetime(coll.sleep_bouts['start_time'], format='%Y-%m-%d %H:%M:%S')
+            coll.sleep_bouts['end_time'] = pd.to_datetime(coll.sleep_bouts['end_time'], format='%Y-%m-%d %H:%M:%S')
+
+        else:
+            message(f"{coll.subject_id}_{coll.coll_id}: {sleep_bouts_csv_path} does not exist",
+                    level='warning', display=(not quiet), log=log, logger_name=self.study_code)
+            message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+
+        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+
+        return coll
+
+    @coll_status
+    def activity(self, coll, quiet=False, log=True):
+
+        message("Calculating activity levels...", level='info', display=(not quiet), log=log,
+                logger_name=self.study_code)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+
+        save = self.module_settings['activity']['save']
+
+        coll.activity_epochs = pd.DataFrame()
+
+        epoch_length = 15
+
+        activity_device_index, dominant = self.select_activity_device(coll=coll)
+
+        if len(activity_device_index) == 0:
+            raise NWException(f"{coll.subject_id}_{coll.coll_id}: Wrist device not found in device list")
+
+        activity_device_index = activity_device_index[0]
+
+        # checks to see if files exist
+        if not coll.devices[activity_device_index]:
+            raise NWException(f'{coll.subject_id}_{coll.coll_id}: Wrist device data is missing')
+
+        accel_x_sig = coll.devices[activity_device_index].get_signal_index('Accelerometer x')
+        accel_y_sig = coll.devices[activity_device_index].get_signal_index('Accelerometer y')
+        accel_z_sig = coll.devices[activity_device_index].get_signal_index('Accelerometer z')
+
+        message(f"Calculating {epoch_length}-second epoch activity...", level='info', display=(not quiet), log=log,
+                logger_name=self.study_code)
+
+        cutpoint_ages = pd.DataFrame(self.module_settings['activity']['cutpoints'])
+
+        subject_age = int(coll.subject_info['age'])
+        lowpass = int(self.module_settings['activity']['lowpass'])
+
+        cutpoint = cutpoint_ages['type'].loc[(cutpoint_ages['min_age'] <= subject_age)
+                                             & (cutpoint_ages['max_age'] >= subject_age)].item()
+
+        # get nonwear for sleep_device
+        device_nonwear = coll.nonwear_times.loc[(coll.nonwear_times['study_code'] == coll.study_code) &
+                                                (coll.nonwear_times['subject_id'] == coll.subject_id) &
+                                                (coll.nonwear_times['coll_id'] == coll.coll_id) &
+                                                (coll.nonwear_times['device_type'] ==
+                                                 coll.device_info.iloc[activity_device_index]['device_type']) &
+                                                (coll.nonwear_times['device_location'] ==
+                                                 coll.device_info.iloc[activity_device_index]['device_location'])]
+
+        e, b, avm, vm = activity_wrist_avm(x=coll.devices[activity_device_index].signals[accel_x_sig],
+                                           y=coll.devices[activity_device_index].signals[accel_y_sig],
+                                           z=coll.devices[activity_device_index].signals[accel_z_sig],
+                                           sample_rate=coll.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
+                                           start_datetime=coll.devices[activity_device_index].header['start_datetime'],
+                                           lowpass=lowpass, epoch_length=epoch_length, cutpoint=cutpoint, dominant=dominant,
+                                           nonwear=device_nonwear, sptw=coll.sptw, sleep_bouts=coll.sleep_bouts,
+                                           quiet=quiet)
+
+        coll.activity_epochs = e
+        coll.activity_bouts = b
+
+        message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log,
+                logger_name=self.study_code)
+        coll.activity_daily = activity_stats(coll.activity_bouts, quiet=quiet)
+
+        coll.activity_epochs.insert(loc=1, column='device_location',
+                                    value=coll.devices[activity_device_index].header['device_location'])
+        coll.activity_epochs.insert(loc=2, column='dominant_hand', value=dominant)
+        coll.activity_epochs.insert(loc=3, column='cutpoint_type', value=cutpoint)
+
+        coll.activity_bouts.insert(loc=1, column='device_location',
+                                   value=coll.devices[activity_device_index].header['device_location'])
+        coll.activity_bouts.insert(loc=2, column='dominant_hand', value=dominant)
+        coll.activity_bouts.insert(loc=3, column='cutpoint_type', value=cutpoint)
+
+        coll.activity_epochs = self.identify_df(coll, coll.activity_epochs)
+        coll.activity_bouts = self.identify_df(coll, coll.activity_bouts)
+
+        coll.activity_daily.insert(loc=2, column='device_location',
+                                   value=coll.devices[activity_device_index].header['device_location'])
+        coll.activity_daily.insert(loc=3, column='dominant_hand', value=dominant)
+        coll.activity_daily.insert(loc=4, column='cutpoint_type', value=cutpoint)
+        coll.activity_daily.insert(loc=5, column='type', value='daily')
+
+        coll.activity_daily = self.identify_df(coll, coll.activity_daily)
+
+        # TODO: more detailed log info about what was done, epochs, days, intensities?
+        # TODO: info about algortihm and settings, device used, dominant vs non-dominant, in log, methods, or data table
+
+        if save:
+            # create all file path variables
+            epoch_activity_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id,
+                                                          coll.coll_id, "ACTIVITY_EPOCHS"]),
+                                                "csv"])
+            bouts_activity_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id,
+                                                          coll.coll_id, "ACTIVITY_BOUTS"]),
+                                                "csv"])
+            daily_activity_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id,
+                                                          coll.coll_id, "ACTIVITY_DAILY"]),
+                                                "csv"])
+
+            epoch_activity_csv_path = self.dirs['activity_epochs'] / epoch_activity_csv_name
+            bouts_activity_csv_path = self.dirs['activity_bouts'] / bouts_activity_csv_name
+            daily_activity_csv_path = self.dirs['activity_daily'] / daily_activity_csv_name
+
+            epoch_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
+            bouts_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
+            daily_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+            message(f"Saving {epoch_activity_csv_path}", level='info', display=(not quiet), log=log,
+                    logger_name=self.study_code)
+            coll.activity_epochs.to_csv(epoch_activity_csv_path, index=False)
+
+            message(f"Saving {bouts_activity_csv_path}", level='info', display=(not quiet), log=log,
+                    logger_name=self.study_code)
+            coll.activity_bouts.to_csv(bouts_activity_csv_path, index=False)
+
+            message(f"Saving {daily_activity_csv_path}", level='info', display=(not quiet), log=log,
+                    logger_name=self.study_code)
+            coll.activity_daily.to_csv(daily_activity_csv_path, index=False)
 
         message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
