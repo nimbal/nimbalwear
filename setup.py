@@ -28,7 +28,7 @@ setuptools.setup(
     python_requires=">=3.6",
     install_requires=['tqdm', 'pandas',
                       'nwdata@git+https://github.com/nimbal/nwdata@v0.9.0#egg=nwdata',
-                      'nwnonwear@git+https://github.com/nimbal/nwnonwear@v0.1.2#egg=nwnonwear',
+                      'nwnonwear@git+https://github.com/nimbal/nwnonwear@v0.1.3#egg=nwnonwear',
                       'nwactivity@git+https://github.com/nimbal/nwactivity@v0.3.0#egg=nwactivity',
                       'nwgait@git+https://github.com/nimbal/nwgait@v0.4.0#egg=nwgait',
                       'nwsleep@git+https://github.com/nimbal/nwsleep@v0.3.1#egg=nwsleep'],

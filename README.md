@@ -28,6 +28,10 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.14.2
+- bug fix: non-wear end detection windows in proper direction (nwnonwear v0.1.3)
+- bug fix: non-wear detection accounts for temperature frequency in rate of change (nwnonwearv0.1.3)
+
 v0.14.1
 - add option to lowpass data before activity calculations (nwactivity v0.2.1)
 - bug fix: does not count activity during nonwear or sleep (nwactivity v0.3.0)
