@@ -584,14 +584,14 @@ class Pipeline:
             # TODO: call different algorithm based on device_type or signals available??
             # TODO: log algorithm used
 
-            nonwear_times, nonwear_array = nwnonwear.vert_nonwear(x_values=coll.devices[index].signals[accel_x_sig],
-                                                                  y_values=coll.devices[index].signals[accel_y_sig],
-                                                                  z_values=coll.devices[index].signals[accel_z_sig],
-                                                                  temperature_values=coll.devices[index].signals[temperature_sig],
-                                                                  accel_freq=coll.devices[index].signal_headers[accel_x_sig]['sample_rate'],
-                                                                  temperature_freq=coll.devices[index].signal_headers[temperature_sig]['sample_rate'],
-                                                                  quiet=quiet)
-            algorithm_name = 'Vert algorithm'
+            nonwear_times, nonwear_array = nwnonwear.cta_nonwear(x_values=coll.devices[index].signals[accel_x_sig],
+                                                                 y_values=coll.devices[index].signals[accel_y_sig],
+                                                                 z_values=coll.devices[index].signals[accel_z_sig],
+                                                                 temperature_values=coll.devices[index].signals[temperature_sig],
+                                                                 accel_freq=coll.devices[index].signal_headers[accel_x_sig]['sample_rate'],
+                                                                 temperature_freq=coll.devices[index].signal_headers[temperature_sig]['sample_rate'],
+                                                                 quiet=quiet)
+            algorithm_name = 'CTA'
 
             bout_count = nonwear_times.shape[0]
 
