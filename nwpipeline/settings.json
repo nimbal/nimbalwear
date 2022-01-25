@@ -67,7 +67,8 @@
       "overwrite_header": true
     },
     "convert": {
-      "sync": true
+      "sync": true,
+      "adj_start": ""
     },
     "sync": {
       "type": "flip",

@@ -6,9 +6,12 @@ import logging
 import traceback
 from functools import wraps
 import json
+import operator
 
 from tqdm import tqdm
 import pandas as pd
+from isodate import parse_duration
+
 import nwdata
 import nwnonwear
 from nwpipeline import __version__
@@ -422,8 +425,10 @@ class Pipeline:
     def convert(self, coll, quiet=False, log=True):
 
         if self.module_settings['convert']['sync']:
-
             coll = self.sync(coll, quiet=quiet, log=log)
+
+        if self.module_settings['convert']['adj_start']:
+            coll = self.adj_start(coll, quiet=quiet, log=log)
 
         message("Converting device data to EDF...", level='info', display=(not quiet), log=log,
                 logger_name=self.study_code)
@@ -538,6 +543,48 @@ class Pipeline:
 
         return coll
 
+    def adj_start(self, coll, quiet=False, log=True):
+
+        # TODO: determine if config_datetime should also be adjusted
+
+        message("Adjusting device start times...", level='info', display=(not quiet), log=log,
+                logger_name=self.study_code)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+
+        # duration is stored in json in iso 8601 format
+        duration_iso = self.module_settings['convert']['adj_start']
+
+        # default to add if no operator specified
+        op = operator.add
+
+        # if operator is specified then isolate from duration
+        if duration_iso[0] in ["+", "-"]:
+            ops = {"+": operator.add,
+                   "-": operator.sub}
+            op = ops[duration_iso[0]]
+            duration_iso = duration_iso[1:]
+
+        # convert iso duration to timedelta
+        duration_delta = parse_duration(duration_iso)
+
+        # adjust start_datetime for each device
+        for idx, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
+                               desc='Adjusting device start times'):
+
+            device_type = row['device_type']
+            device_location = row['device_location']
+
+            old_start_datetime = coll.devices[idx].header['start_datetime']
+            new_start_datetime = op(old_start_datetime, duration_delta)
+
+            coll.devices[idx].header['start_datetime'] = new_start_datetime
+
+            message(f"Adjusted {device_type} {device_location} start time from {old_start_datetime} to {new_start_datetime}",
+                    level='info', display=(not quiet), log=log, logger_name=self.study_code)
+
+        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+
+        return coll
 
     @coll_status
     def nonwear(self, coll, quiet=False, log=True):
