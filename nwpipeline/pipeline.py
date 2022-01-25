@@ -582,7 +582,7 @@ class Pipeline:
             message(f"Adjusted {device_type} {device_location} start time from {old_start_datetime} to {new_start_datetime}",
                     level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+            message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
         return coll
 
