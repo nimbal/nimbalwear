@@ -28,6 +28,10 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v?
+- add option to adjust start time of device on convert
+
+
 v0.14.2
 - bug fix: non-wear end detection windows in proper direction (nwnonwear v0.1.3)
 - bug fix: non-wear detection accounts for temperature frequency in rate of change (nwnonwearv0.1.3)
