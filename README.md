@@ -30,6 +30,7 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 v?
 - add option to adjust start time of device on convert
+- update to nwnonwear v0.2.0 that uses vertdetach package
 
 
 v0.14.2
