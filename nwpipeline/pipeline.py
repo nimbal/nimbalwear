@@ -593,6 +593,10 @@ class Pipeline:
         message("Detecting non-wear...", level='info', display=(not quiet), log=log, logger_name=self.study_code)
         message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
+        low_temperature_cutoff = self.module_settings['nonwear']['low_temperature_cutoff']
+        high_temperature_cutoff = self.module_settings['nonwear']['high_temperature_cutoff']
+        temp_dec_roc = self.module_settings['nonwear']['temp_dec_roc']
+        temp_inc_roc = self.module_settings['nonwear']['temp_inc_roc']
         save = self.module_settings['nonwear']['save']
 
         coll.nonwear_times = pd.DataFrame()
@@ -631,14 +635,22 @@ class Pipeline:
             # TODO: call different algorithm based on device_type or signals available??
             # TODO: log algorithm used
 
-            nonwear_times, nonwear_array = nwnonwear.cta_nonwear(x_values=coll.devices[index].signals[accel_x_sig],
-                                                                 y_values=coll.devices[index].signals[accel_y_sig],
-                                                                 z_values=coll.devices[index].signals[accel_z_sig],
-                                                                 temperature_values=coll.devices[index].signals[temperature_sig],
-                                                                 accel_freq=coll.devices[index].signal_headers[accel_x_sig]['sample_rate'],
-                                                                 temperature_freq=coll.devices[index].signal_headers[temperature_sig]['sample_rate'],
-                                                                 quiet=quiet)
-            algorithm_name = 'CTA'
+            nonwear_times, nonwear_array = nwnonwear.vert_nonwear(
+                x_values=coll.devices[index].signals[accel_x_sig],
+                y_values=coll.devices[index].signals[accel_y_sig],
+                z_values=coll.devices[index].signals[accel_z_sig],
+                temperature_values=coll.devices[index].signals[temperature_sig],
+                accel_freq=coll.devices[index].signal_headers[accel_x_sig]['sample_rate'],
+                temperature_freq=coll.devices[index].signal_headers[temperature_sig]['sample_rate'],
+                low_temperature_cutoff=low_temperature_cutoff,
+                high_temperature_cutoff=high_temperature_cutoff,
+                temp_dec_roc=temp_dec_roc,
+                temp_inc_roc=temp_inc_roc,
+                quiet=quiet)
+            algorithm_name = 'DETACH'
+
+            nonwear_times['nonwear_bout_id'] = nonwear_times.index
+            nonwear_times.rename({'Start Datapoint': 'start_datapoint', 'End Datapoint': 'end_datapoint'}, inplace=True)
 
             bout_count = nonwear_times.shape[0]
 
