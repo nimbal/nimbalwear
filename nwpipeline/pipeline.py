@@ -650,7 +650,8 @@ class Pipeline:
             algorithm_name = 'DETACH'
 
             nonwear_times['nonwear_bout_id'] = nonwear_times.index
-            nonwear_times.rename({'Start Datapoint': 'start_datapoint', 'End Datapoint': 'end_datapoint'}, inplace=True)
+            nonwear_times.rename(columns={'Start Datapoint': 'start_datapoint', 'End Datapoint': 'end_datapoint'},
+                                 inplace=True)
 
             bout_count = nonwear_times.shape[0]
 
