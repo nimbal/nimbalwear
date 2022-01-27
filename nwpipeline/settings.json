@@ -109,6 +109,7 @@
       "save": true
     },
     "gait": {
+      "step_detect_type": "gyro",
       "axis": null,
       "save": true
     }
