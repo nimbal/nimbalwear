@@ -1,9 +1,10 @@
 from nwpipeline import Pipeline
 
-study_dir = 'w:/dev/dev-nimbalwear/dev-OND09'
+study_dir = 'w:/NiMBaLWEAR/OND08'
 
 collections = [('0001', '01')]
-single_stage = 'gait'
+collections = None
+single_stage = 'activity'
 
 test_nwpl = Pipeline(study_dir)
 
