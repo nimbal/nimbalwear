@@ -684,7 +684,7 @@ class Pipeline:
                                           'nonwear_bout_id', 'start_time', 'end_time']]
 
             # append to collection attribute
-            coll.nonwear_times = coll.nonwear_times.append(nonwear_times, ignore_index=True)
+            coll.nonwear_times = pd.concat([coll.nonwear_times, nonwear_times], ignore_index=True)
 
             if save:
 
@@ -751,7 +751,7 @@ class Pipeline:
             nonwear_times['end_time'] = pd.to_datetime(nonwear_times['end_time'], format='%Y-%m-%d %H:%M:%S')
 
             # append to collection attribute
-            coll.nonwear_times = coll.nonwear_times.append(nonwear_times, ignore_index=True)
+            coll.nonwear_times = pd.concat([coll.nonwear_times, nonwear_times], ignore_index=True)
 
             message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
 
