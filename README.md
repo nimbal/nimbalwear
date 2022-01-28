@@ -1,6 +1,6 @@
 # nwpipeline
 
-nwpipeline is the the NiMBaLWear data processing pipeline. This pipeline is used to process data from wearable sensors.
+nwpipeline is the NiMBaLWear data processing pipeline. This pipeline is used to process data from wearable sensors.
 
 This package is pre-release and should not be distributed outside the NiMBaLWear team. Additional functionality and documentation will be provided in subsequent releases.
 
@@ -28,7 +28,7 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
-v?
+v0.15.0
 - add option to adjust start time of device on convert
 - update to nwnonwear v0.2.0 that uses vertdetach package
 - allow choice between accel and gyro step detection

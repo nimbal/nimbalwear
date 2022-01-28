@@ -1,4 +1,4 @@
-import nwpipeline as nwpl
+from src import nwpipeline as nwpl
 
 study_dir = '/Volumes/KIT_DATA/test_sleep'
 

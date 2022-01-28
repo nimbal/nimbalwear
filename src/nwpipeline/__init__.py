@@ -1,3 +1,3 @@
-__version__ = 'DEV'
+__version__ = 'v0.15.0'
 
 from .pipeline import *

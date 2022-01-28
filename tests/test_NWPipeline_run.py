@@ -1,4 +1,4 @@
-from nwpipeline import Pipeline
+from src.nwpipeline import Pipeline
 
 study_dir = 'w:/NiMBaLWEAR/OND08'
 
