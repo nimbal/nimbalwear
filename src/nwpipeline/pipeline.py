@@ -19,6 +19,7 @@ import nwgait
 from nwactivity import activity_wrist_avm, activity_stats
 import nwsleep
 
+# version is defined here instead of __init__ because it is referenced in code
 __version__ = 'v0.15.0'
 
 class Pipeline:
