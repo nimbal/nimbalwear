@@ -14,11 +14,12 @@ from isodate import parse_duration
 
 import nwdata
 import nwnonwear
-from src.nwpipeline import __version__
+
 import nwgait
 from nwactivity import activity_wrist_avm, activity_stats
 import nwsleep
 
+__version__ = 'v0.15.0'
 
 class Pipeline:
 
