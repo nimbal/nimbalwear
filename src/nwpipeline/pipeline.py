@@ -1,5 +1,5 @@
 # version is defined here instead of __init__ because it is referenced in code
-__version__ = 'v0.15.0'
+__version__ = '0.15.0'
 
 import os
 import shutil
