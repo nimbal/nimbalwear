@@ -19,7 +19,7 @@ import nwgait
 from nwactivity import activity_wrist_avm, activity_stats
 import nwsleep
 
-from version import __version__
+from .version import __version__
 
 class Pipeline:
 
