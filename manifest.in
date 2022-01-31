@@ -1,2 +1,2 @@
-include nwpipeline/data_dicts.json
-include nwpipeline/settings.json
+include src/nwpipeline/data_dicts.json
+include src/nwpipeline/settings.json
