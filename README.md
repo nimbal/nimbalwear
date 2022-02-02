@@ -28,6 +28,9 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.15.1
+- fix package setup files
+
 v0.15.0
 - add option to adjust start time of device on convert
 - update to nwnonwear v0.2.0 that uses vertdetach package
