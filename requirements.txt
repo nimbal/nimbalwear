@@ -4,5 +4,5 @@ isodate~=0.6.1
 nwdata@git+https://github.com/nimbal/nwdata@v0.9.2#egg=nwdata
 nwnonwear@git+https://github.com/nimbal/nwnonwear@v0.2.0#egg=nwnonwear
 nwsleep@git+https://github.com/nimbal/nwsleep@v0.3.1#egg=nwsleep
-nwgait@git+https://github.com/nimbal/nwgait@v0.4.1#egg=nwgait
+nwgait@git+https://github.com/nimbal/nwgait@v0.4.2#egg=nwgait
 nwactivity@git+https://github.com/nimbal/nwactivity@v0.3.0#egg=nwactivity
