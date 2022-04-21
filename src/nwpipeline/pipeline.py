@@ -23,7 +23,7 @@ from .version import __version__
 
 class Pipeline:
 
-    def __init__(self, study_dir, log_level=logging.INFO):
+    def __init__(self, study_dir):
 
         self.quiet = False
         self.log = True
@@ -50,7 +50,7 @@ class Pipeline:
         # pipeline data files
         self.device_info_path = self.dirs['pipeline'] / 'devices.csv'
         self.subject_info_path = self.dirs['pipeline'] / 'subjects.csv'
-        self.log_file_path = self.dirs['logs'] / 'processing.log'
+        # self.log_file_path = self.dirs['logs'] / 'processing.log'
         self.status_path = self.dirs['pipeline'] / 'status.csv'
 
         self.stages = settings_json['pipeline']['stages']
@@ -85,17 +85,6 @@ class Pipeline:
                 df = pd.DataFrame(self.data_dicts[key])
                 p = value / f'{key}_dict.csv'
                 df.to_csv(p, index=False)
-
-        fileh = logging.FileHandler(self.log_file_path, 'a')
-        formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
-        fileh.setFormatter(formatter)
-        fileh.setLevel(log_level)
-
-        logger = logging.getLogger(self.study_code)
-        for hdlr in logger.handlers[:]:  # remove all old handlers
-            logger.removeHandler(hdlr)
-        logger.setLevel(log_level)
-        logger.addHandler(fileh)
 
     def coll_status(f):
         @wraps(f)
@@ -140,7 +129,7 @@ class Pipeline:
 
         return coll_status_wrapper
 
-    def run(self, collections=None, single_stage=None, quiet=False, log=True):
+    def run(self, collections=None, single_stage=None, quiet=False, log=True, log_level=logging.INFO):
         """
 
         :param collections: list of tuples (subject_id, coll_id), default is None which will run all collections
@@ -152,6 +141,19 @@ class Pipeline:
 
         self.quiet = quiet
         self.log = log
+
+        log_file_path = self.dirs['logs'] / f'process_log_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.log'
+
+        fileh = logging.FileHandler(log_file_path, 'a')
+        formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
+        fileh.setFormatter(formatter)
+        fileh.setLevel(log_level)
+
+        logger = logging.getLogger(self.study_code)
+        for hdlr in logger.handlers[:]:  # remove all old handlers
+            logger.removeHandler(hdlr)
+        logger.setLevel(log_level)
+        logger.addHandler(fileh)
 
         message("\n\n", level='info', display=(not self.quiet), log=self.log, logger_name=self.study_code)
         message(f"---- Start processing pipeline ----------------------------------------------",

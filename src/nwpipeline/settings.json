@@ -93,11 +93,11 @@
       "cutpoints": [
         {
           "min_age": 0,
-          "max_age": 64,
+          "max_age": 59,
           "type": "Powell"
         },
         {
-          "min_age": 65,
+          "min_age": 60,
           "max_age": 999,
           "type": "Fraysse"
         }
