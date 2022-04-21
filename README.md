@@ -28,6 +28,11 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.15.2
+- update to nwdata v0.9.2 (must faster file reading and writing)
+- update to nwgait v0.4.2
+- new processing log for each run call
+
 v0.15.1
 - fix package setup files
 
