@@ -142,24 +142,24 @@ class Pipeline:
         self.quiet = quiet
         self.log = log
 
-        log_name = f'process_log_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.log'
-        log_path = self.dirs['logs'] / log_name
+        self.log_name = f'process_log_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}'
+        log_path = self.dirs['logs'] / (self.log_name + '.log')
 
         fileh = logging.FileHandler(log_path, 'a')
         formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
         fileh.setFormatter(formatter)
         fileh.setLevel(log_level)
 
-        logger = logging.getLogger(log_name[:-4])
+        logger = logging.getLogger(self.log_name)
         for hdlr in logger.handlers[:]:  # remove all old handlers
             logger.removeHandler(hdlr)
         logger.setLevel(log_level)
         logger.addHandler(fileh)
 
-        message("\n\n", level='info', display=(not self.quiet), log=self.log, logger_name=self.study_code)
+        message("\n\n", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
         message(f"---- Start processing pipeline ----------------------------------------------",
-                level='info', display=(not self.quiet), log=self.log, logger_name=self.study_code)
-        message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.study_code)
+                level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
+        message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
 
         # get all unique collections if none provided
         collections = self.get_collections() if collections is None else collections
@@ -167,29 +167,29 @@ class Pipeline:
         # TODO: ensure collections is a list of tuples
 
         message(f"Version: {__version__}", level='info', display=(not self.quiet), log=self.log,
-                logger_name=self.study_code)
+                logger_name=self.log_name)
         message(f"Study: {self.study_code}", level='info', display=(not self.quiet), log=self.log,
-                logger_name=self.study_code)
+                logger_name=self.log_name)
         message(f"Collections (Subject, Collection): {collections}", level='info', display=(not self.quiet),
-                log=self.log, logger_name=self.study_code)
+                log=self.log, logger_name=self.log_name)
 
         if single_stage is not None:
             message(f"Single stage: {single_stage}", level='info', display=(not self.quiet), log=self.log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
         if not isinstance(self.subject_info, pd.DataFrame):
             message("Missing subjects info file in meta folder `subjects.csv`", level='warning',
-                    display=(not self.quiet), log=self.log, logger_name=self.study_code)
-        message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.study_code)
+                    display=(not self.quiet), log=self.log, logger_name=self.log_name)
+        message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
 
         for collection in tqdm(collections, desc="Processing collections", leave=True):
 
             subject_id = collection[0]
             coll_id = collection[1]
 
-            message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.study_code)
+            message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
             message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not self.quiet),
-                    log=self.log, logger_name=self.study_code)
-            message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.study_code)
+                    log=self.log, logger_name=self.log_name)
+            message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
 
             try:
                 # get devices for this collection from device_list
@@ -215,12 +215,12 @@ class Pipeline:
 
             except:
                 tb = traceback.format_exc()
-                message(tb, level='error', display=(not self.quiet), log=self.log, logger_name=self.study_code)
+                message(tb, level='error', display=(not self.quiet), log=self.log, logger_name=self.log_name)
 
             del coll
 
         message("---- End ----------------------------------------------\n", level='info', display=(not self.quiet),
-                log=self.log, logger_name=self.study_code)
+                log=self.log, logger_name=self.log_name)
 
     def process_collection(self, coll, single_stage=None):
 
@@ -315,8 +315,8 @@ class Pipeline:
     def read(self, coll, single_stage=None, quiet=False, log=True):
 
         message("Reading device data from files...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         overwrite_header = self.module_settings['read']['overwrite_header']
 
@@ -365,13 +365,13 @@ class Pipeline:
             # check that data file exists
             if not device_file_path.exists():
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: {device_file_path} does not exist",
-                        level='warning', display=(not quiet), log=log, logger_name=self.study_code)
+                        level='warning', display=(not quiet), log=log, logger_name=self.log_name)
                 coll.devices.append(None)
                 continue
 
             # import data to device data object
             message(f"Reading {device_file_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
 
             device_data = nwdata.NWData()
             import_func()
@@ -404,13 +404,13 @@ class Pipeline:
                 if not value[0]:
                     message(f"{subject_id}_{coll_id}_{device_type}_{device_location}:  {key} mismatch: " +
                             f"{value[1]} (header) != {value[2]} (device list)",
-                            level='warning', display=(not quiet), log=log, logger_name=self.study_code)
+                            level='warning', display=(not quiet), log=log, logger_name=self.log_name)
                     mismatch = True
 
             if mismatch and overwrite_header:
 
                 message("Overwriting header from device list", level='info', display=(not quiet), log=log,
-                        logger_name=self.study_code)
+                        logger_name=self.log_name)
 
                 device_data.header['study_code'] = study_code
                 device_data.header['subject_id'] = subject_id
@@ -419,7 +419,7 @@ class Pipeline:
                 device_data.header['device_id'] = device_id
                 device_data.header['device_location'] = device_location
 
-            message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
             coll.devices.append(device_data)
 
@@ -435,8 +435,8 @@ class Pipeline:
             coll = self.adj_start(coll, quiet=quiet, log=log)
 
         message("Converting device data to EDF...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         # save all device data to edf
         for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
@@ -457,20 +457,20 @@ class Pipeline:
             standard_device_path.parent.mkdir(parents=True, exist_ok=True)
 
             message(f"Saving {standard_device_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
 
             # write device data as edf
             coll.devices[index].export_edf(file_path=standard_device_path, quiet=quiet)
 
-            message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
     def sync(self, coll, quiet=False, log=True):
 
         message("Synchronizing device data...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         ref_device_type = coll.device_info.iloc[0]['device_type']
         ref_device_location = coll.device_info.iloc[0]['device_location']
@@ -505,7 +505,7 @@ class Pipeline:
                         sync_at_config = False
 
                         message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: Invalid config time, could not add as sync time",
-                                    level='warning', display=(not quiet), log=log, logger_name=self.study_code)
+                                    level='warning', display=(not quiet), log=log, logger_name=self.log_name)
 
 
                 syncs, segments = coll.devices[idx].sync(ref=coll.devices[0],
@@ -516,7 +516,7 @@ class Pipeline:
 
 
                 message(f"Synchronized {device_type} {device_location} to {ref_device_type} {ref_device_location} at {syncs.shape[0]} sync points",
-                        level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                        level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
 
                 if self.module_settings['sync']['save']:
@@ -536,14 +536,14 @@ class Pipeline:
                     segments_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
                     message(f"Saving {syncs_csv_path}", level='info', display=(not quiet), log=log,
-                            logger_name=self.study_code)
+                            logger_name=self.log_name)
                     syncs.to_csv(syncs_csv_path, index=False)
 
                     message(f"Saving {segments_csv_path}", level='info', display=(not quiet), log=log,
-                            logger_name=self.study_code)
+                            logger_name=self.log_name)
                     segments.to_csv(segments_csv_path, index=False)
 
-                message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
@@ -552,8 +552,8 @@ class Pipeline:
         # TODO: determine if config_datetime should also be adjusted
 
         message("Adjusting device start times...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         # duration is stored in json in iso 8601 format
         duration_iso = self.module_settings['convert']['adj_start']
@@ -584,9 +584,9 @@ class Pipeline:
             coll.devices[idx].header['start_datetime'] = new_start_datetime
 
             message(f"Adjusted {device_type} {device_location} start time from {old_start_datetime} to {new_start_datetime}",
-                    level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                    level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-            message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
@@ -594,8 +594,8 @@ class Pipeline:
     def nonwear(self, coll, quiet=False, log=True):
 
         # process nonwear for all devices
-        message("Detecting non-wear...", level='info', display=(not quiet), log=log, logger_name=self.study_code)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+        message("Detecting non-wear...", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         low_temperature_cutoff = self.module_settings['nonwear']['low_temperature_cutoff']
         high_temperature_cutoff = self.module_settings['nonwear']['high_temperature_cutoff']
@@ -620,15 +620,15 @@ class Pipeline:
 
             if device_type not in ['AXV6', 'GNOR']:
                 message(f"Cannot detect non-wear for {device_type}_{device_location}",
-                        level='info', display=(not quiet), log=log, logger_name=self.study_code)
-                message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                        level='info', display=(not quiet), log=log, logger_name=self.log_name)
+                message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
                 continue
 
             # check for data loaded
             if coll.devices[index] is None:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No device data",
-                        level='warning', display=(not quiet), log=log, logger_name=self.study_code)
-                message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                        level='warning', display=(not quiet), log=log, logger_name=self.log_name)
+                message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
                 continue
 
             accel_x_sig = coll.devices[index].get_signal_index('Accelerometer x')
@@ -660,7 +660,7 @@ class Pipeline:
             bout_count = nonwear_times.shape[0]
 
             message(f"Detected {bout_count} nonwear bouts for {device_type} {device_location} ({algorithm_name})",
-                    level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                    level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
             # convert datapoints to times
             start_date = coll.devices[index].header['start_datetime']
@@ -701,11 +701,11 @@ class Pipeline:
                 nonwear_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
                 message(f"Saving {nonwear_csv_path}", level='info', display=(not quiet), log=log,
-                        logger_name=self.study_code)
+                        logger_name=self.log_name)
 
                 nonwear_times.to_csv(nonwear_csv_path, index=False)
 
-            message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
@@ -713,8 +713,8 @@ class Pipeline:
 
         # read nonwear data for all devices
         message("Reading non-wear data from files...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         if single_stage == 'crop':
             nonwear_csv_dir = self.dirs['nonwear_bouts_standard']
@@ -741,13 +741,13 @@ class Pipeline:
 
             if not os.path.isfile(nonwear_csv_path):
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: {nonwear_csv_path} does not exist",
-                        level='warning', display=(not quiet), log=log, logger_name=self.study_code)
-                message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                        level='warning', display=(not quiet), log=log, logger_name=self.log_name)
+                message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
                 #coll.devices.append(None)    THIS SHOULD NOT BE HERE? CUT AND PASTE ERROR?
                 continue
 
             message(f"Reading {nonwear_csv_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
 
             # read nonwear csv file
             nonwear_times = pd.read_csv(nonwear_csv_path, dtype=str)
@@ -757,7 +757,7 @@ class Pipeline:
             # append to collection attribute
             coll.nonwear_times = pd.concat([coll.nonwear_times, nonwear_times], ignore_index=True)
 
-            message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
@@ -765,8 +765,8 @@ class Pipeline:
     def crop(self, coll, quiet=False, log=True):
 
         message("Detecting final device removal...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         min_duration = self.module_settings['crop']['min_duration']
         max_time_to_eof = self.module_settings['crop']['max_time_to_eof']
@@ -785,7 +785,7 @@ class Pipeline:
 
             if coll.devices[index] is None:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No device data",
-                        level='warning', display=(not quiet), log=log, logger_name=self.study_code)
+                        level='warning', display=(not quiet), log=log, logger_name=self.log_name)
                 continue
 
             # if there is nonwear data for any devices in this collection
@@ -831,7 +831,7 @@ class Pipeline:
                         crop_duration = end_time - new_end_time
 
                         message(f"Cropping {crop_duration} after final removal of {device_type} {device_location}",
-                                level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                                level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
                         coll.devices[index].crop(new_start_time, new_end_time, inplace=True)
 
@@ -841,15 +841,15 @@ class Pipeline:
                     else:
 
                         message(f"No final removal of {device_type} {device_location} detected", level='info',
-                                display=(not quiet), log=log, logger_name=self.study_code)
+                                display=(not quiet), log=log, logger_name=self.log_name)
 
                 else:
                     message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for device",
-                            level='warning', display=(not quiet), log=log, logger_name=self.study_code)
+                            level='warning', display=(not quiet), log=log, logger_name=self.log_name)
 
             else:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for collection",
-                        level='warning', display=(not quiet), log=log, logger_name=self.study_code)
+                        level='warning', display=(not quiet), log=log, logger_name=self.log_name)
 
             if save:
 
@@ -869,15 +869,15 @@ class Pipeline:
 
                 # write cropped device data as edf
                 message(f"Saving {cropped_device_path}", level='info', display=(not quiet), log=log,
-                        logger_name=self.study_code)
+                        logger_name=self.log_name)
                 coll.devices[index].export_edf(file_path=cropped_device_path, quiet=quiet)
 
                 # write nonwear times with cropped nonwear removed
                 message(f"Saving {nonwear_csv_path}", level='info', display=(not quiet), log=log,
-                        logger_name=self.study_code)
+                        logger_name=self.log_name)
                 coll.nonwear_times[coll.nonwear_times.index.isin(nonwear_idx)].to_csv(nonwear_csv_path, index=False)
 
-            message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
@@ -885,8 +885,8 @@ class Pipeline:
     def save_sensors(self, coll, quiet=False, log=True):
 
         message("Separating sensors from devices...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
                                desc='Saving sensor edfs'):
@@ -922,11 +922,11 @@ class Pipeline:
                     sensor_path.parent.mkdir(parents=True, exist_ok=True)
 
                     message(f"Saving {sensor_path}", level='info', display=(not quiet), log=log,
-                            logger_name=self.study_code)
+                            logger_name=self.log_name)
 
                     coll.devices[index].export_edf(file_path=sensor_path, sig_nums_out=sig_nums, quiet=quiet)
 
-            message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
@@ -940,8 +940,8 @@ class Pipeline:
         save = self.module_settings['gait']['save']
 
         message(f"Detecting steps and walking bouts using {step_detect_type} data...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         r_gait_device_index, l_gait_device_index = self.select_gait_device(coll=coll)
 
@@ -1012,13 +1012,13 @@ class Pipeline:
             coll.gait_step_times = self.identify_df(coll, coll.gait_step_times)
 
             message(f"Detected {coll.gait_bout_times.shape[0]} gait bouts", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
 
             message(f"Detected {coll.gait_step_times.shape[0]} steps",
-                    level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                    level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
             message("Summarizing daily gait analytics...", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
 
             coll.gait_daily = wb.daily_gait(coll.gait_bout_times)
             coll.gait_daily = self.identify_df(coll, coll.gait_daily)
@@ -1066,13 +1066,13 @@ class Pipeline:
             coll.gait_step_times = self.identify_df(coll, coll.gait_step_times)
 
             message(f"Detected {coll.gait_bout_times.shape[0]} gait bouts", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
 
             message(f"Detected {coll.gait_step_times.shape[0] * 2} steps",
-                    level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                    level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
             message("Summarizing daily gait analytics...", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
 
             coll.gait_daily = nwgait.gait_stats(coll.gait_bout_times, single_leg=True)
             coll.gait_daily = self.identify_df(coll, coll.gait_daily)
@@ -1095,7 +1095,7 @@ class Pipeline:
 
         else:
             message(f"Invalid step_detect_type: {step_detect_type}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
 
             return coll
 
@@ -1122,10 +1122,10 @@ class Pipeline:
             # steps_rej_csv_path = self.dirs['gait_steps'] / steps_rej_csv_name
             daily_gait_csv_path = self.dirs['gait_daily'] / daily_gait_csv_name
 
-            message(f"Saving {bouts_csv_path}", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+            message(f"Saving {bouts_csv_path}", level='info', display=(not quiet), log=log, logger_name=self.log_name)
             coll.gait_bout_times.to_csv(bouts_csv_path, index=False)
 
-            message(f"Saving {steps_csv_path}", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+            message(f"Saving {steps_csv_path}", level='info', display=(not quiet), log=log, logger_name=self.log_name)
             coll.gait_step_times.to_csv(steps_csv_path, index=False)
 
             # message(f"Saving {steps_rej_csv_path}", level='info', display=(not quiet), log=log,
@@ -1133,18 +1133,18 @@ class Pipeline:
             # coll.step_times[coll.step_times['step_state'] != 'success'].to_csv(steps_rej_csv_path, index=False)
 
             message(f"Saving {daily_gait_csv_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
             coll.gait_daily.to_csv(daily_gait_csv_path, index=False)
 
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
     @coll_status
     def sleep(self, coll, quiet=False, log=True):
 
-        message("Analyzing sleep...", level='info', display=(not quiet), log=log, logger_name=self.study_code)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+        message("Analyzing sleep...", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         save = self.module_settings['sleep']['save']
 
@@ -1185,7 +1185,7 @@ class Pipeline:
             nonwear = device_nonwear)
 
         message(f"Detected {coll.sptw.shape[0]} sleep period time windows", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
+                logger_name=self.log_name)
 
         sleep_t5a5 = nwsleep.detect_sleep_bouts(z_angle_diff=z_angle_diff, sptw=coll.sptw,
                                                       z_sample_rate=z_sample_rate,
@@ -1195,7 +1195,7 @@ class Pipeline:
         sleep_t5a5.insert(loc=2, column='bout_detect', value='t5a5')
 
         message(f"Detected {sleep_t5a5.shape[0]} sleep bouts (t5a5)", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
+                logger_name=self.log_name)
 
         sleep_t8a4 = nwsleep.detect_sleep_bouts(z_angle_diff=z_angle_diff, sptw=coll.sptw,
                                                 z_sample_rate=z_sample_rate,
@@ -1205,17 +1205,17 @@ class Pipeline:
         sleep_t8a4.insert(loc=2, column='bout_detect', value='t8a4')
 
         message(f"Detected {sleep_t8a4.shape[0]} sleep bouts (t8a4)", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
+                logger_name=self.log_name)
 
         coll.sleep_bouts = pd.concat([sleep_t5a5, sleep_t8a4])
 
         daily_sleep_t5a5 = nwsleep.sptw_stats(coll.sptw, sleep_t5a5, type='daily', sptw_inc=['long', 'all', 'sleep'])
         message(f"Summarized {daily_sleep_t5a5['sptw_inc'].value_counts()['long']} days of sleep analytics (t5a5)...",
-                level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         daily_sleep_t8a4 = nwsleep.sptw_stats(coll.sptw, sleep_t8a4, type='daily', sptw_inc=['long', 'all', 'sleep'])
         message(f"Summarized {daily_sleep_t8a4['sptw_inc'].value_counts()['long']} days of sleep analytics (t8a4)...",
-                level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         daily_sleep_t5a5.insert(loc=2, column='bout_detect', value='t5a5')
         daily_sleep_t8a4.insert(loc=2, column='bout_detect', value='t8a4')
@@ -1244,18 +1244,18 @@ class Pipeline:
             sleep_bouts_csv_path.parent.mkdir(parents=True, exist_ok=True)
             daily_sleep_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
-            message(f"Saving {sptw_csv_path}", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+            message(f"Saving {sptw_csv_path}", level='info', display=(not quiet), log=log, logger_name=self.log_name)
             coll.sptw.to_csv(sptw_csv_path, index=False)
 
             message(f"Saving {sleep_bouts_csv_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
             coll.sleep_bouts.to_csv(sleep_bouts_csv_path, index=False)
 
             message(f"Saving {daily_sleep_csv_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
             coll.daily_sleep.to_csv(daily_sleep_csv_path, index=False)
 
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
@@ -1263,8 +1263,8 @@ class Pipeline:
 
         # read nonwear data for all devices
         message("Reading sleep data from files...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         sptw_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "SPTW"]), "csv"])
         sleep_bouts_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "SLEEP_BOUTS"]),
@@ -1279,7 +1279,7 @@ class Pipeline:
         if os.path.isfile(sptw_csv_path):
 
             message(f"Reading {sptw_csv_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
 
             # read nonwear csv file
             coll.sptw = pd.read_csv(sptw_csv_path, dtype=str)
@@ -1289,13 +1289,13 @@ class Pipeline:
 
         else:
             message(f"{coll.subject_id}_{coll.coll_id}: {sptw_csv_path} does not exist",
-                    level='warning', display=(not quiet), log=log, logger_name=self.study_code)
-            message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                    level='warning', display=(not quiet), log=log, logger_name=self.log_name)
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         if os.path.isfile(sleep_bouts_csv_path):
 
             message(f"Reading {sleep_bouts_csv_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
 
             # read nonwear csv file
             coll.sleep_bouts = pd.read_csv(sleep_bouts_csv_path, dtype=str)
@@ -1304,10 +1304,10 @@ class Pipeline:
 
         else:
             message(f"{coll.subject_id}_{coll.coll_id}: {sleep_bouts_csv_path} does not exist",
-                    level='warning', display=(not quiet), log=log, logger_name=self.study_code)
-            message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                    level='warning', display=(not quiet), log=log, logger_name=self.log_name)
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
@@ -1315,8 +1315,8 @@ class Pipeline:
     def activity(self, coll, quiet=False, log=True):
 
         message("Calculating activity levels...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         save = self.module_settings['activity']['save']
 
@@ -1340,7 +1340,7 @@ class Pipeline:
         accel_z_sig = coll.devices[activity_device_index].get_signal_index('Accelerometer z')
 
         message(f"Calculating {epoch_length}-second epoch activity...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
+                logger_name=self.log_name)
 
         cutpoint_ages = pd.DataFrame(self.module_settings['activity']['cutpoints'])
 
@@ -1372,7 +1372,7 @@ class Pipeline:
         coll.activity_bouts = b
 
         message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log,
-                logger_name=self.study_code)
+                logger_name=self.log_name)
         coll.activity_daily = activity_stats(coll.activity_bouts, quiet=quiet)
 
         coll.activity_epochs.insert(loc=1, column='device_location',
@@ -1420,18 +1420,18 @@ class Pipeline:
             daily_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
             message(f"Saving {epoch_activity_csv_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
             coll.activity_epochs.to_csv(epoch_activity_csv_path, index=False)
 
             message(f"Saving {bouts_activity_csv_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
             coll.activity_bouts.to_csv(bouts_activity_csv_path, index=False)
 
             message(f"Saving {daily_activity_csv_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.study_code)
+                    logger_name=self.log_name)
             coll.activity_daily.to_csv(daily_activity_csv_path, index=False)
 
-        message("", level='info', display=(not quiet), log=log, logger_name=self.study_code)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
