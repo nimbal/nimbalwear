@@ -142,14 +142,15 @@ class Pipeline:
         self.quiet = quiet
         self.log = log
 
-        log_file_path = self.dirs['logs'] / f'process_log_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.log'
+        log_name = f'process_log_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.log'
+        log_path = self.dirs['logs'] / log_name
 
-        fileh = logging.FileHandler(log_file_path, 'a')
+        fileh = logging.FileHandler(log_path, 'a')
         formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
         fileh.setFormatter(formatter)
         fileh.setLevel(log_level)
 
-        logger = logging.getLogger(self.study_code)
+        logger = logging.getLogger(log_name[:-4])
         for hdlr in logger.handlers[:]:  # remove all old handlers
             logger.removeHandler(hdlr)
         logger.setLevel(log_level)
