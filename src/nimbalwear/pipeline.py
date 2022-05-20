@@ -566,6 +566,19 @@ class Pipeline:
                 message(f"Synchronized {device_type} {device_location} to {ref_device_type} {ref_device_location} at {syncs.shape[0]} sync points",
                         level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
+                syncs.insert(loc=0, column='study_code', value=study_code)
+                syncs.insert(loc=1, column='subject_id', value=subject_id)
+                syncs.insert(loc=2, column='coll_id', value=coll_id)
+                syncs.insert(loc=3, column='device_type', value=device_type)
+                syncs.insert(loc=4, column='device_location', value=device_location)
+                syncs.insert(loc=5, column='sync_id', value=range(1, syncs.shape[0] + 1))
+
+                segments.insert(loc=0, column='study_code', value=study_code)
+                segments.insert(loc=1, column='subject_id', value=subject_id)
+                segments.insert(loc=2, column='coll_id', value=coll_id)
+                segments.insert(loc=3, column='device_type', value=device_type)
+                segments.insert(loc=4, column='device_location', value=device_location)
+                segments.insert(loc=5, column='segment_id', value=range(1, segments.shape[0] + 1))
 
                 if self.module_settings['sync']['save']:
 
