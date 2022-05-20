@@ -12,7 +12,6 @@ from tqdm import tqdm
 import pandas as pd
 from isodate import parse_duration
 
-import nwdata
 import nwnonwear
 
 import nwgait

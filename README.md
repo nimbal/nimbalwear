@@ -1,6 +1,6 @@
-# nwpipeline
+# nimbalwear
 
-nwpipeline is the NiMBaLWear data processing pipeline. This pipeline is used to process data from wearable sensors.
+nimbalwear is the NiMBaLWear data processing pipeline. This pipeline is used to process data from wearable sensors.
 
 This package is pre-release and should not be distributed outside the NiMBaLWear team. Additional functionality and documentation will be provided in subsequent releases.
 
@@ -12,17 +12,17 @@ This package is pre-release and should not be distributed outside the NiMBaLWear
 
 To install the latest release of nwpipeline directly from GitHub using pip, run the following line in terminal or console:
 
-`pip install git+https://github.com/nimbal/nwpipeline#egg=nwpipeline`
+`pip install git+https://github.com/nimbal/nimbalwear`
 
 To install a specific release, insert `@v#.#.#` after the repository name replacing with the tag associated with that release. For example:
 
-`pip install git+https://github.com/nimbal/nwpipeline@v1.0.0#egg=nwpipeline`
+`pip install git+https://github.com/nimbal/nimbalwear@v1.0.0`
 
 # Package Dependency
 
 To include the latest release of nwpipeline as a dependency in your Python package, include the following line in `setup.py` or include the string within the list alongside your other dependencies:
 
-`install_requires=['nwpipeline@git+https://github.com/nimbal/nwpipeline@[version]#egg=nwpipeline']`
+`install_requires=['nimbalwear@git+https://github.com/nimbal/nimbalwear@[version]']`
 
 To include a specific release, replace `[version]` with the tag associated with that release.
 

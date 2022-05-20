@@ -1,2 +1,2 @@
-include src/nwpipeline/data_dicts.json
-include src/nwpipeline/settings.json
+include src/nimbalwear/data_dicts.json
+include src/nimbalwear/settings.json

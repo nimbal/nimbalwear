@@ -18,7 +18,9 @@
       "gait_daily": "analytics/gait/daily",
       "sleep_sptw": "analytics/sleep/sptw",
       "sleep_bouts": "analytics/sleep/bouts",
-      "sleep_daily": "analytics/sleep/daily"
+      "sleep_daily": "analytics/sleep/daily",
+      "reports_collection": "reports/collection",
+      "reports_patient": "reports/patient"
     },
     "stages": ["convert", "nonwear", "crop", "save_sensors", "gait", "sleep", "activity"],
     "sensors": {
