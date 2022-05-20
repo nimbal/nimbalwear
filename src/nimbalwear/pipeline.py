@@ -12,8 +12,8 @@ from tqdm import tqdm
 import pandas as pd
 from isodate import parse_duration
 
+from src.nimbalwear import Data
 import nwnonwear
-
 import nwgait
 from nwactivity import activity_wrist_avm, activity_stats
 import nwsleep
@@ -141,53 +141,47 @@ class Pipeline:
         self.quiet = quiet
         self.log = log
 
-        self.log_name = f'process_log_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}'
-        log_path = self.dirs['logs'] / (self.log_name + '.log')
-
-        fileh = logging.FileHandler(log_path, 'a')
-        formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
-        fileh.setFormatter(formatter)
-        fileh.setLevel(log_level)
-
-        logger = logging.getLogger(self.log_name)
-        for hdlr in logger.handlers[:]:  # remove all old handlers
-            logger.removeHandler(hdlr)
-        logger.setLevel(log_level)
-        logger.addHandler(fileh)
-
-        message("\n\n", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
-        message(f"---- Start processing pipeline ----------------------------------------------",
-                level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
-        message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
-
         # get all unique collections if none provided
         collections = self.get_collections() if collections is None else collections
 
         # TODO: ensure collections is a list of tuples
-
-        message(f"Version: {__version__}", level='info', display=(not self.quiet), log=self.log,
-                logger_name=self.log_name)
-        message(f"Study: {self.study_code}", level='info', display=(not self.quiet), log=self.log,
-                logger_name=self.log_name)
-        message(f"Collections (Subject, Collection): {collections}", level='info', display=(not self.quiet),
-                log=self.log, logger_name=self.log_name)
-
-        if single_stage is not None:
-            message(f"Single stage: {single_stage}", level='info', display=(not self.quiet), log=self.log,
-                    logger_name=self.log_name)
-        if not isinstance(self.subject_info, pd.DataFrame):
-            message("Missing subjects info file in meta folder `subjects.csv`", level='warning',
-                    display=(not self.quiet), log=self.log, logger_name=self.log_name)
-        message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
 
         for collection in tqdm(collections, desc="Processing collections", leave=True):
 
             subject_id = collection[0]
             coll_id = collection[1]
 
+            self.log_name = f'{subject_id}_{coll_id}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}'
+            log_path = self.dirs['logs'] / (self.log_name + '.log')
+
+            fileh = logging.FileHandler(log_path, 'a')
+            formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
+            fileh.setFormatter(formatter)
+            fileh.setLevel(log_level)
+
+            logger = logging.getLogger(self.log_name)
+            for hdlr in logger.handlers[:]:  # remove all old handlers
+                logger.removeHandler(hdlr)
+            logger.setLevel(log_level)
+            logger.addHandler(fileh)
+
+            message("\n\n", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
+            message(f"---- Processing collection ----------------------------------------------",
+                    level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
             message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
-            message(f"---- Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not self.quiet),
+            message(f"---- Study {self.study_code}, Subject {subject_id}, Collection {coll_id} --------", level='info', display=(not self.quiet),
                     log=self.log, logger_name=self.log_name)
+            message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
+
+            message(f"nimbalwear v{__version__}", level='info', display=(not self.quiet), log=self.log,
+                    logger_name=self.log_name)
+
+            if single_stage is not None:
+                message(f"Single stage: {single_stage}", level='info', display=(not self.quiet), log=self.log,
+                        logger_name=self.log_name)
+            if not isinstance(self.subject_info, pd.DataFrame):
+                message("Missing subjects info file in meta folder `subjects.csv`", level='warning',
+                        display=(not self.quiet), log=self.log, logger_name=self.log_name)
             message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
 
             try:
@@ -218,8 +212,8 @@ class Pipeline:
 
             del coll
 
-        message("---- End ----------------------------------------------\n", level='info', display=(not self.quiet),
-                log=self.log, logger_name=self.log_name)
+            message("---- End ----------------------------------------------\n", level='info', display=(not self.quiet),
+                    log=self.log, logger_name=self.log_name)
 
     def process_collection(self, coll, single_stage=None):
 
@@ -372,7 +366,7 @@ class Pipeline:
             message(f"Reading {device_file_path}", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
 
-            device_data = nwdata.NWData()
+            device_data = Data()
             import_func()
             device_data.deidentify()
 
@@ -427,6 +421,9 @@ class Pipeline:
     @coll_status
     def convert(self, coll, quiet=False, log=True):
 
+        if self.module_settings['convert']['autocal']:
+            coll = self.autocal(coll, quiet=quiet, log=log)
+
         if self.module_settings['convert']['sync']:
             coll = self.sync(coll, quiet=quiet, log=log)
 
@@ -460,6 +457,58 @@ class Pipeline:
 
             # write device data as edf
             coll.devices[index].export_edf(file_path=standard_device_path, quiet=quiet)
+
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        return coll
+
+    def autocal(self, coll, quiet=False, log=True):
+
+        message("Autocalibrating device data...", level='info', display=(not quiet), log=log,
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        #TODO: only calibrate devices with Accelerometer and only use_temp if Temperature signal exists
+
+        for idx, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0],
+                             desc="Autocalibrating devices", leave=False):
+            study_code = row['study_code']
+            subject_id = row['subject_id']
+            coll_id = row['coll_id']
+            device_type = row['device_type']
+            device_location = row['device_location']
+            device_id = row['device_id']
+
+            pre_err, post_err, iter = coll.devices[idx].autocal(quiet=quiet)
+
+            calib = pd.DataFrame({'study_code': study_code,
+                                  'subject_id': subject_id,
+                                  'coll_id': coll_id,
+                                  'device_type': device_type,
+                                  'device_location': device_location,
+                                  'device_id': device_id,
+                                  'pre_err': pre_err,
+                                  'post_err': post_err,
+                                  'iter': iter}, index=[0])
+
+            message(f"Autocalibrated {device_type} {device_location}: Calibration error reduced from {pre_err} to {post_err} after {iter} iterations.",
+                    level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+            if self.module_settings['autocal']['save']:
+
+                # create all file path variables
+                calib_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
+                                                     "CALIB"]),
+                                           "csv"])
+
+                calib_csv_path = self.dirs['calib'] / calib_csv_name
+
+
+                calib_csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+                message(f"Saving {calib_csv_path}", level='info', display=(not quiet), log=log,
+                        logger_name=self.log_name)
+                calib.to_csv(calib_csv_path, index=False)
 
             message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 

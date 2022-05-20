@@ -16,7 +16,7 @@ from datetime import timedelta
 from struct import *
 
 import numpy as np
-from nwdata.nwfiles import EDF
+from src.nimbalwear.files import EDF
 
 # TODO: Only works for AX6 - add functionality for packing_format = 0 and mags
 # TODO: add various checks and error handling
@@ -283,11 +283,18 @@ class CWAFile:
 
     def parse_data_header(self, packet):
 
-        data_header = {}
+        start_time = None
+        num_axes = None
+        sample_count = None
+        packing_format = None
+        accel_scale = None
+        gyro_scale = None
+        light = None
+        temperature = None
+        battery = None
 
         packet_header = packet[0:2].decode()  # @ 0  +2   ASCII "AX", little-endian (0x5841)
-        packet_length = unpack('<H', packet[2:4])[
-            0]  # @ 2  +2   Packet length (508 bytes, with header (4) = 512 bytes total)
+        packet_length = unpack('<H', packet[2:4])[0]  # @ 2  +2   Packet length (508 bytes, with header (4) = 512 bytes total)
 
         if packet_header == 'AX':
 
@@ -368,6 +375,8 @@ class CWAFile:
 
             # battery
             battery = (battery + 512.0) * 6000 / 1024 / 1000.0
+
+
 
         return start_time, num_axes, sample_count, packing_format, accel_scale, gyro_scale, light, temperature, battery
 

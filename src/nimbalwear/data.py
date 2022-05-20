@@ -17,8 +17,8 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation as R
-from nimbalwear.files import EDF, GENEActiv, Nonin, CWA
-from nimbalwear.utils.flip_sync import sync_devices
+from src.nimbalwear.files import EDFFile, GENEActivFile, NoninFile, CWAFile
+from src.nimbalwear.utils import sync_devices, autocal
 
 
 class Data:
@@ -78,7 +78,7 @@ class Data:
             return False
 
         # read file
-        edf_file = EDF.EDFFile(file_path)
+        edf_file = EDFFile(file_path)
         edf_file.read(quiet=quiet)
 
         p_add = [item for item in edf_file.header['patient_additional'].split(' ') if item != '']
@@ -160,7 +160,7 @@ class Data:
                            if pd.notnull(self.header['config_datetime']) else '')
 
         # write to edf
-        edf_file = EDF.EDFFile(file_path)
+        edf_file = EDFFile(file_path)
 
         edf_file.header = {'patientcode': self.header['subject_id'],
                            'gender': self.header['sex'],
@@ -353,6 +353,32 @@ class Data:
 
         return True
 
+    def autocal(self, use_temp=True, epoch_secs=None, detect_only=False, plot=False, quiet=False):
+
+        # get accelerometer x, y, z and temperature signals
+        x_i = self.get_signal_index('Accelerometer x')
+        y_i = self.get_signal_index('Accelerometer y')
+        z_i = self.get_signal_index('Accelerometer z')
+
+        temp = None
+        temp_fs = None
+
+        if use_temp:
+            temp_i = self.get_signal_index('Temperature')
+            temp = self.signals[temp_i]
+            temp_fs = self.signal_headers[temp_i]['sample_rate']
+
+        x, y, z, pre_err, post_err, iter = autocal(x=self.signals[x_i], y=self.signals[y_i], z=self.signals[z_i],
+                                                   accel_fs=self.signal_headers[x_i]['sample_rate'], temp=temp,
+                                                   temp_fs=temp_fs, use_temp=use_temp, epoch_secs=epoch_secs,
+                                                   detect_only=detect_only, plot=plot, quiet=quiet)
+
+        self.signals[x_i] = x
+        self.signals[y_i] = y
+        self.signals[z_i] = z
+
+        return pre_err, post_err, iter
+
     def sync(self, ref, sig_labels=('Accelerometer x', 'Accelerometer y', 'Accelerometer z'), type='flip',
              sync_at_config=True, **kwargs):
 
@@ -397,7 +423,7 @@ class Data:
             return False
 
         # read Bittium edf file
-        in_file = EDF.EDFFile(file_path)
+        in_file = EDFFile(file_path)
         in_file.read(quiet=quiet)
         self.signal_headers = in_file.signal_headers
         self.signals = in_file.signals
@@ -489,7 +515,7 @@ class Data:
             return False
 
         # read file
-        in_file = GENEActiv.GENEActivFile(file_path)
+        in_file = GENEActivFile(file_path)
         in_file.read(parse_data=parse_data, start=start, end=end, downsample=downsample,
                      calibrate=calibrate, correct_drift=correct_drift, quiet=quiet)
 
@@ -606,7 +632,7 @@ class Data:
             print("Import failed: file does not exist.")
             return False
 
-        in_file = CWA.CWAFile(file_path)
+        in_file = CWAFile(file_path)
         in_file.read(resample=resample, quiet=quiet)
 
         device_type = in_file.header['device_type']
@@ -768,7 +794,7 @@ class Data:
             return False
 
         # read file
-        in_file = Nonin.NoninFile(file_path)
+        in_file = NoninFile(file_path)
         in_file.read(quiet=quiet)
 
         if in_file.header['gender'] == 1:

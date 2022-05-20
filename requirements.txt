@@ -1,6 +1,7 @@
 pandas~=1.4.0
 tqdm~=4.62.3
 isodate~=0.6.1
+sklearn
 nwnonwear@git+https://github.com/nimbal/nwnonwear@v0.2.0#egg=nwnonwear
 nwsleep@git+https://github.com/nimbal/nwsleep@v0.3.2#egg=nwsleep
 nwgait@git+https://github.com/nimbal/nwgait@v0.4.2#egg=nwgait

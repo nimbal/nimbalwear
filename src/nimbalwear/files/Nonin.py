@@ -4,7 +4,7 @@ import csv
 import time
 import datetime
 
-from nwdata.nwfiles import EDF
+from src.nimbalwear.files import EDF
 
 class NoninFile:
 

@@ -13,7 +13,7 @@ import matplotlib.style as mstyle
 import time
 from tqdm import tqdm
 
-from nwdata.nwfiles import EDF
+from src.nimbalwear.files import EDF
 
 mstyle.use('fast')
 
