@@ -228,14 +228,14 @@ class Pipeline:
         """
 
         if single_stage in ['activity', 'gait', 'sleep']:
-            self.required_devices(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
+            coll = self.required_devices(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
         # read data from all devices in collection
-        self.read(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
+        coll = self.read(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
         # convert to edf
         if single_stage in [None, 'convert']:
-            self.convert(coll=coll, quiet=self.quiet, log=self.log)
+            coll = self.convert(coll=coll, quiet=self.quiet, log=self.log)
 
         # data integrity ??
 
@@ -243,35 +243,35 @@ class Pipeline:
 
         # process nonwear for all devices
         if single_stage in [None, 'nonwear']:
-            self.nonwear(coll=coll, quiet=self.quiet, log=self.log)
+            coll = self.nonwear(coll=coll, quiet=self.quiet, log=self.log)
 
         if single_stage in ['crop', 'sleep', 'activity']:
-            self.read_nonwear(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
+            coll = self.read_nonwear(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
         if single_stage in ['activity']:
-            self.read_sleep(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
+            coll = self.read_sleep(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
         # crop final nonwear
         if single_stage in [None, 'crop']:
-            self.crop(coll=coll, quiet=self.quiet, log=self.log)
+            coll = self.crop(coll=coll, quiet=self.quiet, log=self.log)
 
         # save sensor edf files
         if single_stage in [None, 'save_sensors']:
-            self.save_sensors(coll=coll, quiet=self.quiet, log=self.log)
+            coll = self.save_sensors(coll=coll, quiet=self.quiet, log=self.log)
 
         # process posture
 
         # process gait
         if single_stage in [None, 'gait']:
-            self.gait(coll=coll, quiet=self.quiet, log=self.log, )
+            coll = self.gait(coll=coll, quiet=self.quiet, log=self.log, )
 
         # process sleep
         if single_stage in [None, 'sleep']:
-            self.sleep(coll=coll, quiet=self.quiet, log=self.log)
+            coll = self.sleep(coll=coll, quiet=self.quiet, log=self.log)
 
         # process activity levels
         if single_stage in [None, 'activity']:
-            self.activity(coll=coll, quiet=self.quiet, log=self.log)
+            coll = self.activity(coll=coll, quiet=self.quiet, log=self.log)
 
         return True
 
