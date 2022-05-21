@@ -173,6 +173,13 @@ class Data:
                            'equipment': '_'.join([self.header['device_type'], self.header['device_id']]),
                            'recording_additional': config_datetime}
 
+        for i, s_h in enumerate(self.signals):
+            self.signal_headers[i]['physical_max'] = max(self.signals[i])
+            self.signal_headers[i]['physical_min'] = min(self.signals[i])
+            self.signal_headers[i]['digital_max'] = 32767
+            self.signal_headers[i]['digital_min'] = -32768
+            self.signal_headers[i]['prefilter'] = ''
+
         edf_file.signal_headers = self.signal_headers
         edf_file.signals = self.signals
         edf_file.write(file_path, sig_nums_out=sig_nums_out, quiet=quiet)
