@@ -33,6 +33,11 @@ def autocal(x, y, z, accel_fs, temp=None, temp_fs=None, use_temp=True, epoch_sec
     temp_epochs = temp[:int(int(temp.shape[0] / temp_epoch_samples) * temp_epoch_samples)]
     temp_epochs = temp_epochs.reshape((-1, temp_epoch_samples))
 
+    epoch_count = min(accel_epochs.shape[1], temp_epochs.shape[0])
+
+    accel_epochs = accel_epochs[:, :epoch_count, :]
+    temp_epochs = temp_epochs[:epoch_count, :]
+
     # calculate epoch means and std
     accel_epoch_means = accel_epochs.mean(axis=2)
     accel_epoch_stds = accel_epochs.std(axis=2)
