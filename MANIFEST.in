@@ -1,2 +1,2 @@
-include src/nimbalwear/data_dicts.json
-include src/nimbalwear/settings.json
+include src/nimbalwear/settings/data_dicts.json
+include src/nimbalwear/settings/settings.json

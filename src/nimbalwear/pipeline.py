@@ -12,11 +12,13 @@ from tqdm import tqdm
 import pandas as pd
 from isodate import parse_duration
 
-from src.nimbalwear import Data
 import nwnonwear
 import nwgait
-from nwactivity import activity_wrist_avm, activity_stats
 import nwsleep
+
+from src.nimbalwear import Data
+from src.nimbalwear import activity_wrist_avm, activity_stats
+
 
 from .version import __version__
 
@@ -33,7 +35,7 @@ class Pipeline:
         settings_path.parent.mkdir(parents=True, exist_ok=True)
 
         if not settings_path.exists():
-            settings_src = Path(__file__).parent.absolute() / 'settings.json'
+            settings_src = Path(__file__).parent.absolute() / 'settings/settings.json'
             shutil.copy(settings_src, settings_path)
 
         # get study code
@@ -57,7 +59,7 @@ class Pipeline:
         self.device_locations = settings_json['pipeline']['device_locations']
         self.module_settings = settings_json['modules']
 
-        with open(Path(__file__).parent.absolute() / 'data_dicts.json', 'r') as f:
+        with open(Path(__file__).parent.absolute() / 'settings/data_dicts.json', 'r') as f:
             self.data_dicts = json.load(f)
 
         # TODO: check for required files (raw data, device_list)
