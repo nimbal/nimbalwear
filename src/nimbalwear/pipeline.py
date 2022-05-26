@@ -24,25 +24,29 @@ from .version import __version__
 
 class Pipeline:
 
-    def __init__(self, study_dir):
+    def __init__(self, study_dir, settings_path=None):
 
         self.quiet = False
         self.log = True
 
         # initialize folder structure
         self.study_dir = Path(study_dir)
-        settings_path = self.study_dir / 'pipeline/settings.json'
-        settings_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if not settings_path.exists():
+        self.settings_path = Path(settings_path) if settings_path is not None else settings_path
+
+        if (self.settings_path is None) or (not self.settings_path.is_file()):
+            self.settings_path = self.study_dir / 'pipeline/settings/settings.json'
+            self.settings_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if not self.settings_path.is_file():
             settings_src = Path(__file__).parent.absolute() / 'settings/settings.json'
-            shutil.copy(settings_src, settings_path)
+            shutil.copy(settings_src, self.settings_path)
 
         # get study code
         self.study_code = self.study_dir.name
 
         # read json file
-        with open(self.study_dir / 'pipeline/settings.json', 'r') as f:
+        with open(self.settings_path, 'r') as f:
             settings_json = json.load(f)
 
         self.dirs = settings_json['pipeline']['dirs']
@@ -58,6 +62,8 @@ class Pipeline:
         self.sensors = settings_json['pipeline']['sensors']
         self.device_locations = settings_json['pipeline']['device_locations']
         self.module_settings = settings_json['modules']
+
+        self.settings_str = json.dumps(settings_json, indent=4)
 
         with open(Path(__file__).parent.absolute() / 'settings/data_dicts.json', 'r') as f:
             self.data_dicts = json.load(f)
@@ -184,6 +190,9 @@ class Pipeline:
             if not isinstance(self.subject_info, pd.DataFrame):
                 message("Missing subjects info file in meta folder `subjects.csv`", level='warning',
                         display=(not self.quiet), log=self.log, logger_name=self.log_name)
+            message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
+            message(f"Settings: {self.settings_path}\n\n {self.settings_str}", level='info', display=(not self.quiet),
+                    log=self.log, logger_name=self.log_name)
             message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
 
             try:
