@@ -13,9 +13,10 @@ import os
 import time
 from datetime import datetime
 from datetime import timedelta
-from struct import *
+from struct import unpack
 
 import numpy as np
+
 from src.nimbalwear.files import EDF
 
 # TODO: Only works for AX6 - add functionality for packing_format = 0 and mags

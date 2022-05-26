@@ -3,14 +3,15 @@
 #           Adam Vert
 
 # ======================================== IMPORTS ========================================
-import numpy as np
 import datetime
 import os
 import shutil
+import time
+
+import numpy as np
 import fpdf
 import matplotlib.pyplot as plt
 import matplotlib.style as mstyle
-import time
 from tqdm import tqdm
 
 from src.nimbalwear.files import EDF

@@ -1,8 +1,9 @@
-import textract
 import os
 import csv
 import time
 import datetime
+
+import textract
 
 from src.nimbalwear.files import EDF
 
