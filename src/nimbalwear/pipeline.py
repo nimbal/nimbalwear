@@ -12,13 +12,12 @@ from tqdm import tqdm
 import pandas as pd
 from isodate import parse_duration
 
-import nwnonwear
 import nwgait
 import nwsleep
 
-from src.nimbalwear import Data
-from src.nimbalwear import activity_wrist_avm, activity_stats
-
+from .data import Data
+from .activity import activity_wrist_avm, activity_stats
+from .nonwear import vert_nonwear
 
 from .version import __version__
 
@@ -711,7 +710,7 @@ class Pipeline:
             # TODO: call different algorithm based on device_type or signals available??
             # TODO: log algorithm used
 
-            nonwear_times, nonwear_array = nwnonwear.vert_nonwear(
+            nonwear_times, nonwear_array = vert_nonwear(
                 x_values=coll.devices[index].signals[accel_x_sig],
                 y_values=coll.devices[index].signals[accel_y_sig],
                 z_values=coll.devices[index].signals[accel_z_sig],
