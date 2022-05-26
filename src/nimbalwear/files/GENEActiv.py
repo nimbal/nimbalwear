@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.style as mstyle
 from tqdm import tqdm
 
-from src.nimbalwear.files import EDF
+from .EDF import EDFFile
 
 mstyle.use('fast')
 
@@ -748,7 +748,7 @@ class GENEActivFile:
                 sh_index = sh_index + 1
 
             # write to edf
-            edf_file = EDF.EDFFile(out_file)
+            edf_file = EDFFile(out_file)
             edf_file.header = header
             edf_file.signal_headers = signal_headers
             edf_file.signals = [self.data['x'][trim_samples:],

@@ -5,7 +5,7 @@ import datetime
 
 import textract
 
-from src.nimbalwear.files import EDF
+from .EDF import EDFFile
 
 class NoninFile:
 

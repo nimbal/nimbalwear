@@ -17,7 +17,7 @@ from struct import unpack
 
 import numpy as np
 
-from src.nimbalwear.files import EDF
+from .EDF import EDFFile
 
 # TODO: Only works for AX6 - add functionality for packing_format = 0 and mags
 # TODO: add various checks and error handling
@@ -516,7 +516,7 @@ class CWAFile:
                 sh_index = sh_index + 1
 
             # write to edf
-            edf_file = EDF.EDFFile(out_file)
+            edf_file = EDFFile(out_file)
             edf_file.header = header
             edf_file.signal_headers = signal_headers
             edf_file.signals = [self.data['gx'][trim_samples:],

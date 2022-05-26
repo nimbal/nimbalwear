@@ -2,12 +2,13 @@ from pathlib import Path
 from threading import Thread
 
 from flask import Flask, render_template, request, redirect, url_for
-import src.nimbalwear as nw
+from .version import __version__
+from .pipeline import Pipeline
 
 PIPELINE_ROOT = Path("W:/NiMBaLWEAR")
 
 app = Flask(__name__)
-version = nw.__version__
+version = __version__
 
 @app.route("/")
 def home():
@@ -23,7 +24,7 @@ def study(study):
 
     study_dir = PIPELINE_ROOT / study
 
-    pl = nw.Pipeline(study_dir)
+    pl = Pipeline(study_dir)
     collections = ["_".join(coll) for coll in pl.get_collections()]
     stages = ['convert', 'nonwear', 'crop', 'save_sensors', 'gait', 'sleep', 'activity']
 
@@ -57,7 +58,7 @@ def process(study):
     log = request.form.get('log')
 
     # dialog box showing settings and to confirm
-    pl = nw.Pipeline(study_dir)
+    pl = Pipeline(study_dir)
 
     plargs = {'collections': collections, 'single_stage': single_stage, 'quiet': quiet, 'log': log}
 
