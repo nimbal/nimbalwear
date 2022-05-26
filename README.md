@@ -1,32 +1,45 @@
 # nimbalwear
 
-nimbalwear is the NiMBaLWear data processing pipeline. This pipeline is used to process data from wearable sensors.
+nimbalwear is an open source toolkit for processing data from wearable sensors.
 
-This package is pre-release and should not be distributed outside the NiMBaLWear team. Additional functionality and documentation will be provided in subsequent releases.
+This package is pre-release and should not be distributed outside the NiMBaLWear team. Additional functionality and 
+documentation will be provided in subsequent releases.
 
 # Contents
 
-- `nwpipeline` is the actual nwpipeline package. This package contains `class NWPipeline`, which represents an instance of the pipeline and contains methods that process data and move it through the pipeline.
+- Under construction
 
 # Installation
 
-To install the latest release of nwpipeline directly from GitHub using pip, run the following line in terminal or console:
+To install the latest release of nimbalwear directly from GitHub using pip, run the following line in terminal or 
+console:
 
 `pip install git+https://github.com/nimbal/nimbalwear`
 
-To install a specific release, insert `@v#.#.#` after the repository name replacing with the tag associated with that release. For example:
+To install a specific release, insert `@v#.#.#` after the repository name replacing with the tag associated with that 
+release. For example:
 
 `pip install git+https://github.com/nimbal/nimbalwear@v1.0.0`
 
 # Package Dependency
 
-To include the latest release of nwpipeline as a dependency in your Python package, include the following line in `setup.py` or include the string within the list alongside your other dependencies:
+To include the latest release of nimbalwear as a dependency in your Python package, include the following line in 
+`setup.py` or include the string within the list alongside your other dependencies:
 
 `install_requires=['nimbalwear@git+https://github.com/nimbal/nimbalwear@[version]']`
 
 To include a specific release, replace `[version]` with the tag associated with that release.
 
 # Changes by version
+
+v0.16.0
+- added autocalibration of accelerometers
+- added relevant functions from  nwdata, nwnonwear, nwgait, nwsleep, nwactivity, and nwapp as data.py, nonwear.py, 
+gait.py, sleep.py, activity.py and app.py modules
+- tidy sync outputs
+- add option to provide alternative settings.json file
+- new processing log for each collection
+- output settings to log
 
 v0.15.2
 - update to nwdata v0.9.2 (must faster file reading and writing)
