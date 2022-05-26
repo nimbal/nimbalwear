@@ -12,11 +12,9 @@ from tqdm import tqdm
 import pandas as pd
 from isodate import parse_duration
 
-
-import nwsleep
-
 from .data import Data
 from .nonwear import vert_nonwear
+from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
 from .gait import AccelReader, WalkingBouts, get_gait_bouts, create_timestamps, gait_stats
 from .activity import activity_wrist_avm, activity_stats
 
@@ -1249,7 +1247,7 @@ class Pipeline:
 
         # TODO: should sleep algorithm be modified if dominant vs non-dominant hand?
 
-        coll.sptw, z_angle, z_angle_diff, z_sample_rate = nwsleep.detect_sptw(
+        coll.sptw, z_angle, z_angle_diff, z_sample_rate = detect_sptw(
             x_values=coll.devices[sleep_device_index].signals[accel_x_sig],
             y_values=coll.devices[sleep_device_index].signals[accel_y_sig],
             z_values=coll.devices[sleep_device_index].signals[accel_z_sig],
@@ -1260,7 +1258,7 @@ class Pipeline:
         message(f"Detected {coll.sptw.shape[0]} sleep period time windows", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
 
-        sleep_t5a5 = nwsleep.detect_sleep_bouts(z_angle_diff=z_angle_diff, sptw=coll.sptw,
+        sleep_t5a5 = detect_sleep_bouts(z_angle_diff=z_angle_diff, sptw=coll.sptw,
                                                       z_sample_rate=z_sample_rate,
                                                       start_datetime=coll.devices[sleep_device_index].header['start_datetime'],
                                                       z_abs_threshold=5, min_sleep_length=5)
@@ -1270,7 +1268,7 @@ class Pipeline:
         message(f"Detected {sleep_t5a5.shape[0]} sleep bouts (t5a5)", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
 
-        sleep_t8a4 = nwsleep.detect_sleep_bouts(z_angle_diff=z_angle_diff, sptw=coll.sptw,
+        sleep_t8a4 = detect_sleep_bouts(z_angle_diff=z_angle_diff, sptw=coll.sptw,
                                                 z_sample_rate=z_sample_rate,
                                                 start_datetime=coll.devices[sleep_device_index].header['start_datetime'],
                                                 z_abs_threshold=4, min_sleep_length=8)
@@ -1282,11 +1280,11 @@ class Pipeline:
 
         coll.sleep_bouts = pd.concat([sleep_t5a5, sleep_t8a4])
 
-        daily_sleep_t5a5 = nwsleep.sptw_stats(coll.sptw, sleep_t5a5, type='daily', sptw_inc=['long', 'all', 'sleep'])
+        daily_sleep_t5a5 = sptw_stats(coll.sptw, sleep_t5a5, type='daily', sptw_inc=['long', 'all', 'sleep'])
         message(f"Summarized {daily_sleep_t5a5['sptw_inc'].value_counts()['long']} days of sleep analytics (t5a5)...",
                 level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        daily_sleep_t8a4 = nwsleep.sptw_stats(coll.sptw, sleep_t8a4, type='daily', sptw_inc=['long', 'all', 'sleep'])
+        daily_sleep_t8a4 = sptw_stats(coll.sptw, sleep_t8a4, type='daily', sptw_inc=['long', 'all', 'sleep'])
         message(f"Summarized {daily_sleep_t8a4['sptw_inc'].value_counts()['long']} days of sleep analytics (t8a4)...",
                 level='info', display=(not quiet), log=log, logger_name=self.log_name)
 

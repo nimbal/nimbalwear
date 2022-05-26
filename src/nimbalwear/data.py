@@ -17,6 +17,7 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation as R
+
 from src.nimbalwear.files import EDFFile, GENEActivFile, NoninFile, CWAFile
 from src.nimbalwear.utils import sync_devices, autocal
 

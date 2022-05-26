@@ -3,4 +3,3 @@ tqdm~=4.62.3
 isodate~=0.6.1
 sklearn
 vertdetach@git+https://github.com/nimbal/vertdetach@v1.0.2
-nwsleep@git+https://github.com/nimbal/nwsleep@v0.3.2#egg=nwsleep
