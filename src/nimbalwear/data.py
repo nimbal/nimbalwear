@@ -18,8 +18,12 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation as R
 
-from .files import EDFFile, GENEActivFile, NoninFile, CWAFile
-from .utils import sync_devices, autocal
+from .files.EDF import EDFFile
+from .files.GENEActiv import GENEActivFile
+from .files.Nonin import NoninFile
+from .files.CWA import CWAFile
+from .utils.flip_sync import sync_devices
+from .utils.autocal import autocal
 
 
 class Data:
