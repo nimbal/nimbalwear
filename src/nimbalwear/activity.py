@@ -1,5 +1,5 @@
 from collections import Counter
-from datetime import timedelta, datetime, time
+from datetime import timedelta, datetime
 from copy import deepcopy
 
 import numpy as np
@@ -7,7 +7,7 @@ import pandas as pd
 from scipy.signal import butter, filtfilt
 
 
-def avm_cutpoints(type='Powell', dominant=False):
+def avm_cutpoints(cutpoint_type='Powell', dominant=False):
 
     """
     Powell
@@ -27,7 +27,7 @@ def avm_cutpoints(type='Powell', dominant=False):
 
     dom = 'dominant' if dominant else 'non-dominant'
 
-    cutpoints = cutpoints_dict[type][dom]
+    cutpoints = cutpoints_dict[cutpoint_type][dom]
 
     return cutpoints
 
@@ -73,7 +73,7 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
     epoch_starts = range(0, len(vm) + 1 - epoch_samples, epoch_samples)
     avm = [sum(vm[i:i + epoch_samples]) / epoch_samples for i in epoch_starts]
 
-    cutpoints = avm_cutpoints(type=cutpoint, dominant=dominant)
+    cutpoints = avm_cutpoints(cutpoint, dominant)
 
     epoch_intensity = ['sedentary'] * len(avm)
     for k, v in cutpoints.items():
@@ -180,7 +180,7 @@ def activity_stats(activity_epochs, type='daily', quiet=False):
 
         for new_epoch in new_epochs:
             new_row = pd.Series(new_epoch, index=activity_epochs.columns)
-            activity_epochs = activity_epochs.append(new_row, ignore_index=True)
+            activity_epochs = pd.concat([activity_epochs, new_row], ignore_index=True)
 
         #activity_epochs.sort_values(by='start_time', inplace=True, ignore_index=True)
 
@@ -193,14 +193,15 @@ def activity_stats(activity_epochs, type='daily', quiet=False):
             for intensity, intensity_group in date_group.groupby('intensity'):
                 counts[intensity] = round(sum(intensity_group['duration']) / 60, 2)
 
-            activity_stats = activity_stats.append({'day_num': day_num,
-                                                    'date': date,
-                                                    'none': counts['none'],
-                                                    'sedentary': counts['sedentary'],
-                                                    'light': counts['light'],
-                                                    'moderate': counts['moderate'],
-                                                    'vigorous': counts['vigorous']},
-                                                   ignore_index=True)
+            day_activity_stats = {'day_num': day_num,
+                                  'date': date,
+                                  'none': counts['none'],
+                                  'sedentary': counts['sedentary'],
+                                  'light': counts['light'],
+                                  'moderate': counts['moderate'],
+                                  'vigorous': counts['vigorous']}
+
+            activity_stats = pd.concat([activity_stats, day_activity_stats], ignore_index=True)
 
             day_num += 1
 
