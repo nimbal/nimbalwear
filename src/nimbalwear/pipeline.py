@@ -12,14 +12,16 @@ from tqdm import tqdm
 import pandas as pd
 from isodate import parse_duration
 
-import nwgait
+
 import nwsleep
 
 from .data import Data
-from .activity import activity_wrist_avm, activity_stats
 from .nonwear import vert_nonwear
+from .gait import AccelReader, WalkingBouts, get_gait_bouts, create_timestamps, gait_stats
+from .activity import activity_wrist_avm, activity_stats
 
 from .version import __version__
+
 
 class Pipeline:
 
@@ -1045,7 +1047,7 @@ class Pipeline:
             l_accel_y_sig = coll.devices[l_gait_device_index].get_signal_index('Accelerometer y')
             l_accel_z_sig = coll.devices[l_gait_device_index].get_signal_index('Accelerometer z')
 
-            l_obj = nwgait.AccelReader.sig_init(raw_x=coll.devices[l_gait_device_index].signals[l_accel_x_sig],
+            l_obj = AccelReader.sig_init(raw_x=coll.devices[l_gait_device_index].signals[l_accel_x_sig],
                 raw_y=coll.devices[l_gait_device_index].signals[l_accel_y_sig],
                 raw_z=coll.devices[l_gait_device_index].signals[l_accel_z_sig],
                 startdate = coll.devices[l_gait_device_index].header['start_datetime'],
@@ -1055,7 +1057,7 @@ class Pipeline:
             r_accel_y_sig = coll.devices[r_gait_device_index].get_signal_index('Accelerometer y')
             r_accel_z_sig = coll.devices[r_gait_device_index].get_signal_index('Accelerometer z')
 
-            r_obj = nwgait.AccelReader.sig_init(raw_x=coll.devices[r_gait_device_index].signals[r_accel_x_sig],
+            r_obj = AccelReader.sig_init(raw_x=coll.devices[r_gait_device_index].signals[r_accel_x_sig],
                 raw_y=coll.devices[r_gait_device_index].signals[r_accel_y_sig],
                 raw_z=coll.devices[r_gait_device_index].signals[r_accel_z_sig],
                 startdate = coll.devices[r_gait_device_index].header['start_datetime'],
@@ -1063,7 +1065,7 @@ class Pipeline:
 
             # run gait algorithm to find bouts
             # TODO: Add progress bars instead of print statements??
-            wb = nwgait.WalkingBouts(l_obj, r_obj, left_kwargs={'axis': axis}, right_kwargs={'axis': axis})
+            wb = WalkingBouts(l_obj, r_obj, left_kwargs={'axis': axis}, right_kwargs={'axis': axis})
 
             # save bout times
             coll.gait_bout_times = wb.export_bouts()
@@ -1118,11 +1120,11 @@ class Pipeline:
 
             # creating timestamps && timestamp info if needed-----
             # start_stamp = file.header["start_datetime"]
-            times, idxs = nwgait.create_timestamps(data_start_time=coll.devices[device_idx].header["start_datetime"],
+            times, idxs = create_timestamps(data_start_time=coll.devices[device_idx].header["start_datetime"],
                                                    data_len=len(coll.devices[device_idx].signals[gyro_z_idx]),
                                                    fs=coll.devices[device_idx].signal_headers[gyro_z_idx]['sample_rate'])
 
-            sgp = nwgait.get_gait_bouts(data=coll.devices[device_idx].signals[gyro_z_idx],
+            sgp = get_gait_bouts(data=coll.devices[device_idx].signals[gyro_z_idx],
                                         sample_freq=coll.devices[device_idx].signal_headers[gyro_z_idx]['sample_rate'],
                                         timestamps=times, break_sec=2, bout_steps=3, start_ind=idxs[0], end_ind=idxs[1])
 
@@ -1145,7 +1147,7 @@ class Pipeline:
             message("Summarizing daily gait analytics...", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
 
-            coll.gait_daily = nwgait.gait_stats(coll.gait_bout_times, single_leg=True)
+            coll.gait_daily = gait_stats(coll.gait_bout_times, single_leg=True)
             coll.gait_daily = self.identify_df(coll, coll.gait_daily)
 
             # adjusting gait parameters

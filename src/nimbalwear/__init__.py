@@ -1,8 +1,9 @@
 __version__ = '0.16.0'
 
 from . import files
-import data
+from .data import Data
+import gait
 import activity
-import pipeline
+from .pipeline import *
 
 
