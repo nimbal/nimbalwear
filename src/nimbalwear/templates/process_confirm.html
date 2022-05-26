@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NiMBaLWEAR - {{ study }}</title>
+</head>
+<body>
+    <h1>Data processing confirmation</h1>
+    <h3>Study</h3>
+    <p>{{ study }}</p>
+    <h3>Collections</h3>
+    <p>
+        {% for x in collections %}
+            {{ x }}<br>
+        {% endfor %}
+    </p>
+    <h3>Options</h3>
+    <p>
+        Stage: {{ single_stage }}<br>
+        Quiet: {{ quiet }}<br>
+        Log: {{ log }}
+    </p>
+    <br>
+    <form action="/study/{{study}}/process" method="POST">
+        <input type="hidden" name="study" value={{study}}>
+        {% for x in collections %}
+                     <input type="hidden" name="collections[]" value={{x}}>
+        {% endfor %}
+        <input type="hidden" name="single_stage" value={{single_stage}}>
+        <input type="hidden" name="quiet" value={{quiet}}>
+        <input type="hidden" name="log" value={{log}}>
+        <p>Please confirm you wish to process the following data with these parameters?<br></p>
+        <input type="submit" value="Confirm">
+    </form>
+    <br><br>
+    <a href="{{ url_for('home') }}">Home</a><br>
+    <a href="{{ url_for('study', study=study) }}">Return to {{ study }}</a><br>
+    <br><br>
+    nwpipeline v{{version}}
+
+</body>
+</html>

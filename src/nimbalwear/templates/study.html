@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NiMBaLWEAR - {{study}}</title>
+</head>
+<body>
+    <form action="/study/{{study}}/process_confirm" method="POST">
+        <label for="study">Study</label><br>
+        <select id="study" name="study" onchange="newStudy()">
+            {% for x in studies %}
+                {% if x == study %}
+                    <option value={{x}} selected> {{x}} </option>
+                {% else %}
+                    <option value={{x}}> {{x}} </option>
+                {% endif %}
+            {% endfor %}
+        </select><br>
+        <br>
+        <fieldset>
+            <legend>Select data to process</legend>
+            <label for="collections">Collections</label><br>
+            <select id="collections" name="collections" size="10" multiple>
+                {% for x in collections %}
+                    <option value={{x}}>{{x}}</option>
+                {% endfor %}
+            </select><br>
+            <br>
+            <label for="single_stage">Stage</label><br>
+            <select id="single_stage" name="single_stage">
+                <option value='all' selected>all</option>
+                {% for x in stages %}
+                    <option value={{x}}>{{x}}</option>
+                {% endfor %}
+            </select><br><br>
+            <input type="checkbox" id="quiet" name="quiet" checked>
+            <label for="quiet">Quiet</label><br>
+            <input type="checkbox" id="log" name="log" checked>
+            <label for="log">Log</label><br>
+            <br>
+            <input type="submit" value="Process data">
+        </fieldset>
+    </form><br>
+    <br><br>
+    nwpipeline v{{version}}
+    <script type="text/javascript">
+        var urlmenu = document.getElementById('study');
+        urlmenu.onchange = function() {
+          window.location = this.options[this.selectedIndex].value;
+        };
+    </script>
+</body>
+</html>

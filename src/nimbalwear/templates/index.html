@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NiMBaLWEAR</title>
+</head>
+<body>
+    <label for="study">Study:</label>
+    <select id="study" name="study">
+        <option value="">-</option>
+        {% for x in studies %}
+            <option value={{x}}> {{x}} </option>
+        {% endfor %}
+    </select><br>
+    <br><br>
+    nwpipeline v{{version}}
+    <script type="text/javascript">
+        var urlmenu = document.getElementById('study');
+        urlmenu.onchange = function() {
+          window.location = "/study/" + this.options[this.selectedIndex].value;
+        };
+    </script>
+</body>
+</html>
