@@ -18,12 +18,8 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation as R
 
-from .files.EDF import EDFFile
-from .files.GENEActiv import GENEActivFile
-from .files.Nonin import NoninFile
-from .files.CWA import CWAFile
-from .utils.flip_sync import sync_devices
-from .utils.autocal import autocal
+from .files import EDFFile, GENEActivFile, NoninFile, CWAFile
+from .utils import sync_devices, autocal
 
 
 class Data:
@@ -236,8 +232,8 @@ class Data:
             sig_day_start_times = [first_day_start + dt.timedelta(days=x) for x in range(math.ceil(days))]
             sig_day_start_times[0] = start_datetime
 
-            sig_day_start_idxs = [round((day_start_time - start_datetime).total_seconds() * sample_rate) for day_start_time
-                                     in sig_day_start_times]
+            sig_day_start_idxs = [round((day_start_time - start_datetime).total_seconds() * sample_rate)
+                                  for day_start_time in sig_day_start_times]
 
             day_start_times.append(sig_day_start_times)
             day_start_idxs.append(sig_day_start_idxs)
@@ -380,7 +376,7 @@ class Data:
             temp = self.signals[temp_i]
             temp_fs = self.signal_headers[temp_i]['sample_rate']
 
-        x, y, z, pre_err, post_err, iter = autocal(x=self.signals[x_i], y=self.signals[y_i], z=self.signals[z_i],
+        x, y, z, pre_error, post_error, iterations = autocal(x=self.signals[x_i], y=self.signals[y_i], z=self.signals[z_i],
                                                    accel_fs=self.signal_headers[x_i]['sample_rate'], temp=temp,
                                                    temp_fs=temp_fs, use_temp=use_temp, epoch_secs=epoch_secs,
                                                    detect_only=detect_only, plot=plot, quiet=quiet)
@@ -389,7 +385,7 @@ class Data:
         self.signals[y_i] = y
         self.signals[z_i] = z
 
-        return pre_err, post_err, iter
+        return pre_error, post_error, iterations
 
     def sync(self, ref, sig_labels=('Accelerometer x', 'Accelerometer y', 'Accelerometer z'), type='flip',
              sync_at_config=True, **kwargs):
