@@ -439,18 +439,8 @@ def sptw_stats(sptw, sleep_bouts, type='daily', sptw_inc='long'):
                 # calculate wakefulness after sleep onset (time not sleeping between first sleep start and last sleep end)
                 waso = sleep_to_wake_duration - total_sleep_duration
 
-                day_sleep_stats = pd.DataFrame({'day_num': day_num,
-                                                'date': date,
-                                                'type': type,
-                                                'sptw_inc': s,
-                                                'sptw_duration': total_sptw_duration,
-                                                'sleep_duration': total_sleep_duration,
-                                                'sleep_to_wake_duration': sleep_to_wake_duration,
-                                                'se': sleep_eff,
-                                                'waso': waso})
-
-                day_sleep_stats = pd.Series([day_num, date, type, s, total_sptw_duration, total_sleep_duration,
-                                             sleep_to_wake_duration, sleep_eff, waso], index=sleep_stats.columns)
+                day_sleep_stats = pd.DataFrame([[day_num, date, type, s, total_sptw_duration, total_sleep_duration,
+                                             sleep_to_wake_duration, sleep_eff, waso]], columns=sleep_stats.columns)
 
                 sleep_stats = pd.concat([sleep_stats, day_sleep_stats], ignore_index=True)
 
