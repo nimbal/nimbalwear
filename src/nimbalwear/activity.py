@@ -193,13 +193,13 @@ def activity_stats(activity_epochs, type='daily', quiet=False):
             for intensity, intensity_group in date_group.groupby('intensity'):
                 counts[intensity] = round(sum(intensity_group['duration']) / 60, 2)
 
-            day_activity_stats = {'day_num': day_num,
-                                  'date': date,
-                                  'none': counts['none'],
-                                  'sedentary': counts['sedentary'],
-                                  'light': counts['light'],
-                                  'moderate': counts['moderate'],
-                                  'vigorous': counts['vigorous']}
+            day_activity_stats = pd.DataFrame({'day_num': day_num,
+                                               'date': date,
+                                               'none': counts['none'],
+                                               'sedentary': counts['sedentary'],
+                                               'light': counts['light'],
+                                               'moderate': counts['moderate'],
+                                               'vigorous': counts['vigorous']})
 
             activity_stats = pd.concat([activity_stats, day_activity_stats], ignore_index=True)
 
