@@ -449,6 +449,9 @@ def sptw_stats(sptw, sleep_bouts, type='daily', sptw_inc='long'):
                                                 'se': sleep_eff,
                                                 'waso': waso})
 
+                day_sleep_stats = pd.Series([day_num, date, type, s, total_sptw_duration, total_sleep_duration,
+                                             sleep_to_wake_duration, sleep_eff, waso], index=sleep_stats.columns)
+
                 sleep_stats = pd.concat([sleep_stats, day_sleep_stats], ignore_index=True)
 
                 day_num += 1

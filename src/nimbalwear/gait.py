@@ -1465,13 +1465,10 @@ def gait_stats(bouts, type='daily', single_leg=False):
 
         for date, group_df in bouts.groupby('date'):
 
-            day_gait_stats = pd.DataFrame({'day_num': day_num,
-                                           'date': date,
-                                           'type': type,
-                                           'longest_bout_time': group_df['duration'].max(),
-                                           'longest_bout_steps': round(group_df['Step_count'].max()),
-                                           'bouts_over_3min': group_df.loc[group_df['duration'] > 180].shape[0],
-                                           'total_steps': round(group_df['Step_count'].sum())})
+            day_gait_stats = pd.Series([day_num, date, type, group_df['duration'].max(),
+                                        round(group_df['Step_count'].max()),
+                                        group_df.loc[group_df['duration'] > 180].shape[0],
+                                        round(group_df['Step_count'].sum())], index=gait_stats.columns)
 
             gait_stats = pd.concat([gait_stats, day_gait_stats], ignore_index=True)
 
