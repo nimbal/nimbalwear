@@ -361,7 +361,7 @@ class Data:
 
         return True
 
-    def autocal(self, use_temp=True, epoch_secs=None, detect_only=False, plot=False, quiet=False):
+    def autocal(self, use_temp=True, epoch_secs=10, detect_only=False, plot=False, quiet=False):
 
         # get accelerometer x, y, z and temperature signals
         x_i = self.get_signal_index('Accelerometer x')
@@ -371,15 +371,24 @@ class Data:
         temp = None
         temp_fs = None
 
+        # get index of temperature signal if temp is used
         if use_temp:
             temp_i = self.get_signal_index('Temperature')
-            temp = self.signals[temp_i]
-            temp_fs = self.signal_headers[temp_i]['sample_rate']
 
-        x, y, z, pre_error, post_error, iterations = autocal(x=self.signals[x_i], y=self.signals[y_i], z=self.signals[z_i],
-                                                   accel_fs=self.signal_headers[x_i]['sample_rate'], temp=temp,
-                                                   temp_fs=temp_fs, use_temp=use_temp, epoch_secs=epoch_secs,
-                                                   detect_only=detect_only, plot=plot, quiet=quiet)
+            # if no temperature signal then don't use temp
+            if temp_i is None:
+                if not quiet:
+                    print("No temperature signal so could not use for autocalibration")
+                use_temp = False
+            else:
+                temp = self.signals[temp_i]
+                temp_fs = self.signal_headers[temp_i]['sample_rate']
+
+        cal_var = autocal(x=self.signals[x_i], y=self.signals[y_i], z=self.signals[z_i],
+                          accel_fs=self.signal_headers[x_i]['sample_rate'], temp=temp, temp_fs=temp_fs,
+                          use_temp=use_temp, epoch_secs=epoch_secs, detect_only=detect_only, plot=plot, quiet=quiet)
+
+        x, y, z, pre_error, post_error, iterations = cal_var
 
         self.signals[x_i] = x
         self.signals[y_i] = y
