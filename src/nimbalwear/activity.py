@@ -179,7 +179,7 @@ def activity_stats(activity_epochs, type='daily', quiet=False):
 
 
         for new_epoch in new_epochs:
-            new_row = pd.Series(new_epoch, index=activity_epochs.columns)
+            new_row = pd.DataFrame([new_epoch], columns=activity_epochs.columns)
             activity_epochs = pd.concat([activity_epochs, new_row], ignore_index=True)
 
         #activity_epochs.sort_values(by='start_time', inplace=True, ignore_index=True)
