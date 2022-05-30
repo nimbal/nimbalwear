@@ -1205,7 +1205,7 @@ def get_bouts_data(df):
     # df = bout_events_df
 
     bout_list = df['Bout_number'].unique()
-    bout_df = pd.DataFrame()
+    bout_df = pd.DataFrame(columns=['Bout_number', 'Step_count', 'Start_time', 'End_time', 'Start_idx', 'End_idx'])
     for count, val in enumerate(bout_list):
         # print(f'count:{count}, value:{val}')
         temp = df[df['Bout_number'] == bout_list[count]]
@@ -1216,12 +1216,7 @@ def get_bouts_data(df):
         start_ind = np.min(temp['Step_index'])
         end_ind = np.max(temp['Step_index'])
         # cadence = step_count/((end_ind-start_ind)*(1/fs)/60)
-        data = {'Bout_number': count + 1,
-                'Step_count': step_count,
-                'Start_time': start_time,
-                'End_time': end_time,
-                'Start_idx': start_ind,
-                'End_idx': end_ind}  # , "Cadence":cadence}
+        data = pd.DataFrame([[count + 1,  step_count, start_time, end_time, start_ind, end_ind]], columns=bout_df.columns)    # , "Cadence":cadence}
         bout_df = pd.concat([bout_df, data], ignore_index=True)
 
     return bout_df
@@ -1465,13 +1460,10 @@ def gait_stats(bouts, type='daily', single_leg=False):
 
         for date, group_df in bouts.groupby('date'):
 
-            day_gait_stats = {'day_num': day_num,
-                              'date': date,
-                              'type': type,
-                              'longest_bout_time': group_df['duration'].max(),
-                              'longest_bout_steps': round(group_df['Step_count'].max()),
-                              'bouts_over_3min': group_df.loc[group_df['duration'] > 180].shape[0],
-                              'total_steps': round(group_df['Step_count'].sum())}
+            day_gait_stats = pd.DataFrame([[day_num, date, type, group_df['duration'].max(),
+                                        round(group_df['Step_count'].max()),
+                                        group_df.loc[group_df['duration'] > 180].shape[0],
+                                        round(group_df['Step_count'].sum())]], columns=gait_stats.columns)
 
             gait_stats = pd.concat([gait_stats, day_gait_stats], ignore_index=True)
 

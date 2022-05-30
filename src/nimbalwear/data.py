@@ -232,8 +232,8 @@ class Data:
             sig_day_start_times = [first_day_start + dt.timedelta(days=x) for x in range(math.ceil(days))]
             sig_day_start_times[0] = start_datetime
 
-            sig_day_start_idxs = [round((day_start_time - start_datetime).total_seconds() * sample_rate) for day_start_time
-                                     in sig_day_start_times]
+            sig_day_start_idxs = [round((day_start_time - start_datetime).total_seconds() * sample_rate)
+                                  for day_start_time in sig_day_start_times]
 
             day_start_times.append(sig_day_start_times)
             day_start_idxs.append(sig_day_start_idxs)
@@ -361,7 +361,7 @@ class Data:
 
         return True
 
-    def autocal(self, use_temp=True, epoch_secs=None, detect_only=False, plot=False, quiet=False):
+    def autocal(self, use_temp=True, epoch_secs=10, detect_only=False, plot=False, quiet=False):
 
         # get accelerometer x, y, z and temperature signals
         x_i = self.get_signal_index('Accelerometer x')
@@ -371,21 +371,30 @@ class Data:
         temp = None
         temp_fs = None
 
+        # get index of temperature signal if temp is used
         if use_temp:
             temp_i = self.get_signal_index('Temperature')
-            temp = self.signals[temp_i]
-            temp_fs = self.signal_headers[temp_i]['sample_rate']
 
-        x, y, z, pre_err, post_err, iter = autocal(x=self.signals[x_i], y=self.signals[y_i], z=self.signals[z_i],
-                                                   accel_fs=self.signal_headers[x_i]['sample_rate'], temp=temp,
-                                                   temp_fs=temp_fs, use_temp=use_temp, epoch_secs=epoch_secs,
-                                                   detect_only=detect_only, plot=plot, quiet=quiet)
+            # if no temperature signal then don't use temp
+            if temp_i is None:
+                if not quiet:
+                    print("No temperature signal so could not use for autocalibration")
+                use_temp = False
+            else:
+                temp = self.signals[temp_i]
+                temp_fs = self.signal_headers[temp_i]['sample_rate']
+
+        cal_var = autocal(x=self.signals[x_i], y=self.signals[y_i], z=self.signals[z_i],
+                          accel_fs=self.signal_headers[x_i]['sample_rate'], temp=temp, temp_fs=temp_fs,
+                          use_temp=use_temp, epoch_secs=epoch_secs, detect_only=detect_only, plot=plot, quiet=quiet)
+
+        x, y, z, pre_error, post_error, iterations = cal_var
 
         self.signals[x_i] = x
         self.signals[y_i] = y
         self.signals[z_i] = z
 
-        return pre_err, post_err, iter
+        return pre_error, post_error, iterations
 
     def sync(self, ref, sig_labels=('Accelerometer x', 'Accelerometer y', 'Accelerometer z'), type='flip',
              sync_at_config=True, **kwargs):
