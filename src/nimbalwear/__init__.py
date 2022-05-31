@@ -1,5 +1,5 @@
 __version__ = '0.16.0'
 
-from .data import Data
+from .data import Device
 from .pipeline import Pipeline
 
