@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
-from scipy.signal import butter, filtfilt
+from scipy.signal import butter, sosfilt
 
 
 def avm_cutpoints(cutpoint_type='Powell', dominant=False):
@@ -20,8 +20,8 @@ def avm_cutpoints(cutpoint_type='Powell', dominant=False):
 
     """
 
-    cutpoints_dict = {'Powell': {'dominant': {'light': 51 / 450, 'moderate': 68 / 450, 'vigorous': 142 / 450},
-                                 'non-dominant': {'light': 47 / 450, 'moderate': 64 / 450, 'vigorous': 157 / 450}},
+    cutpoints_dict = {'Powell': {'dominant': {'light': 0.1133, 'moderate': 0.1511, 'vigorous': 0.3156},
+                                 'non-dominant': {'light': 0.1044, 'moderate': 0.1422, 'vigorous': 0.3489}},
                       'Fraysse': {'dominant': {'light': 0.0625, 'moderate': 0.0925},
                                   'non-dominant': {'light': 0.0425, 'moderate': 0.098}}}
 
@@ -32,8 +32,9 @@ def avm_cutpoints(cutpoint_type='Powell', dominant=False):
     return cutpoints
 
 
-def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_length=15, cutpoint='Powell', dominant=False,
-                       nonwear=pd.DataFrame(), sptw=pd.DataFrame(), sleep_bouts=pd.DataFrame(), quiet=False):
+def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_length=15, cutpoint='Powell',
+                       dominant=False,  nonwear=pd.DataFrame(), sptw=pd.DataFrame(), sleep_bouts=pd.DataFrame(),
+                       quiet=False):
 
     """
     Transforms Powell cutpoints to avm based on their 15 second epochs at 30 Hz, probably most
@@ -42,7 +43,7 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
     returns avm (in mg) and intensity for each epoch
 
     """
-    accel = [x, y, z]
+    accel = np.vstack((x, y, z))
     epoch_samples = int(epoch_length * sample_rate)
 
     if lowpass is not None:
@@ -52,12 +53,15 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
 
         # low-pass filter
         order = 5
-        nyq = 0.5 * sample_rate
-        normal_cutoff = lowpass / nyq
-        b, a = butter(order, normal_cutoff, btype='lowpass', analog=False)
+        # nyq = 0.5 * sample_rate
+        # normal_cutoff = lowpass / nyq
+        # b, a = butter(order, normal_cutoff, btype='lowpass', analog=False)
+        #
+        # for i, s in enumerate(accel):
+        #     accel[i] = filtfilt(b, a, s)
 
-        for i, s in enumerate(accel):
-            accel[i] = filtfilt(b, a, s)
+        sos = butter(N=order, Wn=lowpass, btype='lowpass', analog=False, output='sos', fs=sample_rate)
+        accel = sosfilt(sos, accel)
 
     # calculate vector magnitudes
     if not quiet:
@@ -70,8 +74,8 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
     if not quiet:
         print("Calculating average vector magnitude for each epoch...")
 
-    epoch_starts = range(0, len(vm) + 1 - epoch_samples, epoch_samples)
-    avm = [sum(vm[i:i + epoch_samples]) / epoch_samples for i in epoch_starts]
+    #epoch_starts = range(0, len(vm) + 1 - epoch_samples, epoch_samples)
+    avm = vm[:int(len(vm) / epoch_samples) * epoch_samples].reshape(-1, epoch_samples).sum(axis=1) / epoch_samples
 
     cutpoints = avm_cutpoints(cutpoint, dominant)
 
@@ -89,6 +93,9 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
 
     activity_epochs['avm'] = [round(x * 1000, 2) for x in avm]
     activity_epochs['intensity'] = epoch_intensity
+
+    if not quiet:
+        print("Removing non-wear and sleep if entered...")
 
     # set intensity to 'none' during nonwear
     for idx, row in nonwear.iterrows():
@@ -159,6 +166,8 @@ def activity_stats(activity_epochs, type='daily', quiet=False):
                                    for i, x in activity_epochs.iterrows()]
 
     activity_epochs.drop('avm', axis=1, inplace=True, errors='ignore')
+
+    activity_stats = None
 
     if type == 'daily':
 
