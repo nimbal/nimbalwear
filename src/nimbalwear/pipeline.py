@@ -12,7 +12,7 @@ from tqdm import tqdm
 import pandas as pd
 from isodate import parse_duration
 
-from .data import Data
+from .data import Device
 from .nonwear import vert_nonwear
 from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
 from .gait import AccelReader, WalkingBouts, get_gait_bouts, create_timestamps, gait_stats
@@ -376,7 +376,7 @@ class Pipeline:
             message(f"Reading {device_file_path}", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
 
-            device_data = Data()
+            device_data = Device()
             import_func()
             device_data.deidentify()
 
@@ -1097,7 +1097,7 @@ class Pipeline:
             # adjusting gait parameters
             coll.gait_bout_times.rename(columns={'number_steps': 'step_count',
                                                  'start_dp': 'start_idx',
-                                                 'start_dp': 'end_idx'},
+                                                 'end_dp': 'end_idx'},
                                         inplace=True)
 
             coll.gait_step_times.rename(columns={'step_index': 'step_idx'}, inplace=True)

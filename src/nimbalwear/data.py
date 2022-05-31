@@ -16,13 +16,13 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
-from scipy.spatial.transform import Rotation as R
+from scipy.spatial.transform import Rotation
 
 from .files import EDFFile, GENEActivFile, NoninFile, CWAFile
 from .utils import sync_devices, autocal
 
 
-class Data:
+class Device:
     """A class used to represent wearable device data.
 
     The structure of this class is based on the European Data Format (EDF)
@@ -333,7 +333,7 @@ class Data:
             deg: degrees to rotate
         """
 
-        r = R.from_euler(seq='z', angles=deg, degrees=True)
+        r = Rotation.from_euler(seq='z', angles=deg, degrees=True)
 
         ax_idx = self.get_signal_index("Accelerometer x")
         ay_idx = self.get_signal_index("Accelerometer y")
@@ -396,13 +396,13 @@ class Data:
 
         return pre_error, post_error, iterations
 
-    def sync(self, ref, sig_labels=('Accelerometer x', 'Accelerometer y', 'Accelerometer z'), type='flip',
+    def sync(self, ref, sig_labels=('Accelerometer x', 'Accelerometer y', 'Accelerometer z'), sync_type='flip',
              sync_at_config=True, **kwargs):
 
         syncs = None
         segments = None
 
-        if type == 'flip':
+        if sync_type == 'flip':
 
             ref_config_time = ref.header['config_datetime']
 
