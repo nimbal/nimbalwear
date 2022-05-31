@@ -33,6 +33,8 @@ To include a specific release, replace `[version]` with the tag associated with 
 # Changes by version
 
 v0.16.0
+- updated filtering and vm calculation for activity calculation (faster)
+- renamed Data object to Device
 - added autocalibration of accelerometers
 - added relevant functions from  nwdata, nwnonwear, nwgait, nwsleep, nwactivity, and nwapp as data.py, nonwear.py, 
 gait.py, sleep.py, activity.py and app.py modules
@@ -42,7 +44,7 @@ gait.py, sleep.py, activity.py and app.py modules
 - output settings to log
 
 v0.15.2
-- update to nwdata v0.9.2 (must faster file reading and writing)
+- update to nwdata v0.9.2 (much faster file reading and writing)
 - update to nwgait v0.4.2
 - new processing log for each run call
 
