@@ -86,7 +86,7 @@
       "accel_std_thresh_mg": 8,
       "low_temperature_cutoff": 26,
       "high_temperature_cutoff": 30,
-      "temp_dec_roc": -0.2,
+      "temp_dec_roc": -0.3,
       "temp_inc_roc": 0.1,
       "save": true
     },
