@@ -826,16 +826,37 @@ class Device:
         else:
             gender = 2
 
+        patient_code = in_file.header['id'].split('_')
+        study_code = patient_code[0] if len(patient_code) else ''
+        subject_id = patient_code[1] if len(patient_code) > 1 else ''
+        coll_id = patient_code[2] if len(patient_code) > 2 else ''
+
         # update header to match nwdata
-        self.header = {'patientcode': in_file.header['id'],
-                       'gender': gender,
+        # self.header = {'patientcode': in_file.header['id'],
+        #                'gender': gender,
+        #                'birthdate': in_file.header['dob'],
+        #                'patientname': in_file.header['first_name'] + '_' + in_file.header['last_name'],
+        #                'patient_additional': '',
+        #                'startdate': dt.datetime.combine(in_file.header['start_date'], in_file.header['start_time']),
+        #                'admincode': '',
+        #                'technician': in_file.header['physician'],
+        #                'equipment': 'NOWO',
+        #                'recording_additional': ''}
+
+        self.header = {'study_code': study_code,
+                       'subject_id': subject_id,
+                       'coll_id': coll_id,
+                       'name': in_file.header['first_name'] + '_' + in_file.header['last_name'],
+                       'sex': gender,
                        'birthdate': in_file.header['dob'],
-                       'patientname': in_file.header['first_name'] + '_' + in_file.header['last_name'],
                        'patient_additional': '',
-                       'startdate': dt.datetime.combine(in_file.header['start_date'], in_file.header['start_time']),
-                       'admincode': '',
+                       'start_datetime': dt.datetime.combine(in_file.header['start_date'],
+                                                             in_file.header['start_time']),
+                       'config_datetime': '',
                        'technician': in_file.header['physician'],
-                       'equipment': 'NOWO',
+                       'device_type': 'NOWO',
+                       'device_id': '',
+                       'device_location': '',
                        'recording_additional': ''}
 
         # update signal headers to match nwdata
