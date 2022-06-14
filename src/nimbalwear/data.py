@@ -368,6 +368,11 @@ class Device:
         y_i = self.get_signal_index('Accelerometer y')
         z_i = self.get_signal_index('Accelerometer z')
 
+        if None in [x_i, y_i, z_i]:
+            if not quiet:
+                print("Tri-axial accelerometer not detected")
+            return None, None, None
+
         temp = None
         temp_fs = None
 

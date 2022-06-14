@@ -83,6 +83,7 @@
       "save": true
     },
     "nonwear": {
+      "accel_std_thresh_mg": 8,
       "low_temperature_cutoff": 26,
       "high_temperature_cutoff": 30,
       "temp_dec_roc": -0.2,

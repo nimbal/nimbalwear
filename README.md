@@ -32,6 +32,10 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.16.1
+- add accel_std_thresh_mg as nonwear setting in JSON file
+- check for accelerometer signals before autocal
+
 v0.16.0
 - updated filtering and vm calculation for activity calculation (faster)
 - renamed Data object to Device

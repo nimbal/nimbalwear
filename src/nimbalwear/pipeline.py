@@ -491,6 +491,10 @@ class Pipeline:
 
             pre_err, post_err, iter = coll.devices[idx].autocal(quiet=quiet)
 
+            if pre_err is None:
+                message(f"Autocalibration for {device_type} {device_location} could not be performed.",
+                        level='warning', display=(not quiet), log=log, logger_name=self.log_name)
+
             calib = pd.DataFrame({'study_code': study_code,
                                   'subject_id': subject_id,
                                   'coll_id': coll_id,
@@ -668,6 +672,7 @@ class Pipeline:
         message("Detecting non-wear...", level='info', display=(not quiet), log=log, logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
+        accel_std_thresh_mg = self.module_settings['nonwear']['accel_std_thresh_mg']
         low_temperature_cutoff = self.module_settings['nonwear']['low_temperature_cutoff']
         high_temperature_cutoff = self.module_settings['nonwear']['high_temperature_cutoff']
         temp_dec_roc = self.module_settings['nonwear']['temp_dec_roc']
@@ -717,6 +722,7 @@ class Pipeline:
                 temperature_values=coll.devices[index].signals[temperature_sig],
                 accel_freq=coll.devices[index].signal_headers[accel_x_sig]['sample_rate'],
                 temperature_freq=coll.devices[index].signal_headers[temperature_sig]['sample_rate'],
+                std_thresh_mg=accel_std_thresh_mg,
                 low_temperature_cutoff=low_temperature_cutoff,
                 high_temperature_cutoff=high_temperature_cutoff,
                 temp_dec_roc=temp_dec_roc,
