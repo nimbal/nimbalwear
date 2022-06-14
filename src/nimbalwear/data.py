@@ -852,7 +852,7 @@ class Device:
                        'patient_additional': '',
                        'start_datetime': dt.datetime.combine(in_file.header['start_date'],
                                                              in_file.header['start_time']),
-                       'config_datetime': '',
+                       'config_datetime': pd.NaT,
                        'technician': in_file.header['physician'],
                        'device_type': 'NOWO',
                        'device_id': '',
