@@ -3,9 +3,11 @@ import csv
 import time
 import datetime
 
+import numpy as np
 import textract
 
 from .EDF import EDFFile
+
 
 class NoninFile:
 
@@ -95,8 +97,8 @@ class NoninFile:
             print(f"****** WARNING: MISSING DATA. SAMPLE NUMBER DOES NOT MATCH TIME.\n")
 
         # parse data
-        self.data.update({'pulse': [int(line.split(',')[7]) for line in lines[17:]],
-                          'spo2': [int(line.split(',')[8]) for line in lines[17:]]})
+        self.data.update({'pulse': np.array([int(line.split(',')[7]) for line in lines[17:]]),
+                          'spo2': np.array([int(line.split(',')[8]) for line in lines[17:]])})
 
         if not quiet:
             print("Done reading file. Time to read file: ", time.time() - read_start_time, "seconds.")
@@ -191,10 +193,10 @@ class NoninFile:
                 sh_index = sh_index + 1
 
             # write to edf
-            edf_file = EDF.EDFFile(out_file)
+            edf_file = EDFFile(out_file)
             edf_file.header = header
             edf_file.signal_headers = signal_headers
-            if len(self.data['pulse']) > 0:
+            if self.data['pulse'].size > 0:
                 edf_file.signals = [self.data['pulse'], self.data['spo2']]
             edf_file.write(out_file, quiet=quiet)
 
