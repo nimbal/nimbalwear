@@ -494,6 +494,8 @@ class Pipeline:
             if pre_err is None:
                 message(f"Autocalibration for {device_type} {device_location} could not be performed.",
                         level='warning', display=(not quiet), log=log, logger_name=self.log_name)
+                message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+                continue
 
             calib = pd.DataFrame({'study_code': study_code,
                                   'subject_id': subject_id,
@@ -949,10 +951,12 @@ class Pipeline:
                         logger_name=self.log_name)
                 coll.devices[index].export_edf(file_path=cropped_device_path, quiet=quiet)
 
-                # write nonwear times with cropped nonwear removed
-                message(f"Saving {nonwear_csv_path}", level='info', display=(not quiet), log=log,
-                        logger_name=self.log_name)
-                coll.nonwear_times[coll.nonwear_times.index.isin(nonwear_idx)].to_csv(nonwear_csv_path, index=False)
+                if not coll.nonwear_times.empty:
+
+                    # write nonwear times with cropped nonwear removed
+                    message(f"Saving {nonwear_csv_path}", level='info', display=(not quiet), log=log,
+                            logger_name=self.log_name)
+                    coll.nonwear_times[coll.nonwear_times.index.isin(nonwear_idx)].to_csv(nonwear_csv_path, index=False)
 
             message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
