@@ -314,7 +314,7 @@ class StepDetection(AccelReader):
         swingup_times = []
         heelstrike_values = []
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        pushoff_df = pd.read_csv(os.path.join(dir_path, 'pushoff_OND07_left.csv'))
+        pushoff_df = pd.read_csv(os.path.join(dir_path, 'data', 'pushoff_OND07_left.csv'))
 
         for start, end in start_end_times:
             step = StepDetection(accel_path_or_obj=accel_path, label='get_pushoff_stats',
