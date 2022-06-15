@@ -35,6 +35,8 @@ To include a specific release, replace `[version]` with the tag associated with 
 v0.16.1
 - add accel_std_thresh_mg as nonwear setting in JSON file
 - check for accelerometer signals before autocal
+- fix Nonin device data import bugs
+- fix missing gait pushoff data bug
 
 v0.16.0
 - updated filtering and vm calculation for activity calculation (faster)
