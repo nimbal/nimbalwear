@@ -1,2 +1,3 @@
 include src/nimbalwear/settings/data_dicts.json
 include src/nimbalwear/settings/settings.json
+include src/nimbalwear/data/pushoff_OND07_left.csv
