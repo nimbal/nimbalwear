@@ -72,6 +72,7 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
     #epoch_starts = range(0, len(vm) + 1 - epoch_samples, epoch_samples)
     avm = vm[:int(len(vm) / epoch_samples) * epoch_samples].reshape(-1, epoch_samples).sum(axis=1) / epoch_samples
     avm_sec = vm[:int(len(vm) / sec_samples) * sec_samples].reshape(-1, sec_samples).sum(axis=1) / sec_samples
+    avm_sec = np.around(avm_sec * 1000, 2)
 
     cutpoints = avm_cutpoints(cutpoint, dominant)
 
@@ -91,7 +92,7 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
                                        for x in activity_epochs['activity_epoch_num']]
 
     # add avm and intensity for each epoch
-    activity_epochs['avm'] = [round(x * 1000, 2) for x in avm]
+    activity_epochs['avm'] = np.around(avm * 1000, 2)
     activity_epochs['intensity'] = epoch_intensity
 
     if not quiet:
