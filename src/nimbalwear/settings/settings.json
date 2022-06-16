@@ -14,6 +14,7 @@
       "activity_epochs": "analytics/activity/epochs",
       "activity_bouts": "analytics/activity/bouts",
       "activity_daily": "analytics/activity/daily",
+      "activity_avm": "analytics/activity/avm",
       "gait_steps": "analytics/gait/steps",
       "gait_bouts": "analytics/gait/bouts",
       "gait_daily": "analytics/gait/daily",
@@ -98,6 +99,7 @@
     "activity": {
       "dominant": false,
       "lowpass": 20,
+      "epoch_length": 15,
       "cutpoints": [
         {
           "min_age": 0,

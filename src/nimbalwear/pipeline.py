@@ -9,6 +9,7 @@ import json
 import operator
 
 from tqdm import tqdm
+import numpy as np
 import pandas as pd
 from isodate import parse_duration
 
@@ -1400,10 +1401,9 @@ class Pipeline:
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         save = self.module_settings['activity']['save']
+        epoch_length = self.module_settings['activity']['epoch_length']
 
         coll.activity_epochs = pd.DataFrame()
-
-        epoch_length = 15
 
         activity_device_index, dominant = self.select_activity_device(coll=coll)
 
@@ -1440,17 +1440,25 @@ class Pipeline:
                                                 (coll.nonwear_times['device_location'] ==
                                                  coll.device_info.iloc[activity_device_index]['device_location'])]
 
-        e, b, avm, vm = activity_wrist_avm(x=coll.devices[activity_device_index].signals[accel_x_sig],
-                                           y=coll.devices[activity_device_index].signals[accel_y_sig],
-                                           z=coll.devices[activity_device_index].signals[accel_z_sig],
-                                           sample_rate=coll.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
-                                           start_datetime=coll.devices[activity_device_index].header['start_datetime'],
-                                           lowpass=lowpass, epoch_length=epoch_length, cutpoint=cutpoint, dominant=dominant,
-                                           nonwear=device_nonwear, sptw=coll.sptw, sleep_bouts=coll.sleep_bouts,
-                                           quiet=quiet)
+        e, b, avm, vm, avm_sec = activity_wrist_avm(x=coll.devices[activity_device_index].signals[accel_x_sig],
+                                                    y=coll.devices[activity_device_index].signals[accel_y_sig],
+                                                    z=coll.devices[activity_device_index].signals[accel_z_sig],
+                                                    sample_rate=coll.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
+                                                    start_datetime=coll.devices[activity_device_index].header['start_datetime'],
+                                                    lowpass=lowpass, epoch_length=epoch_length, cutpoint=cutpoint, dominant=dominant,
+                                                    nonwear=device_nonwear, sptw=coll.sptw, sleep_bouts=coll.sleep_bouts,
+                                                    quiet=quiet)
 
         coll.activity_epochs = e
         coll.activity_bouts = b
+
+        # prepare avm dataframe
+        coll.avm_sec = pd.DataFrame()
+        coll.avm_sec['avm_num'] = np.arange(1, len(avm_sec) + 1)
+        coll.avm_sec['avm'] = avm_sec
+        coll.avm_sec.insert(loc=0, column='device_location',
+                            value=coll.devices[activity_device_index].header['device_location'])
+        coll.avm_sec = self.identify_df(coll, coll.avm_sec)
 
         message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
@@ -1491,14 +1499,19 @@ class Pipeline:
             daily_activity_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id,
                                                           coll.coll_id, "ACTIVITY_DAILY"]),
                                                 "csv"])
+            avm_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id,
+                                                          coll.coll_id, "ACTIVITY_AVM"]),
+                                                "csv"])
 
             epoch_activity_csv_path = self.dirs['activity_epochs'] / epoch_activity_csv_name
             bouts_activity_csv_path = self.dirs['activity_bouts'] / bouts_activity_csv_name
             daily_activity_csv_path = self.dirs['activity_daily'] / daily_activity_csv_name
+            avm_csv_path = self.dirs['activity_avm'] / avm_csv_name
 
             epoch_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
             bouts_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
             daily_activity_csv_path.parent.mkdir(parents=True, exist_ok=True)
+            avm_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
             message(f"Saving {epoch_activity_csv_path}", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
@@ -1511,6 +1524,10 @@ class Pipeline:
             message(f"Saving {daily_activity_csv_path}", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
             coll.activity_daily.to_csv(daily_activity_csv_path, index=False)
+
+            message(f"Saving {avm_csv_path}", level='info', display=(not quiet), log=log,
+                    logger_name=self.log_name)
+            coll.avm_sec.to_csv(avm_csv_path, index=False)
 
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
