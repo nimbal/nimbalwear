@@ -46,6 +46,7 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
 
     accel = np.vstack((x, y, z))
     epoch_samples = int(epoch_length * sample_rate)
+    sec_samples = int(sample_rate)
 
     if lowpass is not None:
 
@@ -70,7 +71,7 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
 
     #epoch_starts = range(0, len(vm) + 1 - epoch_samples, epoch_samples)
     avm = vm[:int(len(vm) / epoch_samples) * epoch_samples].reshape(-1, epoch_samples).sum(axis=1) / epoch_samples
-    avm_sec = vm[:int(len(vm) / sample_rate) * sample_rate].reshape(-1, sample_rate).sum(axis=1) / sample_rate
+    avm_sec = vm[:int(len(vm) / sec_samples) * sec_samples].reshape(-1, sec_samples).sum(axis=1) / sec_samples
 
     cutpoints = avm_cutpoints(cutpoint, dominant)
 
