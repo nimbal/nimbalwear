@@ -86,9 +86,9 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
 
     # add start and end time for each epoch
     if start_datetime is not None:
-        activity_epochs['start_time'] = [start_datetime + timedelta(seconds=(int(x) - 1) * 15)
+        activity_epochs['start_time'] = [start_datetime + timedelta(seconds=(int(x) - 1) * epoch_length)
                                          for x in activity_epochs['activity_epoch_num']]
-        activity_epochs['end_time'] = [start_datetime + timedelta(seconds=(int(x)) * 15)
+        activity_epochs['end_time'] = [start_datetime + timedelta(seconds=(int(x)) * epoch_length)
                                        for x in activity_epochs['activity_epoch_num']]
 
     # add avm and intensity for each epoch

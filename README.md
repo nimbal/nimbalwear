@@ -32,6 +32,11 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.16.2
+- activity fixes
+  - output 1-second avm
+  - fix hard-coded epoch_length
+
 v0.16.1
 - add accel_std_thresh_mg as nonwear setting in JSON file
 - check for accelerometer signals before autocal
