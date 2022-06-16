@@ -43,6 +43,7 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
     returns avm (in mg) and intensity for each epoch
 
     """
+
     accel = np.vstack((x, y, z))
     epoch_samples = int(epoch_length * sample_rate)
 
@@ -53,13 +54,6 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
 
         # low-pass filter
         order = 5
-        # nyq = 0.5 * sample_rate
-        # normal_cutoff = lowpass / nyq
-        # b, a = butter(order, normal_cutoff, btype='lowpass', analog=False)
-        #
-        # for i, s in enumerate(accel):
-        #     accel[i] = filtfilt(b, a, s)
-
         sos = butter(N=order, Wn=lowpass, btype='lowpass', analog=False, output='sos', fs=sample_rate)
         accel = sosfilt(sos, accel)
 
@@ -76,21 +70,26 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
 
     #epoch_starts = range(0, len(vm) + 1 - epoch_samples, epoch_samples)
     avm = vm[:int(len(vm) / epoch_samples) * epoch_samples].reshape(-1, epoch_samples).sum(axis=1) / epoch_samples
+    avm_sec = vm[:int(len(vm) / sample_rate) * sample_rate].reshape(-1, sample_rate).sum(axis=1) / sample_rate
 
     cutpoints = avm_cutpoints(cutpoint, dominant)
 
+    # classify intensity by comparing avm to cutpoints
     epoch_intensity = ['sedentary'] * len(avm)
     for k, v in cutpoints.items():
         epoch_intensity = [k if x >= v else epoch_intensity[i] for i, x in enumerate(avm)]
 
+    # initialize activity_epochs DataFrame
     activity_epochs = pd.DataFrame({'activity_epoch_num': range(1, len(avm) + 1)})
 
+    # add start and end time for each epoch
     if start_datetime is not None:
         activity_epochs['start_time'] = [start_datetime + timedelta(seconds=(int(x) - 1) * 15)
                                          for x in activity_epochs['activity_epoch_num']]
         activity_epochs['end_time'] = [start_datetime + timedelta(seconds=(int(x)) * 15)
                                        for x in activity_epochs['activity_epoch_num']]
 
+    # add avm and intensity for each epoch
     activity_epochs['avm'] = [round(x * 1000, 2) for x in avm]
     activity_epochs['intensity'] = epoch_intensity
 
@@ -103,13 +102,11 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
         activity_epochs.loc[((activity_epochs['start_time'] < row['end_time'])
                              & (activity_epochs['end_time'] > row['start_time'])), 'intensity'] = 'none'
 
+    # set intensity to 'none' during all sptw that contain sleep
     if not (sptw.empty or sleep_bouts.empty):
-
-        # set intensity to 'none' during all sptw that contain sleep
         sptw = sptw.loc[sptw['sptw_num'].isin(sleep_bouts['sptw_num'].unique())]
 
     for idx, row in sptw.iterrows():
-
         activity_epochs.loc[((activity_epochs['start_time'] < row['end_time'])
                              & (activity_epochs['end_time'] > row['start_time'])), 'intensity'] = 'none'
 
@@ -124,15 +121,15 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
 
     bout_intensity = [epoch_intensity[i] for i in bout_starts]
 
-    bout_start_times = [start_datetime + timedelta(seconds=(int(x)) * 15) for x in bout_starts]
-    bout_end_times = [start_datetime + timedelta(seconds=(int(x)) * 15) for x in bout_ends]
+    bout_start_times = [start_datetime + timedelta(seconds=(int(x)) * epoch_length) for x in bout_starts]
+    bout_end_times = [start_datetime + timedelta(seconds=(int(x)) * epoch_length) for x in bout_ends]
 
     activity_bouts = pd.DataFrame({'activity_bout_num': np.arange(1, len(bout_starts) + 1),
                                    'start_time': bout_start_times,
                                    'end_time': bout_end_times,
                                    'intensity': bout_intensity})
 
-    return activity_epochs, activity_bouts, avm, vm
+    return activity_epochs, activity_bouts, avm, vm, avm_sec
 
 
 def sum_total_activity(epoch_intensity, epoch_length, quiet=False):
