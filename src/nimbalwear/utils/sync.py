@@ -184,9 +184,9 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
         if search_radius is not None:
             mid_sync_ref = s[0] + ((s[1] - s[0]) / 2)
             sample_gain = tgt_freq / ref_freq
-            sample_offset = offset * tgt_freq
-            mid_sync_tgt = mid_sync_ref * sample_gain + sample_offset
-            sample_radius = search_radius * tgt_freq
+            sample_offset = int(offset * tgt_freq)
+            mid_sync_tgt = int(mid_sync_ref * sample_gain + sample_offset)
+            sample_radius = int(search_radius * tgt_freq)
             start_i = mid_sync_tgt - sample_radius
             end_i = mid_sync_tgt + sample_radius
 
