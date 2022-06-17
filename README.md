@@ -32,6 +32,9 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.16.3
+- add sync search radius
+
 v0.16.2
 - activity fixes
   - output 1-second avm
