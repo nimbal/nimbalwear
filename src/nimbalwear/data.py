@@ -402,7 +402,7 @@ class Device:
         return pre_error, post_error, iterations
 
     def sync(self, ref, sig_labels=('Accelerometer x', 'Accelerometer y', 'Accelerometer z'), sync_type='flip',
-             sync_at_config=True, **kwargs):
+             sync_at_config=True, search_radius=None, **kwargs):
 
         syncs = None
         segments = None
@@ -413,9 +413,10 @@ class Device:
 
             last_sync = ref_config_time if sync_at_config and ref_config_time < ref.header['start_datetime'] else None
 
-            # Add warning if config time > start_timme
+            # Add warning if config time > start_time
 
-            syncs, segments = sync_devices(self, ref, sig_labels=sig_labels, last_sync=last_sync, **kwargs)
+            syncs, segments = sync_devices(self, ref, sig_labels=sig_labels, last_sync=last_sync,
+                                           search_radius=search_radius, **kwargs)
 
         else:
 

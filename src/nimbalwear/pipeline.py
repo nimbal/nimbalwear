@@ -561,7 +561,9 @@ class Pipeline:
                     ds_index = freq - 5
                 signal_ds = round(freq / (5 + ds_index))
 
+                sync_type = self.module_settings['sync']['type']
                 sync_at_config = self.module_settings['sync']['sync_at_config']
+                search_radius = self.module_settings['sync']['search_radius']
 
                 # check if synnc_at_config is true and give warning and set to false if config_ate after start_date
                 if sync_at_config:
@@ -572,11 +574,11 @@ class Pipeline:
                         message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: Invalid config time, could not add as sync time",
                                     level='warning', display=(not quiet), log=log, logger_name=self.log_name)
 
-
                 syncs, segments = coll.devices[idx].sync(ref=coll.devices[0],
                                                          sig_labels=tuple(self.sensors['accelerometer']['signals']),
-                                                         type=self.module_settings['sync']['type'],
-                                                         sync_at_config=self.module_settings['sync']['sync_at_config'],
+                                                         type=sync_type,
+                                                         sync_at_config=sync_at_config,
+                                                         search_radius=search_radius,
                                                          signal_ds=signal_ds)
 
 

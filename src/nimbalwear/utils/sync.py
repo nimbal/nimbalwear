@@ -12,7 +12,7 @@ mstyle.use('fast')
 
 
 def sync_devices(tgt_device, ref_device, sig_labels=('Accelerometer x', 'Accelerometer y', 'Accelerometer z'),
-                 last_sync=None, quiet=False, **kwargs):
+                 last_sync=None, search_radius=None, quiet=False, **kwargs):
 
     """Synchronize tgt_device to ref_device based on detection of sync flips.
 
@@ -32,6 +32,7 @@ def sync_devices(tgt_device, ref_device, sig_labels=('Accelerometer x', 'Acceler
     # get start and sample rate
     ref_start_time = ref_device.header['start_datetime']
     tgt_start_time = tgt_device.header['start_datetime']
+    offset = (tgt_start_time - ref_start_time).total_seconds()
 
     # get accelerometer indices
     ref_sig_idx = []
@@ -48,7 +49,8 @@ def sync_devices(tgt_device, ref_device, sig_labels=('Accelerometer x', 'Acceler
     ref_freq = round(ref_device.signal_headers[ref_sig_idx[0]]['sample_rate'])
     tgt_freq = round(tgt_device.signal_headers[tgt_sig_idx[0]]['sample_rate'])
 
-    syncs = detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, **kwargs)
+    syncs = detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=offset,
+                                    search_radius=search_radius, **kwargs)
 
     # if not syncs.empty:
     #     syncs['ref_start_time'] = [ref_start_time + timedelta(seconds=(x['ref_start_idx'] / ref_freq))
@@ -160,7 +162,7 @@ def sync_devices(tgt_device, ref_device, sig_labels=('Accelerometer x', 'Acceler
     return syncs, segments
 
 
-def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, **kwargs):
+def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, search_radius=None, **kwargs):
 
     ref_args = [k for k, v in inspect.signature(detect_sync_flips_ref_signal).parameters.items()]
     ref_dict = {k: kwargs.pop(k) for k in dict(kwargs) if k in ref_args}
@@ -179,7 +181,26 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, **kwargs):
 
         ref_sync = ref_accel[ref_sync_sig_idx][s[0]:s[1]]
 
-        tgt_sync_sig_idx, tgt_sync = detect_sync_flips_tgt_accel(tgt_accel, ref_sync, tgt_freq, ref_freq, **tgt_dict)
+        if search_radius is not None:
+            mid_sync_ref = s[0] + ((s[1] - s[0]) / 2)
+            sample_gain = tgt_freq / ref_freq
+            sample_offset = offset * tgt_freq
+            mid_sync_tgt = mid_sync_ref * sample_gain + sample_offset
+            sample_radius = search_radius * tgt_freq
+            start_i = mid_sync_tgt - sample_radius
+            end_i = mid_sync_tgt + sample_radius
+
+            tgt_accel_window = [a[start_i:end_i] for a in tgt_accel]
+
+        else:
+            start_i = 0
+            tgt_accel_window = tgt_accel
+
+        tgt_sync_sig_idx, tgt_sync = detect_sync_flips_tgt_accel(tgt_accel_window, ref_sync, tgt_freq, ref_freq,
+                                                                 **tgt_dict)
+
+        tgt_sync[0] += start_i
+        tgt_sync[1] += start_i
 
         new_sync = pd.Series([int(ref_sync_sig_idx), int(s[0]), int(s[1]), int(s[2]), round(s[3], 3),
                               int(tgt_sync_sig_idx), int(tgt_sync[0]), int(tgt_sync[1]), round(tgt_sync[2] ,2)],

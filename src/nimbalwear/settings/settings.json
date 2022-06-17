@@ -81,6 +81,7 @@
     "sync": {
       "type": "flip",
       "sync_at_config": true,
+      "search_radius": null,
       "save": true
     },
     "nonwear": {
