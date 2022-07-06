@@ -22,7 +22,7 @@
       "sleep_bouts": "analytics/sleep/bouts",
       "sleep_daily": "analytics/sleep/daily",
       "reports_collection": "reports/collection",
-      "reports_patient": "reports/feedback"
+      "reports_feedback": "reports/feedback"
     },
     "stages": ["convert", "nonwear", "crop", "save_sensors", "gait", "sleep", "activity"],
     "sensors": {
