@@ -262,6 +262,9 @@ class Pipeline:
         if single_stage in ['activity']:
             coll = self.read_sleep(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
+        if single_stage in ['activity']:
+            coll = self.read_gait(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
+
         # crop final nonwear
         if single_stage in [None, 'crop']:
             coll = self.crop(coll=coll, quiet=self.quiet, log=self.log)
@@ -1174,7 +1177,7 @@ class Pipeline:
             wb = WalkingBouts(l_obj, r_obj, left_kwargs={'axis': axis}, right_kwargs={'axis': axis})
 
             # save bout times
-            coll.gait_bout_times = wb.export_bouts()
+            coll.gait_bouts = wb.export_bouts()
 
             # save step times
             coll.gait_step_times = wb.export_steps()
@@ -1187,10 +1190,10 @@ class Pipeline:
                                                         'mid_swing_time', 'step_length', 'step_state', 'step_time',
                                                         'swing_start_accel', 'swing_start_time'])
 
-            coll.gait_bout_times = self.identify_df(coll, coll.gait_bout_times)
+            coll.gait_bouts = self.identify_df(coll, coll.gait_bouts)
             coll.gait_step_times = self.identify_df(coll, coll.gait_step_times)
 
-            message(f"Detected {coll.gait_bout_times.shape[0]} gait bouts", level='info', display=(not quiet), log=log,
+            message(f"Detected {coll.gait_bouts.shape[0]} gait bouts", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
 
             message(f"Detected {coll.gait_step_times.shape[0]} steps",
@@ -1199,11 +1202,11 @@ class Pipeline:
             message("Summarizing daily gait analytics...", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
 
-            coll.gait_daily = wb.daily_gait(coll.gait_bout_times)
+            coll.gait_daily = wb.daily_gait(coll.gait_bouts)
             coll.gait_daily = self.identify_df(coll, coll.gait_daily)
 
             # adjusting gait parameters
-            coll.gait_bout_times.rename(columns={'number_steps': 'step_count',
+            coll.gait_bouts.rename(columns={'number_steps': 'step_count',
                                                  'start_dp': 'start_idx',
                                                  'end_dp': 'end_idx'},
                                         inplace=True)
@@ -1234,17 +1237,17 @@ class Pipeline:
                                         sample_freq=coll.devices[device_idx].signal_headers[gyro_z_idx]['sample_rate'],
                                         timestamps=times, break_sec=2, bout_steps=3, start_ind=idxs[0], end_ind=idxs[1])
 
-            coll.gait_step_times, coll.gait_bout_times, peak_heights = sgp
+            coll.gait_step_times, coll.gait_bouts, peak_heights = sgp
 
             # nnot sure if this is necessary in this version
             # TODO: Fix in nwgait to return columns
             if coll.gait_step_times.empty:
                 coll.gait_step_times = pd.DataFrame(columns=['Step', 'Step_index', 'Bout_number', 'Peak_times'])
 
-            coll.gait_bout_times = self.identify_df(coll, coll.gait_bout_times)
+            coll.gait_bouts = self.identify_df(coll, coll.gait_bouts)
             coll.gait_step_times = self.identify_df(coll, coll.gait_step_times)
 
-            message(f"Detected {coll.gait_bout_times.shape[0]} gait bouts", level='info', display=(not quiet), log=log,
+            message(f"Detected {coll.gait_bouts.shape[0]} gait bouts", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
 
             message(f"Detected {coll.gait_step_times.shape[0] * 2} steps",
@@ -1253,14 +1256,14 @@ class Pipeline:
             message("Summarizing daily gait analytics...", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
 
-            coll.gait_daily = gait_stats(coll.gait_bout_times, single_leg=True)
+            coll.gait_daily = gait_stats(coll.gait_bouts, single_leg=True)
             coll.gait_daily = self.identify_df(coll, coll.gait_daily)
 
             # adjusting gait parameters
-            coll.gait_bout_times.rename(columns={'Bout_number': 'gait_bout_num',
+            coll.gait_bouts.rename(columns={'Bout_number': 'gait_bout_num',
                                                  'Step_count': 'step_count',
-                                                 'Start_time': 'start_timestamp',
-                                                 'End_time': 'end_timestamp',
+                                                 'Start_time': 'start_time',
+                                                 'End_time': 'end_time',
                                                  'Start_idx': 'start_idx',
                                                  'End_idx': 'end_idx'},
                                         inplace=True)
@@ -1279,9 +1282,9 @@ class Pipeline:
             return coll
 
 
-        bout_cols = ['study_code', 'subject_id', 'coll_id', 'gait_bout_num', 'start_timestamp', 'end_timestamp',
+        bout_cols = ['study_code', 'subject_id', 'coll_id', 'gait_bout_num', 'start_time', 'end_time',
                      'step_count']
-        coll.gait_bout_times = coll.gait_bout_times[bout_cols]
+        coll.gait_bouts = coll.gait_bouts[bout_cols]
 
 
         step_cols = ['study_code','subject_id','coll_id','step_num', 'gait_bout_num', 'step_idx', 'step_time']
@@ -1302,7 +1305,7 @@ class Pipeline:
             daily_gait_csv_path = self.dirs['gait_daily'] / daily_gait_csv_name
 
             message(f"Saving {bouts_csv_path}", level='info', display=(not quiet), log=log, logger_name=self.log_name)
-            coll.gait_bout_times.to_csv(bouts_csv_path, index=False)
+            coll.gait_bouts.to_csv(bouts_csv_path, index=False)
 
             message(f"Saving {steps_csv_path}", level='info', display=(not quiet), log=log, logger_name=self.log_name)
             coll.gait_step_times.to_csv(steps_csv_path, index=False)
@@ -1314,6 +1317,39 @@ class Pipeline:
             message(f"Saving {daily_gait_csv_path}", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
             coll.gait_daily.to_csv(daily_gait_csv_path, index=False)
+
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        return coll
+
+    def read_gait(self, coll, single_stage, quiet=False, log=True):
+
+        # read nonwear data for all devices
+        message("Reading gait data from files...", level='info', display=(not quiet), log=log,
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        gait_bouts_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "GAIT_BOUTS"]),
+                                         "csv"])
+
+        gait_bouts_csv_path = self.dirs['gait_bouts'] / gait_bouts_csv_name
+
+        coll.gait_bouts = pd.DataFrame()
+
+        if os.path.isfile(gait_bouts_csv_path):
+
+            message(f"Reading {gait_bouts_csv_path}", level='info', display=(not quiet), log=log,
+                    logger_name=self.log_name)
+
+            # read nonwear csv file
+            coll.gait_bouts = pd.read_csv(gait_bouts_csv_path, dtype=str)
+            coll.gait_bouts['start_time'] = pd.to_datetime(coll.gait_bouts['start_time'], format='%Y-%m-%d %H:%M:%S')
+            coll.gait_bouts['end_time'] = pd.to_datetime(coll.gait_bouts['end_time'], format='%Y-%m-%d %H:%M:%S')
+
+        else:
+            message(f"{coll.subject_id}_{coll.coll_id}: {gait_bouts_csv_path} does not exist",
+                    level='warning', display=(not quiet), log=log, logger_name=self.log_name)
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
@@ -1499,6 +1535,7 @@ class Pipeline:
 
         save = self.module_settings['activity']['save']
         epoch_length = self.module_settings['activity']['epoch_length']
+        sedentary_gait = self.module_settings['activity']['sedentary_gait']
 
         coll.activity_epochs = pd.DataFrame()
 
@@ -1528,7 +1565,7 @@ class Pipeline:
         cutpoint = cutpoint_ages['type'].loc[(cutpoint_ages['min_age'] <= subject_age)
                                              & (cutpoint_ages['max_age'] >= subject_age)].item()
 
-        # get nonwear for sleep_device
+        # get nonwear for activity_device
         device_nonwear = coll.nonwear_bouts.loc[(coll.nonwear_bouts['study_code'] == coll.study_code) &
                                                 (coll.nonwear_bouts['subject_id'] == coll.subject_id) &
                                                 (coll.nonwear_bouts['coll_id'] == coll.coll_id) &
@@ -1542,9 +1579,10 @@ class Pipeline:
                                                     z=coll.devices[activity_device_index].signals[accel_z_sig],
                                                     sample_rate=coll.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
                                                     start_datetime=coll.devices[activity_device_index].header['start_datetime'],
-                                                    lowpass=lowpass, epoch_length=epoch_length, cutpoint=cutpoint, dominant=dominant,
-                                                    nonwear=device_nonwear, sptw=coll.sptw, sleep_bouts=coll.sleep_bouts,
-                                                    quiet=quiet)
+                                                    lowpass=lowpass, epoch_length=epoch_length, cutpoint=cutpoint,
+                                                    dominant=dominant, sedentary_gait=sedentary_gait,
+                                                    gait=coll.gait_bouts, nonwear=device_nonwear, sptw=coll.sptw,
+                                                    sleep_bouts=coll.sleep_bouts, quiet=quiet)
 
         coll.activity_epochs = e
         coll.activity_bouts = b

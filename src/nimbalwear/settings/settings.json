@@ -117,6 +117,7 @@
           "type": "Fraysse"
         }
       ],
+      "sedentary_gait": true,
       "save": true
     },
     "sleep": {
