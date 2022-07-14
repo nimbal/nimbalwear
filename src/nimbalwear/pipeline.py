@@ -14,7 +14,7 @@ import pandas as pd
 from isodate import parse_duration
 
 from .data import Device
-from .nonwear import vert_nonwear
+from .nonwear import vert_nonwear, nonwear_stats
 from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
 from .gait import AccelReader, WalkingBouts, get_gait_bouts, create_timestamps, gait_stats
 from .activity import activity_wrist_avm, activity_stats
@@ -684,7 +684,8 @@ class Pipeline:
         temp_inc_roc = self.module_settings['nonwear']['temp_inc_roc']
         save = self.module_settings['nonwear']['save']
 
-        coll.nonwear_times = pd.DataFrame()
+        coll.nonwear_bouts = pd.DataFrame()
+        coll.daily_nonwear = pd.DataFrame()
 
         # detect nonwear for each device
         for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
@@ -720,7 +721,7 @@ class Pipeline:
             # TODO: call different algorithm based on device_type or signals available??
             # TODO: log algorithm used
 
-            nonwear_times, nonwear_array = vert_nonwear(
+            nonwear_bouts, nonwear_array = vert_nonwear(
                 x_values=coll.devices[index].signals[accel_x_sig],
                 y_values=coll.devices[index].signals[accel_y_sig],
                 z_values=coll.devices[index].signals[accel_z_sig],
@@ -735,11 +736,11 @@ class Pipeline:
                 quiet=quiet)
             algorithm_name = 'DETACH'
 
-            nonwear_times['nonwear_bout_id'] = nonwear_times.index
-            nonwear_times.rename(columns={'Start Datapoint': 'start_datapoint', 'End Datapoint': 'end_datapoint'},
+            nonwear_bouts['nonwear_bout_id'] = nonwear_bouts.index
+            nonwear_bouts.rename(columns={'Start Datapoint': 'start_datapoint', 'End Datapoint': 'end_datapoint'},
                                  inplace=True)
 
-            bout_count = nonwear_times.shape[0]
+            bout_count = nonwear_bouts.shape[0]
 
             message(f"Detected {bout_count} nonwear bouts for {device_type} {device_location} ({algorithm_name})",
                     level='info', display=(not quiet), log=log, logger_name=self.log_name)
@@ -747,30 +748,44 @@ class Pipeline:
             # convert datapoints to times
             start_date = coll.devices[index].header['start_datetime']
             sample_rate = coll.devices[index].signal_headers[accel_x_sig]['sample_rate']
+            samples = coll.devices[index].signals[accel_x_sig].shape[0]
+            end_date = start_date + dt.timedelta(seconds=(samples / sample_rate))
 
             start_times = []
             end_times = []
 
-            for nw_index, nw_row in nonwear_times.iterrows():
+            for nw_index, nw_row in nonwear_bouts.iterrows():
                 start_times.append(start_date + dt.timedelta(seconds=(nw_row['start_datapoint'] / sample_rate)))
                 end_times.append(start_date + dt.timedelta(seconds=(nw_row['end_datapoint'] / sample_rate)))
 
-            nonwear_times['start_time'] = start_times
-            nonwear_times['end_time'] = end_times
+            nonwear_bouts['start_time'] = start_times
+            nonwear_bouts['end_time'] = end_times
 
-            # add study_code
-            nonwear_times['study_code'] = study_code
-            nonwear_times['subject_id'] = subject_id
-            nonwear_times['coll_id'] = coll_id
-            nonwear_times['device_type'] = device_type
-            nonwear_times['device_location'] = device_location
+            nonwear_bouts = nonwear_bouts[['nonwear_bout_id', 'start_time', 'end_time']]
 
-            # reorder columns
-            nonwear_times = nonwear_times[['study_code', 'subject_id', 'coll_id', 'device_type', 'device_location',
-                                          'nonwear_bout_id', 'start_time', 'end_time']]
+            daily_nonwear = nonwear_stats(nonwear_bouts, coll_start=start_date, coll_end=end_date, quiet=quiet)
+
+            # add identifiers
+            nonwear_bouts.insert(loc=0, column='study_code', value=study_code)
+            nonwear_bouts.insert(loc=1, column='subject_id', value=subject_id)
+            nonwear_bouts.insert(loc=2, column='coll_id', value=coll_id)
+            nonwear_bouts.insert(loc=3, column='device_type', value=device_type)
+            nonwear_bouts.insert(loc=4, column='device_location', value=device_location)
+
+            daily_nonwear.insert(loc=0, column='study_code', value=study_code)
+            daily_nonwear.insert(loc=1, column='subject_id', value=subject_id)
+            daily_nonwear.insert(loc=2, column='coll_id', value=coll_id)
+            daily_nonwear.insert(loc=3, column='device_type', value=device_type)
+            daily_nonwear.insert(loc=4, column='device_location', value=device_location)
+
+
+            # # reorder columns
+            # nonwear_bouts = nonwear_bouts[['study_code', 'subject_id', 'coll_id', 'device_type', 'device_location',
+            #                               'nonwear_bout_id', 'start_time', 'end_time']]
 
             # append to collection attribute
-            coll.nonwear_times = pd.concat([coll.nonwear_times, nonwear_times], ignore_index=True)
+            coll.nonwear_bouts = pd.concat([coll.nonwear_bouts, nonwear_bouts], ignore_index=True)
+            coll.daily_nonwear = pd.concat([coll.daily_nonwear, daily_nonwear], ignore_index=True)
 
             if save:
 
@@ -778,14 +793,25 @@ class Pipeline:
                 nonwear_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
                                                        "NONWEAR"]),
                                              "csv"])
+                daily_nonwear_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
+                                                       "NONWEAR_DAILY"]),
+                                             "csv"])
+
                 nonwear_csv_path = self.dirs['nonwear_bouts_standard'] / nonwear_csv_name
+                nonwear_daily_csv_path = self.dirs['nonwear_daily_standard'] / daily_nonwear_csv_name
 
                 nonwear_csv_path.parent.mkdir(parents=True, exist_ok=True)
+                nonwear_daily_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
                 message(f"Saving {nonwear_csv_path}", level='info', display=(not quiet), log=log,
                         logger_name=self.log_name)
 
-                nonwear_times.to_csv(nonwear_csv_path, index=False)
+                nonwear_bouts.to_csv(nonwear_csv_path, index=False)
+
+                message(f"Saving {nonwear_daily_csv_path}", level='info', display=(not quiet), log=log,
+                        logger_name=self.log_name)
+
+                daily_nonwear.to_csv(nonwear_daily_csv_path, index=False)
 
             message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
@@ -803,7 +829,7 @@ class Pipeline:
         else:
             nonwear_csv_dir = self.dirs['nonwear_bouts_cropped']
 
-        coll.nonwear_times = pd.DataFrame()
+        coll.nonwear_bouts = pd.DataFrame()
 
         # detect nonwear for each device
         for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
@@ -832,12 +858,12 @@ class Pipeline:
                     logger_name=self.log_name)
 
             # read nonwear csv file
-            nonwear_times = pd.read_csv(nonwear_csv_path, dtype=str)
-            nonwear_times['start_time'] = pd.to_datetime(nonwear_times['start_time'], format='%Y-%m-%d %H:%M:%S')
-            nonwear_times['end_time'] = pd.to_datetime(nonwear_times['end_time'], format='%Y-%m-%d %H:%M:%S')
+            nonwear_bouts = pd.read_csv(nonwear_csv_path, dtype=str)
+            nonwear_bouts['start_time'] = pd.to_datetime(nonwear_bouts['start_time'], format='%Y-%m-%d %H:%M:%S')
+            nonwear_bouts['end_time'] = pd.to_datetime(nonwear_bouts['end_time'], format='%Y-%m-%d %H:%M:%S')
 
             # append to collection attribute
-            coll.nonwear_times = pd.concat([coll.nonwear_times, nonwear_times], ignore_index=True)
+            coll.nonwear_bouts = pd.concat([coll.nonwear_bouts, nonwear_bouts], ignore_index=True)
 
             message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
@@ -846,17 +872,22 @@ class Pipeline:
     @coll_status
     def crop(self, coll, quiet=False, log=True):
 
-        message("Detecting final device removal...", level='info', display=(not quiet), log=log,
+        message("Cropping initial and final non-wear...", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        min_duration = self.module_settings['crop']['min_duration']
+        min_duration_start = self.module_settings['crop']['min_duration_start']
+        min_duration_end = self.module_settings['crop']['min_duration_end']
+        max_time_to_bof = self.module_settings['crop']['max_time_to_bof']
         max_time_to_eof = self.module_settings['crop']['max_time_to_eof']
         save = self.module_settings['crop']['save']
 
+        coll.daily_nonwear = pd.DataFrame(columns=['study_code', 'subject_id', 'coll_id', 'device_type',
+                                                   'device_location', 'day_num', 'date', 'collect', 'wear', 'nonwear'])
+
         # crop final nonwear from all device data
         for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
-                               desc='Detecting final device removal'):
+                               desc='Cropping initial and final non-wear'):
 
             # get info from device list
             study_code = row['study_code']
@@ -871,22 +902,28 @@ class Pipeline:
                 continue
 
             # if there is nonwear data for any devices in this collection
-            if not coll.nonwear_times.empty:
+            if not coll.nonwear_bouts.empty:
+
+                daily_nonwear = pd.DataFrame(columns=['day_num', 'date', 'collect', 'wear', 'nonwear'])
 
                 # get nonwear indices for current device
-                nonwear_idx = coll.nonwear_times.index[(coll.nonwear_times['study_code'] == study_code) &
-                                                       (coll.nonwear_times['subject_id'] == subject_id) &
-                                                       (coll.nonwear_times['coll_id'] == coll_id) &
-                                                       (coll.nonwear_times['device_type'] == device_type) &
-                                                       (coll.nonwear_times['device_location'] == device_location)]
+                nonwear_idx = coll.nonwear_bouts.index[(coll.nonwear_bouts['study_code'] == study_code) &
+                                                       (coll.nonwear_bouts['subject_id'] == subject_id) &
+                                                       (coll.nonwear_bouts['coll_id'] == coll_id) &
+                                                       (coll.nonwear_bouts['device_type'] == device_type) &
+                                                       (coll.nonwear_bouts['device_location'] == device_location)]
                 nonwear_idx = nonwear_idx.tolist()
 
                 # if there is nonwear data for current device
                 if len(nonwear_idx):
 
+                    # get first nonwear period for current device
+                    first_nonwear_idx = nonwear_idx[0]
+                    first_nonwear = coll.nonwear_bouts.loc[first_nonwear_idx]
+
                     # get last nonwear period for current device
                     last_nonwear_idx = nonwear_idx[-1]
-                    last_nonwear = coll.nonwear_times.loc[last_nonwear_idx]
+                    last_nonwear = coll.nonwear_bouts.loc[last_nonwear_idx]
 
                     # get time info from device data
                     start_time = coll.devices[index].header['start_datetime']
@@ -895,39 +932,87 @@ class Pipeline:
                     duration = dt.timedelta(seconds=samples / sample_rate)
                     end_time = start_time + duration
 
+                    # get duration and time to start of file of first nonwear
+                    first_nonwear_duration = first_nonwear['end_time'] - first_nonwear['start_time']
+                    first_nonwear_time_to_bof = first_nonwear['start_time'] - start_time
+
                     # get duration and time to end of file of last nonwear
-                    nonwear_duration = last_nonwear['end_time'] - last_nonwear['start_time']
-                    nonwear_time_to_eof = end_time - last_nonwear['end_time']
+                    last_nonwear_duration = last_nonwear['end_time'] - last_nonwear['start_time']
+                    last_nonwear_time_to_eof = end_time - last_nonwear['end_time']
+
+                    # only crop if first nonwear starts within 20 minutes of start of file
+                    crop_start = ((first_nonwear_duration >= dt.timedelta(minutes=min_duration_end)) &
+                                (first_nonwear_time_to_bof <= dt.timedelta(minutes=max_time_to_bof)))
 
                     # only crop if last nonwear ends within 20 minutes of end of file
-                    early_removal = ((nonwear_duration >= dt.timedelta(minutes=min_duration)) &
-                                    (nonwear_time_to_eof <= dt.timedelta(minutes=max_time_to_eof)))
+                    crop_end = ((last_nonwear_duration >= dt.timedelta(minutes=min_duration_end)) &
+                                    (last_nonwear_time_to_eof <= dt.timedelta(minutes=max_time_to_eof)))
 
-                    #if removed early then crop
-                    if early_removal:
+                    new_start_time = start_time
+                    new_end_time = end_time
+
+                    #if nonwear at start
+                    if crop_start:
+
+                        # set new file start time to which to crop
+                        new_start_time = first_nonwear['end_time']
+
+                        crop_duration = new_start_time - start_time
+
+                        message(f"Cropping {crop_duration} from begininng of collection for {device_type} {device_location}",
+                                level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+                        # remove last non-wear from data frame
+                        coll.nonwear_bouts.drop(index=first_nonwear_idx, inplace=True)
+
+                    else:
+
+                        message(f"No initial nonwear cropped for {device_type} {device_location}", level='info',
+                                display=(not quiet), log=log, logger_name=self.log_name)
+
+                    # if removed early then crop
+                    if crop_end:
 
                         # set new file end time to which to crop
-                        new_start_time = start_time
+                        # new_start_time = start_time
                         new_end_time = last_nonwear['start_time']
 
                         crop_duration = end_time - new_end_time
 
-                        message(f"Cropping {crop_duration} after final removal of {device_type} {device_location}",
+                        message(f"Cropping {crop_duration} from end of collection for {device_type} {device_location}",
                                 level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-                        coll.devices[index].crop(new_start_time, new_end_time, inplace=True)
-
                         # remove last non-wear from data frame
-                        coll.nonwear_times.drop(index=last_nonwear_idx, inplace=True)
+                        coll.nonwear_bouts.drop(index=last_nonwear_idx, inplace=True)
 
                     else:
 
-                        message(f"No final removal of {device_type} {device_location} detected", level='info',
+                        message(f"No final nonwear cropped for {device_type} {device_location}", level='info',
                                 display=(not quiet), log=log, logger_name=self.log_name)
+
+                    coll.devices[index].crop(new_start_time, new_end_time, inplace=True)
+
+                    # recalculate nonwear summary
+                    nonwear_bouts =  coll.nonwear_bouts[coll.nonwear_bouts.index.isin(nonwear_idx)]
+                    nonwear_bouts = nonwear_bouts.drop(columns=['study_code', 'subject_id', 'coll_id', 'device_type',
+                                                                'device_location'])
+                    daily_nonwear = nonwear_stats(nonwear_bouts, coll_start=new_start_time, coll_end=new_end_time,
+                                                  quiet=quiet)
+
+
+
 
                 else:
                     message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for device",
                             level='warning', display=(not quiet), log=log, logger_name=self.log_name)
+
+                daily_nonwear.insert(loc=0, column='study_code', value=study_code)
+                daily_nonwear.insert(loc=1, column='subject_id', value=subject_id)
+                daily_nonwear.insert(loc=2, column='coll_id', value=coll_id)
+                daily_nonwear.insert(loc=3, column='device_type', value=device_type)
+                daily_nonwear.insert(loc=4, column='device_location', value=device_location)
+
+                coll.daily_nonwear = pd.concat([coll.daily_nonwear, daily_nonwear], ignore_index=True)
 
             else:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for collection",
@@ -941,25 +1026,35 @@ class Pipeline:
                 nonwear_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
                                                        "NONWEAR"]),
                                              "csv"])
+                daily_nonwear_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
+                                                       "NONWEAR_DAILY"]),
+                                             "csv"])
 
                 cropped_device_path = self.dirs['device_edf_cropped'] / device_edf_name
                 nonwear_csv_path = self.dirs['nonwear_bouts_cropped'] / nonwear_csv_name
+                nonwear_daily_csv_path = self.dirs['nonwear_daily_cropped'] / daily_nonwear_csv_name
 
                 # check that all folders exist for data output files
                 cropped_device_path.parent.mkdir(parents=True, exist_ok=True)
                 nonwear_csv_path.parent.mkdir(parents=True, exist_ok=True)
+                nonwear_daily_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
                 # write cropped device data as edf
                 message(f"Saving {cropped_device_path}", level='info', display=(not quiet), log=log,
                         logger_name=self.log_name)
                 coll.devices[index].export_edf(file_path=cropped_device_path, quiet=quiet)
 
-                if not coll.nonwear_times.empty:
+                if not coll.nonwear_bouts.empty:
 
                     # write nonwear times with cropped nonwear removed
                     message(f"Saving {nonwear_csv_path}", level='info', display=(not quiet), log=log,
                             logger_name=self.log_name)
-                    coll.nonwear_times[coll.nonwear_times.index.isin(nonwear_idx)].to_csv(nonwear_csv_path, index=False)
+                    coll.nonwear_bouts[coll.nonwear_bouts.index.isin(nonwear_idx)].to_csv(nonwear_csv_path, index=False)
+
+                    message(f"Saving {nonwear_daily_csv_path}", level='info', display=(not quiet), log=log,
+                        logger_name=self.log_name)
+
+                    daily_nonwear.to_csv(nonwear_daily_csv_path, index=False)
 
             message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
@@ -1252,11 +1347,11 @@ class Pipeline:
         accel_z_sig = coll.devices[sleep_device_index].get_signal_index('Accelerometer z')
 
         # get nonwear for sleep_device
-        device_nonwear = coll.nonwear_times.loc[(coll.nonwear_times['study_code'] == coll.study_code) &
-                                                (coll.nonwear_times['subject_id'] == coll.subject_id) &
-                                                (coll.nonwear_times['coll_id'] == coll.coll_id) &
-                                                (coll.nonwear_times['device_type'] == coll.device_info.iloc[sleep_device_index]['device_type']) &
-                                                (coll.nonwear_times['device_location'] == coll.device_info.iloc[sleep_device_index]['device_location'])]
+        device_nonwear = coll.nonwear_bouts.loc[(coll.nonwear_bouts['study_code'] == coll.study_code) &
+                                                (coll.nonwear_bouts['subject_id'] == coll.subject_id) &
+                                                (coll.nonwear_bouts['coll_id'] == coll.coll_id) &
+                                                (coll.nonwear_bouts['device_type'] == coll.device_info.iloc[sleep_device_index]['device_type']) &
+                                                (coll.nonwear_bouts['device_location'] == coll.device_info.iloc[sleep_device_index]['device_location'])]
 
         # TODO: should sleep algorithm be modified if dominant vs non-dominant hand?
 
@@ -1317,7 +1412,7 @@ class Pipeline:
             sleep_bouts_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "SLEEP_BOUTS"]),
                                              "csv"])
 
-            daily_sleep_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "DAILY_SLEEP"]),
+            daily_sleep_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "SLEEP_DAILY"]),
                                              "csv"])
 
             sptw_csv_path = self.dirs['sleep_sptw'] / sptw_csv_name
@@ -1434,12 +1529,12 @@ class Pipeline:
                                              & (cutpoint_ages['max_age'] >= subject_age)].item()
 
         # get nonwear for sleep_device
-        device_nonwear = coll.nonwear_times.loc[(coll.nonwear_times['study_code'] == coll.study_code) &
-                                                (coll.nonwear_times['subject_id'] == coll.subject_id) &
-                                                (coll.nonwear_times['coll_id'] == coll.coll_id) &
-                                                (coll.nonwear_times['device_type'] ==
+        device_nonwear = coll.nonwear_bouts.loc[(coll.nonwear_bouts['study_code'] == coll.study_code) &
+                                                (coll.nonwear_bouts['subject_id'] == coll.subject_id) &
+                                                (coll.nonwear_bouts['coll_id'] == coll.coll_id) &
+                                                (coll.nonwear_bouts['device_type'] ==
                                                  coll.device_info.iloc[activity_device_index]['device_type']) &
-                                                (coll.nonwear_times['device_location'] ==
+                                                (coll.nonwear_bouts['device_location'] ==
                                                  coll.device_info.iloc[activity_device_index]['device_location'])]
 
         e, b, avm, vm, avm_sec = activity_wrist_avm(x=coll.devices[activity_device_index].signals[accel_x_sig],

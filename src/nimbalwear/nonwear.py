@@ -2,6 +2,9 @@
 # December 5, 2021
 
 # ======================================== IMPORTS ========================================
+from copy import deepcopy
+from datetime import datetime, timedelta
+
 import numpy as np
 import pandas as pd
 
@@ -263,7 +266,6 @@ def zhou_nonwear(x_values, y_values, z_values, temperature_values, accelerometer
 detach_nonwear = vertdetach
 vert_nonwear = vertdetach
 
-
 def detect_nonwear(alg='vert', **kwargs):
     """
 
@@ -290,3 +292,130 @@ def detect_nonwear(alg='vert', **kwargs):
         return
 
     return nonwear_times, nonwear_array
+
+def nonwear_stats(nonwear_bouts, sum_type='daily', coll_start=None, coll_end=None, quiet=False):
+    """
+    Calculates summary for each date in collection.
+
+    @param nonwear_bouts:
+    @param sum_type:
+    @param coll_start: datetime of collection start
+    @param coll_end: datetime of collection end
+    @param quiet:
+
+    @return:
+    """
+
+
+
+    """
+    """
+
+    nonwear_bouts = deepcopy(nonwear_bouts)
+
+    # create date and duration columns
+    nonwear_bouts['date'] = pd.to_datetime(nonwear_bouts['start_time']).dt.date
+    nonwear_bouts['duration'] = [round((x['end_time'] - x['start_time']).total_seconds())
+                                 for i, x in nonwear_bouts.iterrows()]
+
+    nonwear_stats = None
+
+    # check summary type
+    if sum_type == 'daily':
+
+        # DAILY SUMMARY
+        if not quiet:
+            print("Summarizing daily wear and non-wear time...")
+
+        collect_stats = pd.DataFrame(columns=['day_num', 'date', 'collect'])
+        nonwear_stats = pd.DataFrame(columns=['day_num', 'date', 'nonwear'])
+
+        # COLLECTION TIME - calculate known collection time for each day
+
+        # calculate range of dates with known collection time
+        start_date = (min(nonwear_bouts['start_time']) + timedelta(days=1) if coll_start is None else coll_start).date()
+        end_date = (max(nonwear_bouts['end_time']) - timedelta(days=1) if coll_end is None else coll_end).date()
+        dates = pd.date_range(start_date, end_date)
+
+        # calculate collection time for each day
+        collect = []
+        for date in dates:
+            day_start = datetime.combine(date, datetime.min.time())
+            day_end = datetime.combine(date + timedelta(days=1), datetime.min.time())
+            if coll_start is not None:
+                day_start = coll_start if (date.date() == coll_start.date()) else day_start
+            if coll_end is not None:
+                day_end = coll_end if date.date() == coll_end.date() else day_end
+            duration = round((day_end - day_start).total_seconds())
+            collect.append(duration)
+
+        # create collection time dataframe
+        collect_stats = pd.DataFrame({'date': [d.date() for d in dates], 'collect': collect})
+
+        # NON-WEAR
+
+        # if bout crosses midnight then split into two bouts
+        new_bouts = []
+        for idx, row in nonwear_bouts.iterrows():
+
+            # if row ends on next day
+            if row['date'] != pd.to_datetime(row['end_time']).date():
+
+                # find midnight
+                first_midnight = last_midnight = datetime.combine(row['start_time'].date() + timedelta(days=1),
+                                                                  datetime.min.time())
+
+                # add full nonwear days if bout was longer than one full day
+                full_days = pd.date_range(row['start_time'].date() + timedelta(days=1),
+                                          row['end_time'].date() - timedelta(days=1))
+                for date in full_days:
+                    # calculate start and end datetime and append new row
+                    start_midnight = datetime.combine(date, datetime.min.time())
+                    end_midnight = datetime.combine(date + timedelta(days=1), datetime.min.time())
+                    new_bouts.append([0, start_midnight, end_midnight, date.date(),
+                                      round((end_midnight - start_midnight).total_seconds())])
+                    last_midnight = end_midnight
+
+                # create new bout from last midnight to end
+                new_bouts.append([0, last_midnight, row['end_time'], row['end_time'].date(),
+                                  round((row['end_time'] - last_midnight).total_seconds())])
+
+                # adjust current bout to end at midnight
+                nonwear_bouts.at[idx, 'end_time'] = first_midnight
+                nonwear_bouts.at[idx, 'duration'] = round((first_midnight - row['start_time']).total_seconds())
+
+        # add new bouts
+        for new_bout in new_bouts:
+            new_row = pd.DataFrame([new_bout], columns=nonwear_bouts.columns)
+            nonwear_bouts = pd.concat([nonwear_bouts, new_row], ignore_index=True)
+
+        # loop through days and calculate nonwear time
+        dates = []
+        nonwear = []
+        for date, date_group in nonwear_bouts.groupby('date'):
+            dates.append(date)
+            duration = sum(date_group['duration'])
+            nonwear.append(duration)
+
+        # create nonwear dataframe
+        nonwear_stats = pd.DataFrame({'date': dates, 'nonwear': nonwear})
+
+        # merge collection time and nonwear time dataframes by date
+        nonwear_stats = pd.merge(collect_stats, nonwear_stats, how='outer', on='date', sort=True)
+
+        # calculate wear time
+        nonwear_stats['nonwear'] = nonwear_stats['nonwear'].fillna(0)
+        nonwear_stats['wear'] = nonwear_stats['collect'] - nonwear_stats['nonwear']
+
+        nonwear_stats = nonwear_stats.astype(
+            {'collect': pd.Int64Dtype(), 'wear': pd.Int64Dtype(), 'nonwear': pd.Int64Dtype(), })
+
+        nonwear_stats['day_num'] = range(1, nonwear_stats.shape[0] + 1)
+        nonwear_stats = nonwear_stats[['day_num', 'date', 'collect', 'wear', 'nonwear']]
+
+
+
+    else:
+        print('Invalid sum_type selected.')
+
+    return nonwear_stats
