@@ -1,4 +1,4 @@
-__version__ = '0.16.2.sync_bug'
+__version__ = '0.16.3'
 
 from .data import Device
 from .pipeline import Pipeline
