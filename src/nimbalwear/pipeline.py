@@ -537,12 +537,12 @@ class Pipeline:
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        ref_device_type = coll.device_info.iloc[0]['device_type']
-        ref_device_location = coll.device_info.iloc[0]['device_location']
+        if not coll.device_info.empty:
+            ref_device_type = coll.device_info.iloc[0]['device_type']
+            ref_device_location = coll.device_info.iloc[0]['device_location']
 
         for idx, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0],
                              desc="Synchronizing devices", leave=False):
-
             study_code = row['study_code']
             subject_id = row['subject_id']
             coll_id = row['coll_id']

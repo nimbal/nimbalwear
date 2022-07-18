@@ -438,6 +438,8 @@ class Device:
             True if successful, False otherwise.
         """
 
+        #TODO: if header doesn't look like Bittium read as EDF or add checks here
+
         file_path = Path(file_path)
 
         # check if file exists
