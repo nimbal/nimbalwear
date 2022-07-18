@@ -438,6 +438,8 @@ class Device:
             True if successful, False otherwise.
         """
 
+        #TODO: if header doesn't look like Bittium read as EDF or add checks here
+
         file_path = Path(file_path)
 
         # check if file exists
@@ -457,14 +459,20 @@ class Device:
         coll_id = patient_code[2] if len(patient_code) > 2 else ''
 
         # get serial id and device type
-        serial_id = in_file.header['equipment'].split('SER=', 1)[1].split('_', 1)[0]
-        device_type = in_file.header['equipment'].split('DEVTYPE=', 1)[1].split('_', 1)[0]
-        if device_type == 'Faros360':
-            device_type = 'BF36'
-        elif device_type == 'Faros180':
-            device_type = 'BF18'
+
+        if ('SER=' in in_file.header['equipment']) &  ('DEVTYPE=' in in_file.header['equipment']):
+            serial_id = in_file.header['equipment'].split('SER=', 1)[1].split('_', 1)[0]
+            device_type = in_file.header['equipment'].split('DEVTYPE=', 1)[1].split('_', 1)[0]
+            if device_type == 'Faros360':
+                device_type = 'BF36'
+            elif device_type == 'Faros180':
+                device_type = 'BF18'
+            else:
+                device_type = 'BFXX'
         else:
-            device_type = 'BFXX'
+            serial_id = ''
+            device_type = ''
+
 
         self.header = {'study_code': study_code,
                        'subject_id': subject_id,

@@ -32,7 +32,8 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
-v0.17.0
+v0.16.3
+- handle Bittium file import if header is imperfect
 - add sync search radius
 
 v0.16.2

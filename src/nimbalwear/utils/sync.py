@@ -115,11 +115,11 @@ def sync_devices(tgt_device, ref_device, sig_labels=('Accelerometer x', 'Acceler
 
                     obj_del.extend(range(round(abs(seg_start_idx) / seg_adjust_rate)))
                     obj_del.extend(
-                        [round(seg_adjust_rate * (j + 1)) for j in range(round(seg_end_idx / seg_adjust_rate))])
+                        [round(seg_adjust_rate * (j + 1)) - 1 for j in range(round(seg_end_idx / seg_adjust_rate))])
 
                 else:
 
-                    obj_del.extend([seg_start_idx + round(seg_adjust_rate * (j + 1))
+                    obj_del.extend([seg_start_idx + round(seg_adjust_rate * (j + 1)) - 1
                                     for j in range(int(seg_length / seg_adjust_rate))])
 
                 # delete data from each signal
@@ -188,7 +188,9 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
             mid_sync_tgt = int(mid_sync_ref * sample_gain - sample_offset)
             sample_radius = int(search_radius * tgt_freq)
             start_i = mid_sync_tgt - sample_radius
+            start_i = 0 if start_i < 0 else start_i
             end_i = mid_sync_tgt + sample_radius
+            end_i = len(tgt_accel[0]) - 1 if end_i >= len(tgt_accel[0]) else end_i
 
             tgt_accel_window = [a[start_i:end_i] for a in tgt_accel]
 
