@@ -540,6 +540,10 @@ class Pipeline:
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
+        sync_type = self.module_settings['sync']['type']
+        sync_at_config = self.module_settings['sync']['sync_at_config']
+        search_radius = self.module_settings['sync']['search_radius']
+
         if not coll.device_info.empty:
             ref_device_type = coll.device_info.iloc[0]['device_type']
             ref_device_location = coll.device_info.iloc[0]['device_location']
@@ -563,10 +567,6 @@ class Pipeline:
                 except ValueError:
                     ds_index = freq - 5
                 signal_ds = round(freq / (5 + ds_index))
-
-                sync_type = self.module_settings['sync']['type']
-                sync_at_config = self.module_settings['sync']['sync_at_config']
-                search_radius = self.module_settings['sync']['search_radius']
 
                 # check if synnc_at_config is true and give warning and set to false if config_ate after start_date
                 if sync_at_config:
