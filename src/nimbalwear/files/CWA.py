@@ -1,5 +1,6 @@
 #
 # CWA structure found at: https://github.com/digitalinteraction/openmovement/blob/master/Docs/ax3/cwa.h
+# https://github.com/digitalinteraction/openmovement/blob/master/Docs/ax3/ax3-technical.md
 
 # Code adapted from:
 # https://github.com/digitalinteraction/openmovement/blob/master/Software/AX3/cwa-convert/python/cwa_metadata.py

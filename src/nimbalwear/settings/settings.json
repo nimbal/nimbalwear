@@ -11,6 +11,8 @@
       "sync": "analytics/sync",
       "nonwear_bouts_standard": "analytics/nonwear/bouts_standard",
       "nonwear_bouts_cropped": "analytics/nonwear/bouts_cropped",
+      "nonwear_daily_standard": "analytics/nonwear/daily_standard",
+      "nonwear_daily_cropped": "analytics/nonwear/daily_cropped",
       "activity_epochs": "analytics/activity/epochs",
       "activity_bouts": "analytics/activity/bouts",
       "activity_daily": "analytics/activity/daily",
@@ -22,7 +24,7 @@
       "sleep_bouts": "analytics/sleep/bouts",
       "sleep_daily": "analytics/sleep/daily",
       "reports_collection": "reports/collection",
-      "reports_patient": "reports/patient"
+      "reports_feedback": "reports/feedback"
     },
     "stages": ["convert", "nonwear", "crop", "save_sensors", "gait", "sleep", "activity"],
     "sensors": {
@@ -93,7 +95,9 @@
       "save": true
     },
     "crop": {
-      "min_duration": 3,
+      "min_duration_start": 3,
+      "min_duration_end": 3,
+      "max_time_to_bof": 20,
       "max_time_to_eof": 20,
       "save": true
     },
@@ -113,6 +117,7 @@
           "type": "Fraysse"
         }
       ],
+      "sedentary_gait": true,
       "save": true
     },
     "sleep": {

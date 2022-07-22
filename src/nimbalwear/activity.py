@@ -33,8 +33,8 @@ def avm_cutpoints(cutpoint_type='Powell', dominant=False):
 
 
 def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_length=15, cutpoint='Powell',
-                       dominant=False,  nonwear=pd.DataFrame(), sptw=pd.DataFrame(), sleep_bouts=pd.DataFrame(),
-                       quiet=False):
+                       dominant=False, sedentary_gait=False, gait=pd.DataFrame(), nonwear=pd.DataFrame(),
+                       sptw=pd.DataFrame(), sleep_bouts=pd.DataFrame(), quiet=False):
 
     """
     Transforms Powell cutpoints to avm based on their 15 second epochs at 30 Hz, probably most
@@ -112,6 +112,15 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
         activity_epochs.loc[((activity_epochs['start_time'] < row['end_time'])
                              & (activity_epochs['end_time'] > row['start_time'])), 'intensity'] = 'none'
 
+    # set 'sedentary' intensity to 'sedentary_gait' during gait
+    if sedentary_gait:
+        for idx, row in gait.iterrows():
+            activity_epochs.loc[((activity_epochs['intensity'] == 'sedentary')
+                                 & (activity_epochs['start_time'] < row['end_time'])
+                                 & (activity_epochs['end_time'] > row['start_time'])), 'intensity'] = 'sedentary_gait'
+
+
+    # create bouts
     epoch_intensity = activity_epochs['intensity']
 
     bout_starts = [i for i in range(1, len(epoch_intensity))
@@ -173,7 +182,8 @@ def activity_stats(activity_epochs, type='daily', quiet=False):
         if not quiet:
             print("Summarizing daily activity...")
 
-        activity_stats = pd.DataFrame(columns=['day_num', 'date', 'none', 'sedentary', 'light', 'moderate', 'vigorous'])
+        activity_stats = pd.DataFrame(columns=['day_num', 'date', 'none', 'sedentary', 'sedentary_gait', 'light',
+                                               'moderate', 'vigorous'])
 
 
         new_epochs = []
@@ -196,13 +206,14 @@ def activity_stats(activity_epochs, type='daily', quiet=False):
 
         for date, date_group in activity_epochs.groupby('date'):
 
-            counts = {'none': 0, 'sedentary': 0, 'light': 0, 'moderate': 0, 'vigorous': 0}
+            counts = {'none': 0, 'sedentary': 0, 'sedentary_gait': 0, 'light': 0, 'moderate': 0, 'vigorous': 0}
 
             for intensity, intensity_group in date_group.groupby('intensity'):
                 counts[intensity] = round(sum(intensity_group['duration']) / 60, 2)
 
-            day_activity_stats = pd.DataFrame([[day_num, date, counts['none'], counts['sedentary'], counts['light'],
-                                            counts['moderate'], counts['vigorous']]], columns=activity_stats.columns)
+            day_activity_stats = pd.DataFrame([[day_num, date, counts['none'], counts['sedentary'],
+                                                counts['sedentary_gait'],counts['light'], counts['moderate'],
+                                                counts['vigorous']]], columns=activity_stats.columns)
 
             activity_stats = pd.concat([activity_stats, day_activity_stats], ignore_index=True)
 

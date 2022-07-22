@@ -16,7 +16,7 @@ The following code is based on the following Algorithm described in a paper: van
 
 """
 import math
-import datetime as dt
+from datetime import datetime, timedelta, time
 
 import numpy as np
 import pandas as pd
@@ -68,8 +68,9 @@ def z_angle_change(x_values, y_values, z_values, epoch_samples):
 
     return z_angle, z_angle_change
 
-def detect_sptw(x_values, y_values, z_values, sample_rate, start_datetime, nonwear=None, day_offset=12, raw_epoch_length=5,
-                 z_epoch_length=300, min_wear_hours=3, min_sptw_length=30, max_gap_time=60, z_per_threshold=10):
+def detect_sptw(x_values, y_values, z_values, sample_rate, start_datetime, nonwear=None, day_offset=12,
+                raw_epoch_length=5,  z_epoch_length=300, min_wear_hours=3, min_sptw_length=30, max_gap_time=60,
+                z_per_threshold=10, overnight_start=22, overnight_end=8):
     '''
 
     Uses Heuristic algorithm looking at Distribution of Change in Z-Angle (HDCZA) to detect sleep period time
@@ -149,11 +150,11 @@ def detect_sptw(x_values, y_values, z_values, sample_rate, start_datetime, nonwe
     ################################################################
 
     # calculate day start sample indices
-    first_day_start = dt.datetime.combine(start_datetime - dt.timedelta(hours=day_offset), dt.time.min) \
-                      + dt.timedelta(hours=day_offset)
+    first_day_start = datetime.combine(start_datetime - timedelta(hours=day_offset), time.min) \
+                      + timedelta(hours=day_offset)
     days = ((z_num_samples / z_sample_rate) + (start_datetime - first_day_start).total_seconds()) / (60 * 60 * 24)
 
-    day_start_times = [first_day_start + dt.timedelta(days=x) for x in range(math.ceil(days))]
+    day_start_times = [first_day_start + timedelta(days=x) for x in range(math.ceil(days))]
     day_start_times[0] = start_datetime
 
     day_start_indices = [round((day_start_time - start_datetime).total_seconds() * z_sample_rate) for day_start_time
@@ -233,16 +234,16 @@ def detect_sptw(x_values, y_values, z_values, sample_rate, start_datetime, nonwe
                     del sptw_candidates[0][j]
                     del sptw_candidates[1][j - 1]
 
-                sptw_start_time.extend([start_datetime + dt.timedelta(seconds=((start_index + j) * raw_epoch_length))
+                sptw_start_time.extend([start_datetime + timedelta(seconds=((start_index + j) * raw_epoch_length))
                                         for j in sptw_candidates[0]])
-                sptw_end_time.extend([start_datetime + dt.timedelta(seconds=((start_index + j) * raw_epoch_length))
+                sptw_end_time.extend([start_datetime + timedelta(seconds=((start_index + j) * raw_epoch_length))
                                       for j in sptw_candidates[1]])
 
     ##########################
     # Format data for return
     ##########################
 
-    sptw_date = [(x - dt.timedelta(hours=day_offset)).date()for x in sptw_start_time]
+    sptw_date = [(x - timedelta(hours=day_offset)).date() for x in sptw_start_time]
 
     sptw = {'sptw_num': list(range(1, len(sptw_start_time) + 1)),
             'relative_date': sptw_date,
@@ -251,10 +252,17 @@ def detect_sptw(x_values, y_values, z_values, sample_rate, start_datetime, nonwe
 
     sptw = pd.DataFrame.from_dict(sptw)
 
+    # classify overnight based on overnight times
+    sptw['overnight'] = ((sptw['start_time'] < (pd.to_datetime(sptw['relative_date']) + timedelta(days=1, hours=overnight_end)))
+                         & (sptw['end_time'] > (pd.to_datetime(sptw['relative_date']) + timedelta(hours=overnight_start))))
+
+
+
     return sptw, z_angle, z_angle_diff, z_sample_rate
 
 
-def detect_sleep_bouts(z_angle_diff, sptw, z_sample_rate, start_datetime, raw_epoch_length=5, z_abs_threshold=5, min_sleep_length=5):
+def detect_sleep_bouts(z_angle_diff, sptw, z_sample_rate, start_datetime, raw_epoch_length=5, z_abs_threshold=5,
+                       min_sleep_length=5):
     '''
 
     Args:
@@ -317,9 +325,9 @@ def detect_sleep_bouts(z_angle_diff, sptw, z_sample_rate, start_datetime, raw_ep
             sleep_candidates = np.delete(sleep_candidates, sleep_del, 0).T.tolist()
 
             sleep_sptw_num.extend([sptw['sptw_num'][i]] * len(sleep_candidates[0]))
-            sleep_start_time.extend([start_datetime + dt.timedelta(seconds=((start_index + j) * raw_epoch_length))
+            sleep_start_time.extend([start_datetime + timedelta(seconds=((start_index + j) * raw_epoch_length))
                                      for j in sleep_candidates[0]])
-            sleep_end_time.extend([start_datetime + dt.timedelta(seconds=((start_index + j) * raw_epoch_length))
+            sleep_end_time.extend([start_datetime + timedelta(seconds=((start_index + j) * raw_epoch_length))
                                    for j in sleep_candidates[1]])
 
     sleep_bouts = {'sleep_bout_num': list(range(1, len(sleep_start_time) + 1)),
@@ -328,6 +336,10 @@ def detect_sleep_bouts(z_angle_diff, sptw, z_sample_rate, start_datetime, raw_ep
                    'end_time': sleep_end_time}
 
     sleep_bouts = pd.DataFrame.from_dict(sleep_bouts)
+
+    # classify sleep bouts as overnight if in overnight sptw
+    sleep_bouts['overnight'] = [sptw['overnight'][sptw['sptw_num'] == row['sptw_num']].item()
+                                for idx, row in sleep_bouts.iterrows()]
 
     return sleep_bouts
 
@@ -358,9 +370,11 @@ def sptw_stats(sptw, sleep_bouts, type='daily', sptw_inc='long'):
     Args:
         sptw:
         sleep_bouts:
-        type:           'all', 'daily'
+        type:           'sptw', 'daily'
         sptw_inc:       types of sptw to include in daily summary ('long' = longest sptw, 'all' = all sptws, 'sleep' =
-                        all sptws that contain sleep bouts) (can specify multiple in a list to run multiple summaries)
+                        all sptws that contain sleep bouts, 'overnight' = all overnight sptws, 'overnight_sleep' = all
+                        overnight sptws that contain sleep bouts) (can specify multiple in a list to run multiple
+                        summaries)
 
     Returns:
 
@@ -404,7 +418,10 @@ def sptw_stats(sptw, sleep_bouts, type='daily', sptw_inc='long'):
                 sptw_day = sptw.loc[sptw['relative_date'] == date]
 
                 # get longest sptw if 'daily_long' type is selected
-                sptw_day = sptw_day.iloc[[sptw_day['duration'].argmax()]] if s == 'long' else sptw_day
+                if s == 'long':
+                    sptw_day = sptw_day.iloc[[sptw_day['duration'].argmax()]]
+                elif s in ['overnight', 'overnight_sleep']:
+                    sptw_day = sptw_day.loc[sptw['overnight'] == True]
 
                 for i, sptw_cur in sptw_day.iterrows():
 
@@ -428,7 +445,7 @@ def sptw_stats(sptw, sleep_bouts, type='daily', sptw_inc='long'):
                     else:
 
                         # if sptw_type is long or all then add sptw duration
-                        if s in ['long', 'all']:
+                        if s in ['long', 'all', 'overnight']:
 
                             # get sptw duration
                             total_sptw_duration += sptw_cur['duration']
@@ -446,7 +463,7 @@ def sptw_stats(sptw, sleep_bouts, type='daily', sptw_inc='long'):
 
                 day_num += 1
 
-    elif type == 'all':
+    elif type == 'sptw':
 
         sleep_stats = pd.DataFrame(columns=['sptw_num', 'start_time', 'end_time', 'type', 'sptw_duration',
                                             'sleep_duration', 'sleep_to_wake_duration', 'se', 'waso'])

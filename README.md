@@ -32,6 +32,13 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.17.0
+- rename "feedback report"
+- add daily non-wear summary
+- crop non-wear from start of collection
+- separate sedentary detected from wrist data while walking from other sedentary
+- option to classify sptw and sleep bouts as 'overnight'
+
 v0.16.3
 - handle Bittium file import if header is imperfect
 - add sync search radius

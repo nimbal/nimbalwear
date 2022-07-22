@@ -717,6 +717,8 @@ class Device:
                        'device_location': body_location,
                        'recording_additional': ''}
 
+        #TODO: these physical min and max values will not work if signal not in file - needs to be fixed
+
         # update signal headers to match nwdata
         new_signal_headers = {'gx': {'label': "Gyroscope x",
                                      'transducer': "MEMS",
