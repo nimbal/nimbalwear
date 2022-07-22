@@ -93,6 +93,8 @@ class Pipeline:
                 p = value / f'{key}_dict.csv'
                 df.to_csv(p, index=False)
 
+        return
+
     def coll_status(f):
         @wraps(f)
         def coll_status_wrapper(self, *args, **kwargs):
@@ -225,6 +227,8 @@ class Pipeline:
 
             message("---- End ----------------------------------------------\n", level='info', display=(not self.quiet),
                     log=self.log, logger_name=self.log_name)
+
+        return
 
     def process_collection(self, coll, single_stage=None):
 
