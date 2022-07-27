@@ -1206,7 +1206,7 @@ class Pipeline:
             message("Summarizing daily gait analytics...", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
 
-            coll.gait_daily = wb.daily_gait(coll.gait_bouts)
+            coll.gait_daily = gait_stats(coll.gait_bouts)
             coll.gait_daily = self.identify_df(coll, coll.gait_daily)
 
             # adjusting gait parameters
