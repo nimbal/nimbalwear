@@ -708,7 +708,7 @@ class WalkingBouts():
         steps_df = steps_df.sort_values(by=['step_index'], ignore_index=True)
 
         # assumes Hz are the same
-        bout_dict = {'start': [], 'end': [], 'number_steps': [], 'start_timestamp': [], 'end_timestamp': []}
+        bout_dict = {'start': [], 'end': [], 'number_steps': [], 'start_time': [], 'end_time': []}
         if steps_df.empty:
             return pd.DataFrame(bout_dict)
         start_step = steps_df.iloc[0]  # start of bout step
@@ -734,8 +734,8 @@ class WalkingBouts():
                     bout_dict['start'].append(start_ind)
                     bout_dict['end'].append(end_ind)
                     bout_dict['number_steps'].append(step_count)
-                    bout_dict['start_timestamp'].append(start_step['timestamp'])
-                    bout_dict['end_timestamp'].append(
+                    bout_dict['start_time'].append(start_step['timestamp'])
+                    bout_dict['end_time'].append(
                         curr_step['timestamp'] + pd.Timedelta(curr_step['step_length'] / freq, unit='sec'))
 
                 # resets state and creates new bout
@@ -751,11 +751,11 @@ class WalkingBouts():
     @staticmethod
     def find_overlapping_times(left_bouts, right_bouts):
         # merge based on step index
-        export_dict = {'start': [], 'end': [], 'number_steps': [], 'start_timestamp': [], 'end_timestamp': []}
+        export_dict = {'start': [], 'end': [], 'number_steps': [], 'start_time': [], 'end_time': []}
         all_bouts = pd.concat([left_bouts, right_bouts])
-        all_bouts = all_bouts.sort_values(by=['start_timestamp'], ignore_index=True)
-        all_bouts['overlaps'] = (all_bouts['start_timestamp'] < all_bouts['end_timestamp'].shift()) & (
-                    all_bouts['start_timestamp'].shift() < all_bouts['end_timestamp'])
+        all_bouts = all_bouts.sort_values(by=['start_time'], ignore_index=True)
+        all_bouts['overlaps'] = (all_bouts['start_time'] < all_bouts['end_time'].shift()) & (
+                    all_bouts['start_time'].shift() < all_bouts['end_time'])
         all_bouts['intersect_id'] = (((all_bouts['overlaps'].shift(-1) == True) & (all_bouts['overlaps'] == False)) |
                                      ((all_bouts['overlaps'].shift() == True) & (
                                                  all_bouts['overlaps'] == False))).cumsum()
@@ -767,19 +767,19 @@ class WalkingBouts():
                     export_dict['start'].append(row['start'])
                     export_dict['end'].append(row['end'])
                     export_dict['number_steps'].append(row['number_steps'])
-                    export_dict['start_timestamp'].append(row['start_timestamp'])
-                    export_dict['end_timestamp'].append(row['end_timestamp'])
+                    export_dict['start_time'].append(row['start_time'])
+                    export_dict['end_time'].append(row['end_time'])
             else:
                 export_dict['start'].append(intersect['start'].min())
                 export_dict['end'].append(intersect['end'].max())
                 export_dict['number_steps'].append(intersect['number_steps'].sum())
-                export_dict['start_timestamp'].append(intersect['start_timestamp'].min())
-                export_dict['end_timestamp'].append(intersect['end_timestamp'].max())
+                export_dict['start_time'].append(intersect['start_time'].min())
+                export_dict['end_time'].append(intersect['end_time'].max())
 
         df = pd.DataFrame(export_dict)
-        df = df.sort_values(by=['start_timestamp'], ignore_index=True)
-        df['overlaps'] = (df['start_timestamp'] < df['end_timestamp'].shift()) & (
-                    df['start_timestamp'].shift() < df['end_timestamp'])
+        df = df.sort_values(by=['start_time'], ignore_index=True)
+        df['overlaps'] = (df['start_time'] < df['end_time'].shift()) & (
+                    df['start_time'].shift() < df['end_time'])
 
         # if there are no overlaps
         if not df['overlaps'].any():
@@ -811,7 +811,7 @@ class WalkingBouts():
         steps_df = steps_df.sort_values(by=['step_index'], ignore_index=True)
 
         # assumes Hz are the same
-        bout_dict = {'start': [], 'end': [], 'bilateral_steps': [], 'start_timestamp': [], 'end_timestamp': []}
+        bout_dict = {'start': [], 'end': [], 'bilateral_steps': [], 'start_time': [], 'end_time': []}
         if steps_df.empty:
             return pd.DataFrame(bout_dict)
         start_step = steps_df.iloc[0]  # start of bout step
@@ -845,8 +845,8 @@ class WalkingBouts():
                     bout_dict['end'].append(end_ind)
                     bout_dict['number_steps'].append(step_count)
                     bout_dict['bilateral_steps'].append(bilateral_count)
-                    bout_dict['start_timestamp'].append(start_step['timestamp'])
-                    bout_dict['end_timestamp'].append(
+                    bout_dict['start_time'].append(start_step['timestamp'])
+                    bout_dict['end_time'].append(
                         curr_step['timestamp'] + pd.Timedelta(curr_step['step_length'] / freq, unit='sec'))
 
                 bilateral_count = 0
@@ -895,8 +895,8 @@ class WalkingBouts():
     def export_steps(self):
         bout_steps = []
         for i, row in self.bout_num_df.iterrows():
-            start = row['start_timestamp'] - pd.Timedelta(1, unit='sec')
-            end = row['end_timestamp'] + pd.Timedelta(1, unit='sec')
+            start = row['start_time'] - pd.Timedelta(1, unit='sec')
+            end = row['end_time'] + pd.Timedelta(1, unit='sec')
 
             left_bout_step_df = self.left_step_df.loc[
                 (self.left_step_df['step_time'] > start) & (self.left_step_df['step_time'] < end)]
@@ -1032,12 +1032,12 @@ class WalkingBouts():
         summary = pd.DataFrame({
             'name': name,
             'gait_bout_num': self.bout_num_df.index + 1,
-            'start_timestamp': self.bout_num_df['start_timestamp'],
-            'end_timestamp': self.bout_num_df['end_timestamp'],
+            'start_time': self.bout_num_df['start_time'],
+            'end_time': self.bout_num_df['end_time'],
             'start_dp': self.bout_num_df['start'],
             'end_dp': self.bout_num_df['end'],
             'bout_length_dp': self.bout_num_df['end'] - self.bout_num_df['start'],
-            'bout_length_sec': [(row['end_timestamp'] - row['start_timestamp']).total_seconds() for i, row in
+            'bout_length_sec': [(row['end_time'] - row['start_time']).total_seconds() for i, row in
                                 self.bout_num_df.iterrows()],
             'number_steps': self.bout_num_df['number_steps']
         })
@@ -1084,7 +1084,7 @@ class WalkingBouts():
 
     @staticmethod
     def daily_gait(bout_times):
-        bout_times['date'] = pd.to_datetime(bout_times['start_timestamp']).dt.date
+        bout_times['date'] = pd.to_datetime(bout_times['start_time']).dt.date
         daily_gait_dict = {
             'date': [],
             'longest_bout_length_secs': [],
@@ -1114,15 +1114,15 @@ def get_signals(data, index_dict, gyro_axis='z', acc_axis='x', start_index=0, st
     return gyro, acc
 
 
-def create_timestamps(data_start_time, data_len, fs, start_timestamp=None, end_timestamp=None):
+def create_timestamps(data_start_time, data_len, fs, start_time=None, end_time=None):
 
-    start_timestamp = data_start_time if start_timestamp is None else start_timestamp
-    end_timestamp = data_start_time + timedelta(seconds=(data_len / fs)) if end_timestamp is None else end_timestamp
+    start_time = data_start_time if start_time is None else start_time
+    end_time = data_start_time + timedelta(seconds=(data_len / fs)) if end_time is None else end_time
 
-    indexes = [int((start_timestamp - data_start_time).total_seconds() * fs),
-               int((end_timestamp - data_start_time).total_seconds() * fs)]
+    indexes = [int((start_time - data_start_time).total_seconds() * fs),
+               int((end_time - data_start_time).total_seconds() * fs)]
     length = indexes[1]-indexes[0]
-    timestamps = pd.date_range(start=start_timestamp, periods=length, freq=f'{1/fs}S')
+    timestamps = pd.date_range(start=start_time, periods=length, freq=f'{1/fs}S')
 
     return timestamps, indexes
 
