@@ -1039,7 +1039,7 @@ class WalkingBouts():
             'bout_length_dp': self.bout_num_df['end'] - self.bout_num_df['start'],
             'bout_length_sec': [(row['end_time'] - row['start_time']).total_seconds() for i, row in
                                 self.bout_num_df.iterrows()],
-            'number_steps': self.bout_num_df['number_steps']
+            'step_count': self.bout_num_df['number_steps']
         })
         if self.left_states.shape == self.right_states.shape:
             states = self.left_states + self.right_states
@@ -1445,11 +1445,11 @@ def get_gait_bouts(data, sample_freq,  timestamps, break_sec=2, bout_steps=3, st
 
 def gait_stats(bouts, type='daily', single_leg=False):
 
-    bouts['date'] = pd.to_datetime(bouts['Start_time']).dt.date
-    bouts['duration'] = [round((x['End_time'] - x['Start_time']).total_seconds()) for i, x in bouts.iterrows()]
+    bouts['date'] = pd.to_datetime(bouts['start_time']).dt.date
+    bouts['duration'] = [round((x['end_time'] - x['start_time']).total_seconds()) for i, x in bouts.iterrows()]
 
     # if only steps from one leg then double step counts
-    bouts['Step_count'] = bouts['Step_count'] * 2 if single_leg else bouts['Step_count']
+    bouts['step_count'] = bouts['step_count'] * 2 if single_leg else bouts['step_count']
 
     if type == 'daily':
 
@@ -1461,9 +1461,9 @@ def gait_stats(bouts, type='daily', single_leg=False):
         for date, group_df in bouts.groupby('date'):
 
             day_gait_stats = pd.DataFrame([[day_num, date, type, group_df['duration'].max(),
-                                        round(group_df['Step_count'].max()),
+                                        round(group_df['step_count'].max()),
                                         group_df.loc[group_df['duration'] > 180].shape[0],
-                                        round(group_df['Step_count'].sum())]], columns=gait_stats.columns)
+                                        round(group_df['step_count'].sum())]], columns=gait_stats.columns)
 
             gait_stats = pd.concat([gait_stats, day_gait_stats], ignore_index=True)
 

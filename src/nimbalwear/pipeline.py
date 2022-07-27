@@ -1210,10 +1210,9 @@ class Pipeline:
             coll.gait_daily = self.identify_df(coll, coll.gait_daily)
 
             # adjusting gait parameters
-            coll.gait_bouts.rename(columns={'number_steps': 'step_count',
-                                                 'start_dp': 'start_idx',
-                                                 'end_dp': 'end_idx'},
-                                        inplace=True)
+            coll.gait_bouts.rename(columns={'start_dp': 'start_idx',
+                                            'end_dp': 'end_idx'},
+                                    inplace=True)
 
             coll.gait_step_times.rename(columns={'step_index': 'step_idx'}, inplace=True)
 
@@ -1234,12 +1233,12 @@ class Pipeline:
             # creating timestamps && timestamp info if needed-----
             # start_stamp = file.header["start_datetime"]
             times, idxs = create_timestamps(data_start_time=coll.devices[device_idx].header["start_datetime"],
-                                                   data_len=len(coll.devices[device_idx].signals[gyro_z_idx]),
-                                                   fs=coll.devices[device_idx].signal_headers[gyro_z_idx]['sample_rate'])
+                                            data_len=len(coll.devices[device_idx].signals[gyro_z_idx]),
+                                            fs=coll.devices[device_idx].signal_headers[gyro_z_idx]['sample_rate'])
 
             sgp = get_gait_bouts(data=coll.devices[device_idx].signals[gyro_z_idx],
-                                        sample_freq=coll.devices[device_idx].signal_headers[gyro_z_idx]['sample_rate'],
-                                        timestamps=times, break_sec=2, bout_steps=3, start_ind=idxs[0], end_ind=idxs[1])
+                                 sample_freq=coll.devices[device_idx].signal_headers[gyro_z_idx]['sample_rate'],
+                                 timestamps=times, break_sec=2, bout_steps=3, start_ind=idxs[0], end_ind=idxs[1])
 
             coll.gait_step_times, coll.gait_bouts, peak_heights = sgp
 
@@ -1260,9 +1259,6 @@ class Pipeline:
             message("Summarizing daily gait analytics...", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
 
-            coll.gait_daily = gait_stats(coll.gait_bouts, single_leg=True)
-            coll.gait_daily = self.identify_df(coll, coll.gait_daily)
-
             # adjusting gait parameters
             coll.gait_bouts.rename(columns={'Bout_number': 'gait_bout_num',
                                                  'Step_count': 'step_count',
@@ -1277,6 +1273,11 @@ class Pipeline:
                                                  'Bout_number': 'gait_bout_num',
                                                  'Peak_times': 'step_time'},
                                         inplace=True)
+
+            coll.gait_daily = gait_stats(coll.gait_bouts, single_leg=True)
+            coll.gait_daily = self.identify_df(coll, coll.gait_daily)
+
+
 
 
         else:
