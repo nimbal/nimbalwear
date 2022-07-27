@@ -32,6 +32,9 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.17.2
+- accel step detection uses gait_stats for summary
+
 v0.17.1
 - rename start_timestamp and end_timestamp to start_time and end_time in gait
 
