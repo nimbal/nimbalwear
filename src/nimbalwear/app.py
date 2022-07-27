@@ -3,7 +3,7 @@ from threading import Thread
 
 from flask import Flask, render_template, request, redirect, url_for
 
-from .version import __version__
+from .__version__ import __version__
 from .pipeline import Pipeline
 
 PIPELINE_ROOT = Path("W:/NiMBaLWEAR")

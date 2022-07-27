@@ -19,7 +19,7 @@ from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
 from .gait import AccelReader, WalkingBouts, get_gait_bouts, create_timestamps, gait_stats
 from .activity import activity_wrist_avm, activity_stats
 
-from .version import __version__
+from .__version__ import __version__
 
 
 class Pipeline:
