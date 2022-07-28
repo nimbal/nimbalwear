@@ -1579,7 +1579,7 @@ class Pipeline:
                                                 (coll.nonwear_bouts['device_location'] ==
                                                  coll.device_info.iloc[activity_device_index]['device_location'])]
 
-        sptw = coll.sptw.loc[coll.sptw['bout_detect'] == 't8a4']
+        sptw = coll.sptw
         sleep_bouts =  coll.sleep_bouts.loc[coll.sleep_bouts['bout_detect'] == 't8a4']
 
         e, b, avm, vm, avm_sec = activity_wrist_avm(x=coll.devices[activity_device_index].signals[accel_x_sig],
@@ -1589,8 +1589,8 @@ class Pipeline:
                                                     start_datetime=coll.devices[activity_device_index].header['start_datetime'],
                                                     lowpass=lowpass, epoch_length=epoch_length, cutpoint=cutpoint,
                                                     dominant=dominant, sedentary_gait=sedentary_gait,
-                                                    gait=coll.gait_bouts, nonwear=device_nonwear, sptw=coll.sptw,
-                                                    sleep_bouts=coll.sleep_bouts, quiet=quiet)
+                                                    gait=coll.gait_bouts, nonwear=device_nonwear, sptw=sptw,
+                                                    sleep_bouts=sleep_bouts, quiet=quiet)
 
         coll.activity_epochs = e
         coll.activity_bouts = b
