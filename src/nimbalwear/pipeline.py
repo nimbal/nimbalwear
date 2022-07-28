@@ -1579,6 +1579,9 @@ class Pipeline:
                                                 (coll.nonwear_bouts['device_location'] ==
                                                  coll.device_info.iloc[activity_device_index]['device_location'])]
 
+        sptw = coll.sptw.loc[coll.sptw['bout_detect'] == 't8a4']
+        sleep_bouts =  coll.sleep_bouts.loc[coll.sleep_bouts['bout_detect'] == 't8a4']
+
         e, b, avm, vm, avm_sec = activity_wrist_avm(x=coll.devices[activity_device_index].signals[accel_x_sig],
                                                     y=coll.devices[activity_device_index].signals[accel_y_sig],
                                                     z=coll.devices[activity_device_index].signals[accel_z_sig],
