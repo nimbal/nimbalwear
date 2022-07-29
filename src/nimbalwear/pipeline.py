@@ -1014,8 +1014,8 @@ class Pipeline:
                 #     crop_end = ((last_nonwear_duration >= dt.timedelta(minutes=min_duration_end)) &
                 #                     (last_nonwear_time_to_eof <= dt.timedelta(minutes=max_time_to_eof)))
 
-                    new_start_time = device_bouts['start_time'][0]
-                    new_end_time = device_bouts['end_time'][-1]
+                    new_start_time = device_bouts.iloc[0, 'start_time']
+                    new_end_time = device_bouts.iloc[-1, 'end_time']
 
                     start_crop_duration = new_start_time - start_time
 
