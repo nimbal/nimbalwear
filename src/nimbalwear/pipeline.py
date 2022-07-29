@@ -927,7 +927,7 @@ class Pipeline:
         max_time_to_eof = self.module_settings['crop']['max_time_to_eof']
         save = self.module_settings['crop']['save']
 
-        nonwear_bouts = coll.nonwear_bouts
+        nonwear_bouts_keep = coll.nonwear_bouts
 
         coll.daily_nonwear = pd.DataFrame(columns=['study_code', 'subject_id', 'coll_id', 'device_type',
                                                    'device_location', 'day_num', 'date', 'wear', 'nonwear'])
@@ -953,16 +953,17 @@ class Pipeline:
                 continue
 
             # if there is nonwear data for any devices in this collection
-            if not nonwear_bouts.empty:
+            if not nonwear_bouts_keep.empty:
 
                 daily_nonwear = pd.DataFrame(columns=['day_num', 'date', 'wear', 'nonwear'])
 
                 # get nonwear indices for current device
-                nonwear_idx = nonwear_bouts.index[(nonwear_bouts['study_code'] == study_code) &
-                                                       (nonwear_bouts['subject_id'] == subject_id) &
-                                                       (nonwear_bouts['coll_id'] == coll_id) &
-                                                       (nonwear_bouts['device_type'] == device_type) &
-                                                       (nonwear_bouts['device_location'] == device_location)]
+                nonwear_idx = nonwear_bouts_keep.index[(nonwear_bouts_keep['study_code'] == study_code) &
+                                                       (nonwear_bouts_keep['subject_id'] == subject_id) &
+                                                       (nonwear_bouts_keep['coll_id'] == coll_id) &
+                                                       (nonwear_bouts_keep['device_type'] == device_type) &
+                                                       (nonwear_bouts_keep['device_location'] == device_location) &
+                                                       (nonwear_bouts_keep['event'] == 'nonwear')]
                 nonwear_idx = nonwear_idx.tolist()
 
                 # if there is nonwear data for current device
@@ -970,16 +971,16 @@ class Pipeline:
 
                     # get first nonwear period for current device
                     first_nonwear_idx = nonwear_idx[0]
-                    first_nonwear = coll.nonwear_bouts.loc[first_nonwear_idx]
+                    first_nonwear = nonwear_bouts_keep.loc[first_nonwear_idx]
 
                     # get last nonwear period for current device
                     last_nonwear_idx = nonwear_idx[-1]
-                    last_nonwear = coll.nonwear_bouts.loc[last_nonwear_idx]
+                    last_nonwear = nonwear_bouts_keep.loc[last_nonwear_idx]
 
                     # get time info from device data
-                    start_time = coll.devices[index].header['start_datetime']
-                    samples = len(coll.devices[index].signals[0])
-                    sample_rate = coll.devices[index].signal_headers[0]['sample_rate']
+                    start_time = device.header['start_datetime']
+                    samples = len(device.signals[0])
+                    sample_rate = device.signal_headers[0]['sample_rate']
                     duration = dt.timedelta(seconds=samples / sample_rate)
                     end_time = start_time + duration
 
@@ -1014,7 +1015,7 @@ class Pipeline:
                                 level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
                         # remove last non-wear from data frame
-                        coll.nonwear_bouts.drop(index=first_nonwear_idx, inplace=True)
+                        nonwear_bouts_keep.drop(index=first_nonwear_idx, inplace=True)
 
                     else:
 
@@ -1034,23 +1035,22 @@ class Pipeline:
                                 level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
                         # remove last non-wear from data frame
-                        coll.nonwear_bouts.drop(index=last_nonwear_idx, inplace=True)
+                        nonwear_bouts_keep.drop(index=last_nonwear_idx, inplace=True)
 
                     else:
 
                         message(f"No final nonwear cropped for {device_type} {device_location}", level='info',
                                 display=(not quiet), log=log, logger_name=self.log_name)
 
-                    coll.devices[index].crop(new_start_time, new_end_time, inplace=True)
+                    device.crop(new_start_time, new_end_time, inplace=True)
 
                     # recalculate nonwear summary
-                    nonwear_bouts =  coll.nonwear_bouts[coll.nonwear_bouts.index.isin(nonwear_idx)]
+                    nonwear_bouts =  nonwear_bouts_keep[nonwear_bouts_keep.index.isin(nonwear_idx)]
                     nonwear_bouts = nonwear_bouts.drop(columns=['study_code', 'subject_id', 'coll_id', 'device_type',
                                                                 'device_location'])
-                    daily_nonwear = nonwear_stats(nonwear_bouts, coll_start=new_start_time, coll_end=new_end_time,
-                                                  quiet=quiet)
+                    daily_nonwear = nonwear_stats(nonwear_bouts, quiet=quiet)
 
-
+                    coll.nonwear_bouts = nonwear_bouts_keep
 
 
                 else:
@@ -1093,7 +1093,7 @@ class Pipeline:
                 # write cropped device data as edf
                 message(f"Saving {cropped_device_path}", level='info', display=(not quiet), log=log,
                         logger_name=self.log_name)
-                coll.devices[index].export_edf(file_path=cropped_device_path, quiet=quiet)
+                device.export_edf(file_path=cropped_device_path, quiet=quiet)
 
                 if not coll.nonwear_bouts.empty:
 
