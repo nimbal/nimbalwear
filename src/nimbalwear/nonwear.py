@@ -315,8 +315,7 @@ def nonwear_stats(nonwear_bouts, sum_type='daily', quiet=False):
 
     # create date and duration columns
     nonwear_bouts['date'] = pd.to_datetime(nonwear_bouts['start_time']).dt.date
-    nonwear_bouts['duration'] = [round((x['end_time'] - x['start_time']).total_seconds())
-                                 for i, x in nonwear_bouts.iterrows()]
+    nonwear_bouts['duration'] = (nonwear_bouts['end_time'] - nonwear_bouts['start_time']).dt.total_seconds().round()
 
     nonwear_stats = None
 
@@ -399,7 +398,7 @@ def nonwear_stats(nonwear_bouts, sum_type='daily', quiet=False):
             counts = {'wear': 0, 'nonwear': 0, }
 
             for event, event_group in date_group.groupby('event'):
-                counts[event] = round(sum(event_group['duration']) / 60, 2)
+                counts[event] = sum(event_group['duration'])
 
             day_nonwear_stats = pd.DataFrame([[day_num, date, counts['wear'], counts['nonwear'],]],
                                              columns=nonwear_stats.columns)

@@ -929,7 +929,7 @@ class Pipeline:
         save = self.module_settings['crop']['save']
 
         nonwear_bouts = coll.nonwear_bouts.copy()
-        nonwear_bouts['duration'] = round((nonwear_bouts['end_time'] - nonwear_bouts['start_time']).total_seconds() / 60)
+        nonwear_bouts['duration'] = ((nonwear_bouts['end_time'] - nonwear_bouts['start_time']).dt.total_seconds() / 60).round()
 
         coll.daily_nonwear = pd.DataFrame(columns=['study_code', 'subject_id', 'coll_id', 'device_type',
                                                    'device_location', 'day_num', 'date', 'wear', 'nonwear'])
