@@ -807,7 +807,7 @@ class Pipeline:
             nonwear_bouts = pd.concat([nonwear_bouts, wear_bouts], ignore_index=True)
             nonwear_bouts = nonwear_bouts.sort_values('start_time')
 
-            nonwear_bouts['id'] = range(1, nonwear_bouts.shape[0] + 1)
+            nonwear_bouts.insert(loc=0, column='id', value=range(1, nonwear_bouts.shape[0] + 1))
             daily_nonwear = nonwear_stats(nonwear_bouts, quiet=quiet)
 
             # add identifiers
