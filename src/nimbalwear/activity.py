@@ -163,6 +163,9 @@ def sum_total_activity(epoch_intensity, epoch_length, quiet=False):
 
 
 def activity_stats(activity_epochs, type='daily', quiet=False):
+
+    #TODO: make generic event stats (activity_stats and nonwear stats identical)
+
     """Calculates summary for each date in collection.
 
     Includes all epochs that start in that day for that day.

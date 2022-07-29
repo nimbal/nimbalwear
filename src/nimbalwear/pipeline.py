@@ -695,17 +695,21 @@ class Pipeline:
         coll.daily_nonwear = pd.DataFrame()
 
         # detect nonwear for each device
-        for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
+        for i, r in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
                                desc='Detecting non-wear'):
 
             # get info from device list
-            study_code = row['study_code']
-            subject_id = row['subject_id']
-            coll_id = row['coll_id']
-            device_type = row['device_type']
-            device_location = row['device_location']
+            study_code = r['study_code']
+            subject_id = r['subject_id']
+            coll_id = r['coll_id']
+            device_type = r['device_type']
+            device_location = r['device_location']
+
+            device = coll.devices[i]
 
             # TODO: Add nonwear detection for other devices
+            # TODO: add wear bouts
+            # TODO: rename from nonwear to wear
 
             if device_type not in ['AXV6', 'GNOR']:
                 message(f"Cannot detect non-wear for {device_type}_{device_location}",
@@ -714,36 +718,42 @@ class Pipeline:
                 continue
 
             # check for data loaded
-            if coll.devices[index] is None:
+            if device is None:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No device data",
                         level='warning', display=(not quiet), log=log, logger_name=self.log_name)
                 message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
                 continue
 
-            accel_x_sig = coll.devices[index].get_signal_index('Accelerometer x')
-            accel_y_sig = coll.devices[index].get_signal_index('Accelerometer y')
-            accel_z_sig = coll.devices[index].get_signal_index('Accelerometer z')
-            temperature_sig = coll.devices[index].get_signal_index('Temperature')
+            accel_x_idx = device.get_signal_index('Accelerometer x')
+            accel_y_idx = device.get_signal_index('Accelerometer y')
+            accel_z_idx = device.get_signal_index('Accelerometer z')
+            temperature_idx = device.get_signal_index('Temperature')
 
             # TODO: call different algorithm based on device_type or signals available??
             # TODO: log algorithm used
 
-            nonwear_bouts, nonwear_array = vert_nonwear(
-                x_values=coll.devices[index].signals[accel_x_sig],
-                y_values=coll.devices[index].signals[accel_y_sig],
-                z_values=coll.devices[index].signals[accel_z_sig],
-                temperature_values=coll.devices[index].signals[temperature_sig],
-                accel_freq=coll.devices[index].signal_headers[accel_x_sig]['sample_rate'],
-                temperature_freq=coll.devices[index].signal_headers[temperature_sig]['sample_rate'],
-                std_thresh_mg=accel_std_thresh_mg,
-                low_temperature_cutoff=low_temperature_cutoff,
-                high_temperature_cutoff=high_temperature_cutoff,
-                temp_dec_roc=temp_dec_roc,
-                temp_inc_roc=temp_inc_roc,
-                quiet=quiet)
+            accel_x = device.signals[accel_x_idx]
+            accel_y = device.signals[accel_y_idx]
+            accel_z = device.signals[accel_z_idx]
+            temperature = device.signals[temperature_idx]
+
+            accel_fs = device.signal_headers[accel_x]['sample_rate']
+            temperature_fs = device.signal_headers[temperature_idx]['sample_rate']
+
+
+            nonwear_bouts, nonwear_array = vert_nonwear(x_values=accel_x, y_values=accel_y, z_values=accel_z,
+                                                        temperature_values=temperature, accel_freq=accel_fs,
+                                                        temperature_freq=temperature_fs,
+                                                        std_thresh_mg=accel_std_thresh_mg,
+                                                        low_temperature_cutoff=low_temperature_cutoff,
+                                                        high_temperature_cutoff=high_temperature_cutoff,
+                                                        temp_dec_roc=temp_dec_roc, temp_inc_roc=temp_inc_roc,
+                                                        quiet=quiet)
+
             algorithm_name = 'DETACH'
 
-            nonwear_bouts['nonwear_bout_id'] = nonwear_bouts.index
+
+            nonwear_bouts['event'] = "nonwear"
             nonwear_bouts.rename(columns={'Start Datapoint': 'start_datapoint', 'End Datapoint': 'end_datapoint'},
                                  inplace=True)
 
@@ -753,24 +763,50 @@ class Pipeline:
                     level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
             # convert datapoints to times
-            start_date = coll.devices[index].header['start_datetime']
-            sample_rate = coll.devices[index].signal_headers[accel_x_sig]['sample_rate']
-            samples = coll.devices[index].signals[accel_x_sig].shape[0]
+            start_date = device.header['start_datetime']
+            sample_rate = device.signal_headers[accel_x_idx]['sample_rate']
+            samples = device.signals[accel_x_idx].shape[0]
             end_date = start_date + dt.timedelta(seconds=(samples / sample_rate))
 
-            start_times = []
-            end_times = []
+            nonwear_start_times = []
+            nonwear_end_times = []
 
             for nw_index, nw_row in nonwear_bouts.iterrows():
-                start_times.append(start_date + dt.timedelta(seconds=(nw_row['start_datapoint'] / sample_rate)))
-                end_times.append(start_date + dt.timedelta(seconds=(nw_row['end_datapoint'] / sample_rate)))
+                nonwear_start_times.append(start_date + dt.timedelta(seconds=(nw_row['start_datapoint'] / sample_rate)))
+                nonwear_end_times.append(start_date + dt.timedelta(seconds=(nw_row['end_datapoint'] / sample_rate)))
 
-            nonwear_bouts['start_time'] = start_times
-            nonwear_bouts['end_time'] = end_times
+            nonwear_bouts['start_time'] = nonwear_start_times
+            nonwear_bouts['end_time'] = nonwear_end_times
 
-            nonwear_bouts = nonwear_bouts[['nonwear_bout_id', 'start_time', 'end_time']]
+            nonwear_bouts = nonwear_bouts[['event', 'start_time', 'end_time']]
 
-            daily_nonwear = nonwear_stats(nonwear_bouts, coll_start=start_date, coll_end=end_date, quiet=quiet)
+            # nonwear end times are wear start times -- nonwear start times are wear end times
+            wear_start_times = nonwear_end_times
+            wear_end_times = nonwear_start_times
+
+            # collection start is first wear start
+            wear_start_times.insert(0, start_date)
+
+            # collection end is last wear end
+            wear_end_times.append(end_date)
+
+            # remove first wear bout if duration is 0 - started with non-wear
+            if wear_start_times[0] == wear_end_times[0]:
+                wear_start_times = wear_start_times[1:]
+                wear_end_times = wear_end_times[1:]
+
+            if wear_start_times[-1] == wear_end_times[-1]:
+                wear_start_times = wear_start_times[:-1]
+                wear_end_times = wear_end_times[:-1]
+
+            wear_bouts = pd.DataFrame({'start_time': wear_start_times, 'end_time': wear_end_times, })
+            wear_bouts['event'] = 'wear'
+
+            nonwear_bouts = pd.concat([nonwear_bouts, wear_bouts], ignore_index=True, sort='start_time')
+            nonwear_bouts = nonwear_bouts.sort_values('start_time')
+
+            nonwear_bouts['id'] = range(1, nonwear_bouts.shape + 1)
+            daily_nonwear = nonwear_stats(nonwear_bouts, quiet=quiet)
 
             # add identifiers
             nonwear_bouts.insert(loc=0, column='study_code', value=study_code)
@@ -1407,20 +1443,18 @@ class Pipeline:
         message(f"Detected {coll.sptw.shape[0]} sleep period time windows", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
 
-        sleep_t5a5 = detect_sleep_bouts(z_angle_diff=z_angle_diff, sptw=coll.sptw,
-                                                      z_sample_rate=z_sample_rate,
-                                                      start_datetime=coll.devices[sleep_device_index].header['start_datetime'],
-                                                      z_abs_threshold=5, min_sleep_length=5)
+        sleep_t5a5 = detect_sleep_bouts(z_angle_diff=z_angle_diff, sptw=coll.sptw, z_sample_rate=z_sample_rate,
+                                        start_datetime=coll.devices[sleep_device_index].header['start_datetime'],
+                                        z_abs_threshold=5, min_sleep_length=5)
 
         sleep_t5a5.insert(loc=2, column='bout_detect', value='t5a5')
 
         message(f"Detected {sleep_t5a5.shape[0]} sleep bouts (t5a5)", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
 
-        sleep_t8a4 = detect_sleep_bouts(z_angle_diff=z_angle_diff, sptw=coll.sptw,
-                                                z_sample_rate=z_sample_rate,
-                                                start_datetime=coll.devices[sleep_device_index].header['start_datetime'],
-                                                z_abs_threshold=4, min_sleep_length=8)
+        sleep_t8a4 = detect_sleep_bouts(z_angle_diff=z_angle_diff, sptw=coll.sptw, z_sample_rate=z_sample_rate,
+                                        start_datetime=coll.devices[sleep_device_index].header['start_datetime'],
+                                        z_abs_threshold=4, min_sleep_length=8)
 
         sleep_t8a4.insert(loc=2, column='bout_detect', value='t8a4')
 
