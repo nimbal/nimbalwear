@@ -32,6 +32,9 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.18.0
+- insert wear bouts between nonwear bouts (added event column)
+
 v0.17.3
 - fixed bug excluding sleep windows to exclude from activity
 
