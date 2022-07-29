@@ -400,7 +400,7 @@ def nonwear_stats(nonwear_bouts, sum_type='daily', quiet=False):
             for event, event_group in date_group.groupby('event'):
                 counts[event] = sum(event_group['duration'])
 
-            day_nonwear_stats = pd.DataFrame([[day_num, date, counts['wear'], counts['nonwear'],]],
+            day_nonwear_stats = pd.DataFrame([[day_num, date, counts['wear'], counts['nonwear']]],
                                              columns=nonwear_stats.columns)
 
             nonwear_stats = pd.concat([nonwear_stats, day_nonwear_stats], ignore_index=True)
