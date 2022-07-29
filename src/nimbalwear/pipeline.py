@@ -807,7 +807,7 @@ class Pipeline:
             nonwear_bouts = pd.concat([nonwear_bouts, wear_bouts], ignore_index=True, sort='start_time')
             nonwear_bouts = nonwear_bouts.sort_values('start_time')
 
-            nonwear_bouts['id'] = range(1, nonwear_bouts.shape + 1)
+            nonwear_bouts['id'] = range(1, nonwear_bouts.shape[0] + 1)
             daily_nonwear = nonwear_stats(nonwear_bouts, quiet=quiet)
 
             # add identifiers
@@ -927,36 +927,42 @@ class Pipeline:
         max_time_to_eof = self.module_settings['crop']['max_time_to_eof']
         save = self.module_settings['crop']['save']
 
+        nonwear_bouts = coll.nonwear_bouts
+
         coll.daily_nonwear = pd.DataFrame(columns=['study_code', 'subject_id', 'coll_id', 'device_type',
-                                                   'device_location', 'day_num', 'date', 'collect', 'wear', 'nonwear'])
+                                                   'device_location', 'day_num', 'date', 'wear', 'nonwear'])
+
+
 
         # crop final nonwear from all device data
-        for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
+        for i, r in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
                                desc='Cropping initial and final non-wear'):
 
             # get info from device list
-            study_code = row['study_code']
-            subject_id = row['subject_id']
-            coll_id = row['coll_id']
-            device_type = row['device_type']
-            device_location = row['device_location']
+            study_code = r['study_code']
+            subject_id = r['subject_id']
+            coll_id = r['coll_id']
+            device_type = r['device_type']
+            device_location = r['device_location']
 
-            if coll.devices[index] is None:
+            device = coll.devices[i]
+
+            if device is None:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No device data",
                         level='warning', display=(not quiet), log=log, logger_name=self.log_name)
                 continue
 
             # if there is nonwear data for any devices in this collection
-            if not coll.nonwear_bouts.empty:
+            if not nonwear_bouts.empty:
 
-                daily_nonwear = pd.DataFrame(columns=['day_num', 'date', 'collect', 'wear', 'nonwear'])
+                daily_nonwear = pd.DataFrame(columns=['day_num', 'date', 'wear', 'nonwear'])
 
                 # get nonwear indices for current device
-                nonwear_idx = coll.nonwear_bouts.index[(coll.nonwear_bouts['study_code'] == study_code) &
-                                                       (coll.nonwear_bouts['subject_id'] == subject_id) &
-                                                       (coll.nonwear_bouts['coll_id'] == coll_id) &
-                                                       (coll.nonwear_bouts['device_type'] == device_type) &
-                                                       (coll.nonwear_bouts['device_location'] == device_location)]
+                nonwear_idx = nonwear_bouts.index[(nonwear_bouts['study_code'] == study_code) &
+                                                       (nonwear_bouts['subject_id'] == subject_id) &
+                                                       (nonwear_bouts['coll_id'] == coll_id) &
+                                                       (nonwear_bouts['device_type'] == device_type) &
+                                                       (nonwear_bouts['device_location'] == device_location)]
                 nonwear_idx = nonwear_idx.tolist()
 
                 # if there is nonwear data for current device
