@@ -970,9 +970,9 @@ class Pipeline:
                                                  (nonwear_bouts['device_location'] == device_location)].copy()
 
                 long_wear_idxs = device_bouts.index[(device_bouts['event'] == 'wear')
-                                                    & (device_bouts['duration'] > dt.timedelta(minutes=min_wear_time))]
+                                                    & (device_bouts['duration'] > min_wear_time)]
 
-                #TODO: What if not wear logner than min wear
+                #TODO: What if no wear logner than min wear
 
                 device_bouts = device_bouts.loc[long_wear_idxs[0]:long_wear_idxs[-1]]
 
