@@ -366,8 +366,7 @@ def nonwear_stats(nonwear_bouts, sum_type='daily', quiet=False):
                                                                   datetime.min.time())
 
                 # add full nonwear days if bout was longer than one full day
-                full_days = pd.date_range(r['event'],
-                                          r['start_time'].date() + timedelta(days=1),
+                full_days = pd.date_range(r['start_time'].date() + timedelta(days=1),
                                           r['end_time'].date() - timedelta(days=1))
                 for date in full_days:
                     # calculate start and end datetime and append new row
