@@ -737,7 +737,9 @@ class Pipeline:
             accel_z = device.signals[accel_z_idx]
             temperature = device.signals[temperature_idx]
 
-            accel_fs = device.signal_headers[accel_x]['sample_rate']
+            # TODO: index signals by label - make option to return datetimeindex
+
+            accel_fs = device.signal_headers[accel_x_idx]['sample_rate']
             temperature_fs = device.signal_headers[temperature_idx]['sample_rate']
 
 
