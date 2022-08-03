@@ -921,10 +921,10 @@ class Pipeline:
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        min_duration_start = self.module_settings['crop']['min_duration_start']
-        min_duration_end = self.module_settings['crop']['min_duration_end']
-        max_time_to_bof = self.module_settings['crop']['max_time_to_bof']
-        max_time_to_eof = self.module_settings['crop']['max_time_to_eof']
+        # min_duration_start = self.module_settings['crop']['min_duration_start']
+        # min_duration_end = self.module_settings['crop']['min_duration_end']
+        # max_time_to_bof = self.module_settings['crop']['max_time_to_bof']
+        # max_time_to_eof = self.module_settings['crop']['max_time_to_eof']
         min_wear_time = self.module_settings['crop']['min_wear_time']
         save = self.module_settings['crop']['save']
 
@@ -969,71 +969,77 @@ class Pipeline:
                                                  (nonwear_bouts['device_type'] == device_type) &
                                                  (nonwear_bouts['device_location'] == device_location)].copy()
 
-                long_wear_idxs = device_bouts.index[(device_bouts['event'] == 'wear')
-                                                    & (device_bouts['duration'] > min_wear_time)]
-
-                #TODO: What if no wear logner than min wear
-
-                device_bouts = device_bouts.loc[long_wear_idxs[0]:long_wear_idxs[-1]]
-
                 if not device_bouts.empty:
 
-                # nonwear_idx = nonwear_idx.tolist()
-                #
-                # # if there is nonwear data for current device
-                # if len(nonwear_idx):
-                #
-                #     # get first nonwear period for current device
-                #     first_nonwear_idx = nonwear_idx[0]
-                #     first_nonwear = nonwear_bouts_keep.loc[first_nonwear_idx]
-                #
-                #     # get last nonwear period for current device
-                #     last_nonwear_idx = nonwear_idx[-1]
-                #     last_nonwear = nonwear_bouts_keep.loc[last_nonwear_idx]
-                #
-                    # get time info from device data
-                    start_time = device.header['start_datetime']
-                    samples = len(device.signals[0])
-                    sample_rate = device.signal_headers[0]['sample_rate']
-                    duration = dt.timedelta(seconds=samples / sample_rate)
-                    end_time = start_time + duration
-                #
-                #     # get duration and time to start of file of first nonwear
-                #     first_nonwear_duration = first_nonwear['end_time'] - first_nonwear['start_time']
-                #     first_nonwear_time_to_bof = first_nonwear['start_time'] - start_time
-                #
-                #     # get duration and time to end of file of last nonwear
-                #     last_nonwear_duration = last_nonwear['end_time'] - last_nonwear['start_time']
-                #     last_nonwear_time_to_eof = end_time - last_nonwear['end_time']
-                #
-                #     # only crop if first nonwear starts within 20 minutes of start of file
-                #     crop_start = ((first_nonwear_duration >= dt.timedelta(minutes=min_duration_end)) &
-                #                 (first_nonwear_time_to_bof <= dt.timedelta(minutes=max_time_to_bof)))
-                #
-                #     # only crop if last nonwear ends within 20 minutes of end of file
-                #     crop_end = ((last_nonwear_duration >= dt.timedelta(minutes=min_duration_end)) &
-                #                     (last_nonwear_time_to_eof <= dt.timedelta(minutes=max_time_to_eof)))
+                    long_wear_idxs = device_bouts.index[(device_bouts['event'] == 'wear')
+                                                    & (device_bouts['duration'] > min_wear_time)]
 
-                    new_start_time = device_bouts.iloc[0, 'start_time']
-                    new_end_time = device_bouts.iloc[-1, 'end_time']
+                    if not long_wear_idxs.empty:
 
-                    start_crop_duration = new_start_time - start_time
+                        device_bouts = device_bouts.loc[long_wear_idxs[0]:long_wear_idxs[-1]]
 
-                    message(f"Cropping {start_crop_duration} from begininng of collection for {device_type} {device_location}",
-                            level='info', display=(not quiet), log=log, logger_name=self.log_name)
+                        if not device_bouts.empty:
 
-                    end_crop_duration = end_time - new_end_time
+                        # nonwear_idx = nonwear_idx.tolist()
+                        #
+                        # # if there is nonwear data for current device
+                        # if len(nonwear_idx):
+                        #
+                        #     # get first nonwear period for current device
+                        #     first_nonwear_idx = nonwear_idx[0]
+                        #     first_nonwear = nonwear_bouts_keep.loc[first_nonwear_idx]
+                        #
+                        #     # get last nonwear period for current device
+                        #     last_nonwear_idx = nonwear_idx[-1]
+                        #     last_nonwear = nonwear_bouts_keep.loc[last_nonwear_idx]
+                        #
+                            # get time info from device data
+                            start_time = device.header['start_datetime']
+                            samples = len(device.signals[0])
+                            sample_rate = device.signal_headers[0]['sample_rate']
+                            duration = dt.timedelta(seconds=samples / sample_rate)
+                            end_time = start_time + duration
+                        #
+                        #     # get duration and time to start of file of first nonwear
+                        #     first_nonwear_duration = first_nonwear['end_time'] - first_nonwear['start_time']
+                        #     first_nonwear_time_to_bof = first_nonwear['start_time'] - start_time
+                        #
+                        #     # get duration and time to end of file of last nonwear
+                        #     last_nonwear_duration = last_nonwear['end_time'] - last_nonwear['start_time']
+                        #     last_nonwear_time_to_eof = end_time - last_nonwear['end_time']
+                        #
+                        #     # only crop if first nonwear starts within 20 minutes of start of file
+                        #     crop_start = ((first_nonwear_duration >= dt.timedelta(minutes=min_duration_end)) &
+                        #                 (first_nonwear_time_to_bof <= dt.timedelta(minutes=max_time_to_bof)))
+                        #
+                        #     # only crop if last nonwear ends within 20 minutes of end of file
+                        #     crop_end = ((last_nonwear_duration >= dt.timedelta(minutes=min_duration_end)) &
+                        #                     (last_nonwear_time_to_eof <= dt.timedelta(minutes=max_time_to_eof)))
 
-                    message(f"Cropping {end_crop_duration} from end of collection for {device_type} {device_location}",
-                            level='info', display=(not quiet), log=log, logger_name=self.log_name)
+                            new_start_time = device_bouts.iloc[0]['start_time']
+                            new_end_time = device_bouts.iloc[-1]['end_time']
 
-                    device.crop(new_start_time, new_end_time, inplace=True)
+                            start_crop_duration = new_start_time - start_time
 
-                    # recalculate nonwear summary
-                    #nonwear_bouts =  nonwear_bouts_keep[nonwear_bouts_keep.index.isin(nonwear_idx)]
-                    db = device_bouts.drop(columns=['study_code', 'subject_id', 'coll_id', 'device_type',
-                                                             'device_location'], )
-                    daily_nonwear = nonwear_stats(db, quiet=quiet)
+                            message(f"Cropping {start_crop_duration} from begininng of collection for {device_type} {device_location}",
+                                    level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+                            end_crop_duration = end_time - new_end_time
+
+                            message(f"Cropping {end_crop_duration} from end of collection for {device_type} {device_location}",
+                                    level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+                            device.crop(new_start_time, new_end_time, inplace=True)
+
+                            # recalculate nonwear summary
+                            #nonwear_bouts =  nonwear_bouts_keep[nonwear_bouts_keep.index.isin(nonwear_idx)]
+                            db = device_bouts.drop(columns=['study_code', 'subject_id', 'coll_id', 'device_type',
+                                                                     'device_location', 'duration'], )
+                            daily_nonwear = nonwear_stats(db, quiet=quiet)
+
+                    else:
+                        message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: Could not crop due to lack of wear time",
+                                level='warning', display=(not quiet), log=log, logger_name=self.log_name)
 
                 else:
                     message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for device",
@@ -1046,7 +1052,9 @@ class Pipeline:
                 daily_nonwear.insert(loc=4, column='device_location', value=device_location)
 
                 coll.daily_nonwear = pd.concat([coll.daily_nonwear, daily_nonwear], ignore_index=True)
+                device_bouts = device_bouts.drop(columns=['duration'])
                 coll.nonwear_bouts = pd.concat([coll.nonwear_bouts, device_bouts], ignore_index=True)
+                coll.devices[i] = device
 
             else:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for collection",
@@ -1419,7 +1427,8 @@ class Pipeline:
                                                 (coll.nonwear_bouts['subject_id'] == coll.subject_id) &
                                                 (coll.nonwear_bouts['coll_id'] == coll.coll_id) &
                                                 (coll.nonwear_bouts['device_type'] == coll.device_info.iloc[sleep_device_index]['device_type']) &
-                                                (coll.nonwear_bouts['device_location'] == coll.device_info.iloc[sleep_device_index]['device_location'])]
+                                                (coll.nonwear_bouts['device_location'] == coll.device_info.iloc[sleep_device_index]['device_location']) &
+                                                (coll.nonwear_bouts['event'] == 'nonwear')]
 
         # TODO: should sleep algorithm be modified if dominant vs non-dominant hand?
 
@@ -1602,7 +1611,8 @@ class Pipeline:
                                                 (coll.nonwear_bouts['device_type'] ==
                                                  coll.device_info.iloc[activity_device_index]['device_type']) &
                                                 (coll.nonwear_bouts['device_location'] ==
-                                                 coll.device_info.iloc[activity_device_index]['device_location'])]
+                                                 coll.device_info.iloc[activity_device_index]['device_location']) &
+                                                (coll.nonwear_bouts['event'] == 'nonwear')]
 
         sptw = coll.sptw
         sleep_bouts =  coll.sleep_bouts.loc[coll.sleep_bouts['bout_detect'] == 't8a4']

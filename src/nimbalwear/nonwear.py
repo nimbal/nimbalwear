@@ -367,16 +367,16 @@ def nonwear_stats(nonwear_bouts, sum_type='daily', quiet=False):
                 # add full nonwear days if bout was longer than one full day
                 full_days = pd.date_range(r['start_time'].date() + timedelta(days=1),
                                           r['end_time'].date() - timedelta(days=1))
-                for date in full_days:
+                for date in full_days.date:
                     # calculate start and end datetime and append new row
                     start_midnight = datetime.combine(date, datetime.min.time())
                     end_midnight = datetime.combine(date + timedelta(days=1), datetime.min.time())
-                    new_bouts.append([0, r['event'], start_midnight, end_midnight, date.date(),
+                    new_bouts.append([r['id'], r['event'], start_midnight, end_midnight, date,
                                       round((end_midnight - start_midnight).total_seconds())])
                     last_midnight = end_midnight
 
                 # create new bout from last midnight to end
-                new_bouts.append([0, r['event'], last_midnight, r['end_time'], r['end_time'].date(),
+                new_bouts.append([r['id'], r['event'], last_midnight, r['end_time'], r['end_time'].date(),
                                   round((r['end_time'] - last_midnight).total_seconds())])
 
                 # adjust current bout to end at midnight
@@ -398,7 +398,7 @@ def nonwear_stats(nonwear_bouts, sum_type='daily', quiet=False):
             counts = {'wear': 0, 'nonwear': 0, }
 
             for event, event_group in date_group.groupby('event'):
-                counts[event] = sum(event_group['duration'])
+                counts[event] = round(sum(event_group['duration']))
 
             day_nonwear_stats = pd.DataFrame([[day_num, date, counts['wear'], counts['nonwear']]],
                                              columns=nonwear_stats.columns)
