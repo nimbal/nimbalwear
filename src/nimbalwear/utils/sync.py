@@ -187,9 +187,13 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
             sample_offset = int(offset * tgt_freq)
             mid_sync_tgt = int(mid_sync_ref * sample_gain - sample_offset)
             sample_radius = int(search_radius * tgt_freq)
+
             start_i = mid_sync_tgt - sample_radius
             start_i = 0 if start_i < 0 else start_i
+            start_i = len(tgt_accel[0]) - 1 if start_i >= len(tgt_accel[0]) else start_i
+
             end_i = mid_sync_tgt + sample_radius
+            end_i = 0 if end_i < 0 else end_i
             end_i = len(tgt_accel[0]) - 1 if end_i >= len(tgt_accel[0]) else end_i
 
             tgt_accel_window = [a[start_i:end_i] for a in tgt_accel]
@@ -198,15 +202,17 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
             start_i = 0
             tgt_accel_window = tgt_accel
 
-        tgt_sync_sig_idx, tgt_sync = detect_sync_flips_tgt_accel(tgt_accel_window, ref_sync, tgt_freq, ref_freq,
-                                                                 **tgt_dict)
+        if start_i != end_i:
 
-        new_sync = pd.Series([int(ref_sync_sig_idx), int(s[0]), int(s[1]), int(s[2]), round(s[3], 3),
-                              int(tgt_sync_sig_idx), int(tgt_sync[0] + start_i), int(tgt_sync[1] + start_i),
-                              round(tgt_sync[2] ,2)],
-                             index=syncs.columns)
+            tgt_sync_sig_idx, tgt_sync = detect_sync_flips_tgt_accel(tgt_accel_window, ref_sync, tgt_freq, ref_freq,
+                                                                     **tgt_dict)
 
-        syncs = syncs.append(new_sync, ignore_index=True)
+            new_sync = pd.Series([int(ref_sync_sig_idx), int(s[0]), int(s[1]), int(s[2]), round(s[3], 3),
+                                  int(tgt_sync_sig_idx), int(tgt_sync[0] + start_i), int(tgt_sync[1] + start_i),
+                                  round(tgt_sync[2] ,2)],
+                                 index=syncs.columns)
+
+            syncs = syncs.append(new_sync, ignore_index=True)
 
     return syncs
 
@@ -240,7 +246,7 @@ def detect_sync_flips_ref_accel(accel, signal_freq, **kwargs):
 
 
 def detect_sync_flips_ref_signal(signal, signal_freq, signal_ds=1, rest_min=2, rest_max=15, rest_sens=0.12, flip_max=2,
-                                 min_flips=4, reject_above_ae=0.2, plot_detect=False, plot_quality=False):
+                                 min_flips=4, reject_above_ae=0.2, plot_detect_ref=False, plot_quality_ref=False):
 
     """Detect sync flips in a single reference signal by searching for "flips" between periods of rest
 
@@ -333,7 +339,7 @@ def detect_sync_flips_ref_signal(signal, signal_freq, signal_ds=1, rest_min=2, r
     # Plot
     ###########
 
-    if plot_detect:
+    if plot_detect_ref:
 
         signal_linewidth = 0.25
         signal_color = 'grey'
@@ -376,7 +382,7 @@ def detect_sync_flips_ref_signal(signal, signal_freq, signal_ds=1, rest_min=2, r
         for x in rej_sync_ind:
             ax[2].axvspan(xmin=x[0], xmax=x[1], ymin=0, ymax=1, alpha=0.5, color='lightcoral')
 
-    if plot_quality:
+    if plot_quality_ref:
 
         signal_linewidth = 0.25
         accepted_color = 'green'
@@ -439,11 +445,13 @@ def detect_sync_flips_tgt_accel(tgt_accel, ref_sync, tgt_freq, ref_freq, **kwarg
     return tgt_sync_sig_idx, tgt_sync
 
 
-def detect_sync_flips_tgt_signal(tgt_signal, ref_sync, tgt_signal_freq, ref_signal_freq, plot=False):
+def detect_sync_flips_tgt_signal(tgt_signal, ref_sync, tgt_signal_freq, ref_signal_freq, plot_detect_tgt=False):
 
     """Detect a reference sync flip within a single target signal by finding the highest cross-correlation.
 
     """
+
+    sync_start = sync_end = sync_corr = None
 
     # ref_ds = 1
     tgt_ds = 1
@@ -456,27 +464,28 @@ def detect_sync_flips_tgt_signal(tgt_signal, ref_sync, tgt_signal_freq, ref_sign
         tgt_signal = tgt_signal[::tgt_ds]
 
     # corr = correlate(tgt_signal, ref_sync) / len(ref_sync)
-    corr = correlate(tgt_signal, ref_sync) / max(correlate(ref_sync, ref_sync))
+    if tgt_signal is not None:
+        corr = correlate(tgt_signal, ref_sync) / max(correlate(ref_sync, ref_sync))
 
-    max_corr_idx = np.argmax(abs(corr))
-    max_corr = round(corr[max_corr_idx], 2)
+        max_corr_idx = np.argmax(abs(corr))
+        max_corr = round(corr[max_corr_idx], 2)
 
-    tgt_sync_end = max_corr_idx + 1
-    tgt_sync_start = tgt_sync_end - len(ref_sync)
+        tgt_sync_end = max_corr_idx + 1
+        tgt_sync_start = tgt_sync_end - len(ref_sync)
 
-    if plot:
-        plt.figure()
-        plt.title(f'corr = {max_corr}')
-        plt.plot(range(tgt_sync_start - round(len(ref_sync) / 2), tgt_sync_end + round(len(ref_sync) / 2)),
-                 tgt_signal[tgt_sync_start - round(len(ref_sync) / 2):tgt_sync_end + round(len(ref_sync) / 2)],
-                 color='black')
-        if max_corr < 0:
-            ref_sync = [-x for x in ref_sync]
-        plt.plot(range(tgt_sync_start, tgt_sync_end), ref_sync, color='red')
-        plt.show()
+        if plot_detect_tgt:
+            plt.figure()
+            plt.title(f'corr = {max_corr}')
+            plt.plot(range(tgt_sync_start - round(len(ref_sync) / 2), tgt_sync_end + round(len(ref_sync) / 2)),
+                     tgt_signal[tgt_sync_start - round(len(ref_sync) / 2):tgt_sync_end + round(len(ref_sync) / 2)],
+                     color='black')
+            if max_corr < 0:
+                ref_sync = [-x for x in ref_sync]
+            plt.plot(range(tgt_sync_start, tgt_sync_end), ref_sync, color='red')
+            plt.show()
 
-    sync_start = round(tgt_sync_start * tgt_ds)
-    sync_end = round(tgt_sync_end * tgt_ds)
-    sync_corr = round(abs(max_corr), 2)
+        sync_start = round(tgt_sync_start * tgt_ds)
+        sync_end = round(tgt_sync_end * tgt_ds)
+        sync_corr = round(abs(max_corr), 2)
 
     return sync_start, sync_end, sync_corr
