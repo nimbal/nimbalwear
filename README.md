@@ -32,6 +32,9 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.18.1
+- fix bug when sync search radius falls outside target collection time
+
 v0.18.0
 - insert wear bouts between nonwear bouts (added event column)
 
