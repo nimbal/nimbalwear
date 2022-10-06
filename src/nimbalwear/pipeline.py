@@ -254,8 +254,6 @@ class Pipeline:
 
         # data integrity ??
 
-        # synchronize devices
-
         # process nonwear for all devices
         if single_stage in [None, 'nonwear']:
             coll = self.nonwear(coll=coll, quiet=self.quiet, log=self.log)
@@ -340,7 +338,12 @@ class Pipeline:
                          'BF36': lambda: device_data.import_bittium(device_file_path, quiet=quiet),
                          'NOWO': lambda: device_data.import_nonin(device_file_path, quiet=quiet)}
 
+
+        # initialize list of collection device objects
         coll.devices = []
+
+        # initialize list of device objects to be removed if file does not exist
+        remove_idx = []
 
         # read in all data files for one subject
         for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
@@ -375,9 +378,17 @@ class Pipeline:
 
             # check that data file exists
             if not device_file_path.exists():
-                message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: {device_file_path} does not exist",
+
+                # if file does not exist then log,
+                message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: {device_file_path} does not exist - "
+                        + "this device will be excluded from further processing",
                         level='warning', display=(not quiet), log=log, logger_name=self.log_name)
-                coll.devices.append(None)
+                message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+                # store list of device_info rows to be removed,
+                remove_idx.append(index)
+
+                # go to next row
                 continue
 
             # import data to device data object
@@ -433,6 +444,9 @@ class Pipeline:
             message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
             coll.devices.append(device_data)
+
+        #remove devices from device_info if file was not found
+        coll.device_info = coll.device_info.drop(index=remove_idx).reset_index(drop=True)
 
         return coll
 
