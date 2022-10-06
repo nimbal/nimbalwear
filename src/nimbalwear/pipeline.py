@@ -345,7 +345,7 @@ class Pipeline:
         # initialize list of device objects to be removed if file does not exist
         remove_idx = []
 
-        # read in all data files for one subject
+        # read in all data files for one collection
         for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
                                desc='Reading all device data'):
 
