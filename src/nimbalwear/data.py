@@ -211,6 +211,9 @@ class Device:
 
         index = None if index == len(self.signal_headers) else index
 
+        if index == None:
+            raise ValueError("Signal label does not exist")
+
         return index
 
     def get_day_idxs(self, day_offset):
