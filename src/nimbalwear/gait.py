@@ -2,14 +2,13 @@ from datetime import timedelta
 import math
 import os
 from pathlib import Path
-
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
 from scipy.signal import butter, filtfilt, sosfilt, find_peaks, peak_widths, welch
 import matplotlib.pyplot as plt
 import pyedflib
-
+import nimbalwear
 
 class AccelReader:
     def __init__(self, accel_path_or_obj, label='AccelReader', axis=None, orient_signal=True, low_pass=True, start=-1,
@@ -646,7 +645,6 @@ class StepDetection(AccelReader):
         else:
             return plt
 
-
 class WalkingBouts():
     def __init__(self, left_accel_path, right_accel_path, start_time=None, duration_sec=None, bout_num_df=None,
                  legacy_alg=False, left_kwargs={}, right_kwargs={}):
@@ -1104,15 +1102,27 @@ class WalkingBouts():
             ['day_num', 'date', 'longest_bout_length_secs', 'num_bouts_over_3mins', 'total_steps']]
         return daily_gait_df
 
-def get_signals(data, index_dict, gyro_axis='z', acc_axis='x', start_index=0, stop_index=None):
-    # import vertical acceleration for plotting
-    # import ML/sagittal gyro for step detection
+def get_accelerometer_signal(data, acc_axis='x', start_index=0, stop_index=None):
+    #TODO this should probably read in the vertical and sagittal signals; either with logic or an argument in the function; currently just hardcoded
+    #step detection uses vertical acceleration and ML/sagittal gyro for step detection
+    #import vertical acceleration
+    if data.header['device_type'] == 'AXV6':
+        acc = np.array(data.get_signal_index(f'Accelerometer {acc_axis}')[start_index:stop_index])
+    else:
+        print('Device type does no exist')
 
-    gyro = np.array(data[index_dict[f"gyro_{gyro_axis}"]][start_index:stop_index])
-    acc = np.array(data[index_dict[f"accel_{acc_axis}"]][start_index:stop_index])
+    return acc
 
-    return gyro, acc
+def get_gyroscope_signal(data, gyro_axis='z', start_index=0, stop_index=None):
+    #TODO this should probably read in the vertical and sagittal signals; either with logic or an argument in the function; currently just hardcoded
+    #step detection uses vertical acceleration and ML/sagittal gyro for step detection
+    #import vertical acceleration
+    if data.header['device_type'] == 'AXV6':
+        gyro = np.array(data.get_signal_index(f'Gyroscope {gyro_axis}')[start_index:stop_index])
+    else:
+        print('Device type does no exist')
 
+    return gyro
 
 def create_timestamps(data_start_time, data_len, fs, start_time=None, end_time=None):
 
@@ -1473,3 +1483,37 @@ def gait_stats(bouts, type='daily', single_leg=False):
         print('Invalid type selected.')
 
     return gait_stats
+
+def detect_stepping(accelerometer = False, gyroscope = False, bilateral=False):
+    if accelerometer == False & gyroscope == False:
+            print('Signal not defined. Define signal availability to run Step Detection.')
+    elif accelerometer == True & gyroscope == True:
+
+    else:
+
+
+
+    return steps_df
+
+#############################################################################################################################
+if __name__ == '__main__':
+    #setup subject and filepath
+    subj = "OND09_0001_01"
+    ankle_path = fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_AXV6_LAnkle_ACCELEROMETER.edf'
+    # TODO: Import data for step detection (gotta do this more than once) (1) needs to be a participant with only acceleration (2) unilateral with IMU (3) bilateral IMUs
+    # import data
+    ankle_acc = nimbalwear.Device()
+    if os.path.exists(ankle_path):
+        ankle_acc.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_AXV6_LAnkle_ACCELEROMETER.edf')
+    else:
+        ankle_acc.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_AXV6_RAnkle_ACCELEROMETER.edf')
+
+    # TODO: Select the signals that are needed (gyroscope OR accelerometer) for step detection
+    acc = get_accelerometer_signal(data=ankle_acc)
+
+    # TODO: Run step detection algorithm
+    steps_df = detect_stepping(accelerometer = None, gyroscope = None, bilateral=False)
+
+    # TODO: Run steps through to find walking bouts
+
+    # TODO: Run walking bouts through spatiotemporal characteristics that are available for that person
