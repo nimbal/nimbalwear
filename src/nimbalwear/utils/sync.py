@@ -186,20 +186,19 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
             sample_gain = tgt_freq / ref_freq
             sample_offset = int(offset * tgt_freq)
             mid_sync_tgt = int(mid_sync_ref * sample_gain - sample_offset)
-            sample_radius = int(search_radius * tgt_freq)
+            sample_radius = int(search_radius * 60 * tgt_freq)
 
-            start_i = mid_sync_tgt - sample_radius
-            start_i = 0 if start_i < 0 else start_i
-            start_i = len(tgt_accel[0]) - 1 if start_i >= len(tgt_accel[0]) else start_i
+            start_i = max(0, mid_sync_tgt - sample_radius)
+            start_i = min(start_i, len(tgt_accel[0]) - 1)
 
-            end_i = mid_sync_tgt + sample_radius
-            end_i = 0 if end_i < 0 else end_i
-            end_i = len(tgt_accel[0]) - 1 if end_i >= len(tgt_accel[0]) else end_i
+            end_i = max(0, mid_sync_tgt + sample_radius)
+            end_i = min(end_i, len(tgt_accel[0]) - 1)
 
             tgt_accel_window = [a[start_i:end_i] for a in tgt_accel]
 
         else:
             start_i = 0
+            end_i = len(tgt_accel[0]) - 1
             tgt_accel_window = tgt_accel
 
         if start_i != end_i:
@@ -476,8 +475,10 @@ def detect_sync_flips_tgt_signal(tgt_signal, ref_sync, tgt_signal_freq, ref_sign
         if plot_detect_tgt:
             plt.figure()
             plt.title(f'corr = {max_corr}')
-            plt.plot(range(tgt_sync_start - round(len(ref_sync) / 2), tgt_sync_end + round(len(ref_sync) / 2)),
-                     tgt_signal[tgt_sync_start - round(len(ref_sync) / 2):tgt_sync_end + round(len(ref_sync) / 2)],
+            win_start = max(0, tgt_sync_start - round(len(ref_sync) / 2))
+            win_end = min(tgt_signal.shape[0] - 1, tgt_sync_end + round(len(ref_sync) / 2))
+            plt.plot(range(win_start, win_end),
+                     tgt_signal[win_start:win_end],
                      color='black')
             if max_corr < 0:
                 ref_sync = [-x for x in ref_sync]
