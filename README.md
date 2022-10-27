@@ -32,6 +32,11 @@ To include a specific release, replace `[version]` with the tag associated with 
 
 # Changes by version
 
+v0.18.3
+- change search radius to minutes
+- fix bug in plot if sync is near end of sync radius
+- fix assignment bug if search radius is not set
+
 v0.18.2
 - fix bug where pipeline tries to autocalibrate data from file that wasn't found
 
