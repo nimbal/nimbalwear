@@ -476,8 +476,10 @@ def detect_sync_flips_tgt_signal(tgt_signal, ref_sync, tgt_signal_freq, ref_sign
         if plot_detect_tgt:
             plt.figure()
             plt.title(f'corr = {max_corr}')
-            plt.plot(range(tgt_sync_start - round(len(ref_sync) / 2), tgt_sync_end + round(len(ref_sync) / 2)),
-                     tgt_signal[tgt_sync_start - round(len(ref_sync) / 2):tgt_sync_end + round(len(ref_sync) / 2)],
+            win_start = max(0, tgt_sync_start - round(len(ref_sync) / 2))
+            win_end = min(tgt_signal.shape[0] - 1, tgt_sync_end + round(len(ref_sync) / 2))
+            plt.plot(range(win_start, win_end),
+                     tgt_signal[win_start:win_end],
                      color='black')
             if max_corr < 0:
                 ref_sync = [-x for x in ref_sync]
