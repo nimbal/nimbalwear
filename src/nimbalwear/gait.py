@@ -1074,6 +1074,8 @@ class WalkingBouts():
             ['day_num', 'date', 'longest_bout_length_secs', 'num_bouts_over_3mins', 'total_steps']]
         return daily_gait_df
 
+
+#gyro.py?
 def get_accelerometer_signal(data, acc_axis='x', start_index=0, stop_index=None):
     #TODO this should probably read in the vertical and sagittal signals; either with logic or an argument in the function; currently just hardcoded
     #step detection uses vertical acceleration and ML/sagittal gyro for step detection
@@ -1575,6 +1577,54 @@ def get_acc_data(accelerometer=None, axis=None, orient_signal=True, low_pass=Tru
 
     return freq, acc_data, xz_data, timestamps, axis
 
+#Stepdetector declassed
+    # increase swing threshold
+    # decrease heel strike length
+    push_off_threshold = 0.85
+    swing_threshold = 0.5  # 0.5
+    heel_strike_threshold = -5  # -5
+    pushoff_time = 0.4  # 0.4 #tried 0.2 here
+    swing_down_detect_time = 0.1  # 0.3
+    swing_up_detect_time = 0.1  # 0.1
+    swing_phase_time = swing_down_detect_time + swing_up_detect_time * 2
+    heel_strike_detect_time = 0.5  # 0.8
+    foot_down_time = 0.05  # 0.1 #tried 0.2 here
+
+    def __init__(self, pushoff_df=None, label='StepDetection', **kwargs):
+        """
+        StepDetectioon class performs step detection through a steady state controller algorithm
+
+        Required Parameters:
+        accel_reader_obj (AccelReader): Object from AccelReader class
+        pushoff_df (pandas.DataFrame): A dataframe that outlines the mean, std, and min/max for a pushoff
+
+        Optional Parameters:
+        - `quiet` (bool): stops printing
+        """
+        super(StepDetection, self).__init__(**kwargs)
+        self.label = label
+        self.pushoff_len = int(self.pushoff_time * self.freq)
+        self.states = {1: 'stance', 2: 'push-off',
+                       3: 'swing-up', 4: 'swing-down', 5: 'footdown'}
+        self.state = self.states[1]
+        self.pushoff_df = StepDetection.get_pushoff_stats(self.accel_path_or_obj,
+                                                          start_end_times=[(self.start_dp, self.end_dp)],
+                                                          quiet=self.quiet,
+                                                          axis=self.axis) if pushoff_df is None else pushoff_df
+        self.swing_peaks = []
+
+        # set threshold values
+        if {'swing_down_mean', 'swing_down_std', 'swing_up_mean', 'swing_up_std', 'heel_strike_mean',
+            'heel_strike_std'}.issubset(self.pushoff_df.columns):
+            self.swing_phase_time = self.pushoff_df['swing_down_mean'].iloc[0] + self.pushoff_df['swing_down_std'].iloc[
+                0] + self.pushoff_df['swing_up_mean'].iloc[0] + self.pushoff_df['swing_up_std'].iloc[0]
+            self.swing_phase_time = max(self.swing_phase_time, 0.1)
+            self.heel_strike_detect_time = 0.5 + self.pushoff_df['swing_up_mean'].iloc[0] + 2 * \
+                                           self.pushoff_df['swing_up_std'].iloc[0]
+            self.heel_strike_threshold = -3 - self.pushoff_df['heel_strike_mean'].iloc[0] / (
+                        2 * self.heel_strike_threshold)
+
+        self.step_detect()
 
 #############################################################################################################################
 if __name__ == '__main__':
