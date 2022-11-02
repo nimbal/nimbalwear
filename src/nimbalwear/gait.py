@@ -1457,7 +1457,7 @@ def gait_stats(bouts, type='daily', single_leg=False):
     return gait_stats
 
 
-#AccelReader
+#AccelReader declassed
 def detect_vert(axes, method='adg'):
         """
         NOTE: To improve function when passing in axes:
