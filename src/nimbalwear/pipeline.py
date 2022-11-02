@@ -935,10 +935,6 @@ class Pipeline:
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        # min_duration_start = self.module_settings['crop']['min_duration_start']
-        # min_duration_end = self.module_settings['crop']['min_duration_end']
-        # max_time_to_bof = self.module_settings['crop']['max_time_to_bof']
-        # max_time_to_eof = self.module_settings['crop']['max_time_to_eof']
         min_wear_time = self.module_settings['crop']['min_wear_time']
         save = self.module_settings['crop']['save']
 
