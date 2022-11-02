@@ -10,252 +10,224 @@ import matplotlib.pyplot as plt
 import pyedflib
 import nimbalwear
 
-class AccelReader:
-    def __init__(self, accel_path_or_obj, label='AccelReader', axis=None, orient_signal=True, low_pass=True, start=-1,
-                 end=-1, quiet=False):
-        """
-        AccelReader object reads accelerometer data from EDF files and loads it into the class
+""" 
+# class AccelReader:
+#     def __init__(self, accel_path_or_obj, label='AccelReader', axis=None, orient_signal=True, low_pass=True, start=-1,
+#                  end=-1, quiet=False):
+#         """
+#         AccelReader object reads accelerometer data from EDF files and loads it into the class
+#
+#         Required Parameters:
+#         - `accel_path` (str): path to the accelerometer EDF
+#         - `label` (str): A label that's associated with the particular accelerometer data
+#         - `axis` (int): tells the EDF reader which column of the EDF to access
+#
+#         Optional Parameters:
+#         - `start` (int): starting datapoint to splice data
+#         - `end` (int): ending datapoint to splice data
+#         - `quiet` (bool): stops printing
+#         """
+#         if not quiet:
+#             print("%s: Reading Accel Data..." % label)
+#         self.accel_path_or_obj = accel_path_or_obj
+#         self.freq, self.data, self.xz_data, self.timestamps, self.axis = AccelReader.get_accel_data(
+#             accel_path_or_obj, axis=axis, start=start, end=end)
+#         self.raw_data = self.data.copy()
+#         self.start_dp = start
+#         self.end_dp = end
+#
+#         self.label = label
+#         self.quiet = quiet
+#         self.sig_length = len(self.data)
+#
+#
+#     @staticmethod
+#     def find_dp(path, duration_sec, timestamp_str=None, axis=1):
+#         """
+#         Gets start and end time based on a timestamp and duration_sec (# data points)
+#         """
+#         accel_file = pyedflib.EdfReader(path)
+#         time_delta = pd.to_timedelta(
+#             1 / accel_file.getSampleFrequency(axis), unit='s')
+#         start = 0
+#         if timestamp_str:
+#             start = int((pd.to_datetime(timestamp_str) -
+#                          accel_file.getStartdatetime()) / time_delta)
+#         end = int(start + pd.to_timedelta(duration_sec, unit='s') / time_delta)
+#         accel_file.close()
+#         return start, end
+#
+#     @staticmethod
+#     def get_accel_data_path(path, axis=None, start=-1, end=-1):
+#         """
+#         Gets the accelerometer data from EDF
+#         """
+#         accel_axes = [0, 1, 2]
+#         accel_file = pyedflib.EdfReader(path)
+#
+#         if not (start > -1 and end > -1):
+#             start = 0
+#             end = accel_file.getNSamples()[accel_axes[0]]
+#
+#         if axis is not None:
+#             accel_axes.remove(axis)
+#             data = accel_file.readSignal(axis, start=start, n=(end - start))
+#             xz_data = np.sqrt(
+#                 accel_file.readSignal(accel_axes[0], start=start, n=(end - start)) ** 2 + accel_file.readSignal(
+#                     accel_axes[1], start=start, n=(end - start)) ** 2)
+#         else:
+#             all_data = np.array([accel_file.readSignal(ax, start=start, n=(end - start)) for ax in accel_axes])
+#             axis_index, test_stats = AccelReader.detect_vert(all_data[0:2])  # assumes vertical is 0 or 1
+#             other_axes = np.delete(np.arange(all_data.shape[0]), axis_index)
+#             axis = accel_axes[axis_index]
+#             data = all_data[axis_index]
+#             xz_data = np.sqrt((all_data[other_axes] ** 2).sum(axis=0))
+#
+#         freq = accel_file.getSampleFrequency(axis)
+#         start_time = accel_file.getStartdatetime() + timedelta(0, start / freq)
+#         end_time = start_time + timedelta(0, accel_file.getFileDuration(
+#         )) - timedelta(0, accel_file.getFileDuration() - (end - start) / freq)
+#         timestamps = np.asarray(pd.date_range(
+#             start=start_time, end=end_time, periods=len(data)))
+#
+#         accel_file.close()
+#         return freq, data, xz_data, timestamps, axis
+#
+#     @staticmethod
+#     def get_accel_data(path_or_obj, axis=None, start=-1, end=-1):
+#         """
+#
+#         Parameters
+#         ----------
+#         path_or_obj : TYPE
+#             DESCRIPTION.
+#         axis : TYPE, optional
+#             DESCRIPTION. The default is None.
+#
+#         Returns
+#         -------
+#         frequency, accelerometer data, xz_data, timestamps, axis
+#
+#         """
+#         if isinstance(path_or_obj, str):
+#             return AccelReader.get_accel_data_path(path_or_obj, axis, start, end)
+#         all_data = np.array(path_or_obj.signals)
+#         accel_axes = [0, 1, 2]
+#         if axis is not None:
+#             accel_axes.remove(axis)
+#             data = all_data[axis]
+#             xz_data = np.sqrt(all_data[accel_axes[0]] ** 2 + all_data[accel_axes[1]] ** 2)
+#         else:
+#             axis_index, test_stats = AccelReader.detect_vert(all_data[0:2])  # assumes vertical is 0 or 1
+#             other_axes = np.delete(np.arange(all_data.shape[0]), axis_index)
+#             axis = accel_axes[axis_index]
+#             data = all_data[axis_index]
+#             xz_data = np.sqrt((all_data[other_axes] ** 2).sum(axis=0))
+#
+#         freq = path_or_obj.signal_headers[axis]['sample_rate']
+#         start_time = path_or_obj.header['startdate']
+#         file_duration = len(data) / freq
+#         end_time = start_time + timedelta(0, file_duration)
+#         timestamps = np.asarray(pd.date_range(
+#             start=start_time, end=end_time, periods=len(data)))
+#
+#         return freq, data, xz_data, timestamps, axis
+#
+#     @staticmethod
+#
+#     @staticmethod
+#     def sig_init(raw_x, raw_y, raw_z, startdate, freq, **kwargs):
+#         """
+#         Initialize AccelReader object with raw signals, startdate, and freq
+#         raw_x, raw_y, raw_z: list
+#         startdate: datetime
+#         freq: int
+#         ---
+#         returns nwdata object
+#         """
+#
+#         class nwdata:
+#             def __init__(self):
+#                 self.header = {}
+#                 self.signal_headers = []
+#                 self.signals = []
+#
+#         data = nwdata()
+#         sigs = [raw_x, raw_y, raw_z]
+#         data.signals.extend(sigs)
+#         data.signal_headers.extend([{'sample_rate': freq}] * len(sigs))
+#         data.header['startdate'] = startdate
+#
+#         return data
+#
+#     def flip_signal(self):
+#         """
+#         Finds orientation based on lowpassed signal and flips the signal
+#         """
+#
+#         cutoff_freq = self.freq * 0.005
+#         sos = butter(N=1, Wn=cutoff_freq,
+#                             btype='low', fs=self.freq, output='sos')
+#         orientation = sosfilt(sos, self.data)
+#         flip_ind = np.where(orientation < -0.25)
+#         self.orientation = orientation
+#         self.data[flip_ind] = -self.data[flip_ind]
+#
+#     # 40Hz butter low pass filter
+#     def lowpass_filter(self, order=2, cutoff_ratio=0.17):
+#         """
+#         Applies a lowpass filter on the accelerometer data
+#         """
+#         cutoff_freq = self.freq * cutoff_ratio
+#         sos = butter(N=order, Wn=cutoff_freq,
+#                             btype='low', fs=self.freq, output='sos')
+#         self.data = sosfilt(sos, self.data)
+#
+#     def plot(self, return_plt=False):
+#         """
+#         Plots the signal, with additional option to plot other signals that are of the same length
+#         """
+#         dp_range = np.arange(self.start_dp, self.end_dp)
+#         ax1 = plt.subplot(311)
+#         ax1.set_title('Raw Accelerometer Data')
+#         plt.plot(dp_range, self.raw_data, 'r-')
+#         plt.grid(True)
+#
+#         ax2 = plt.subplot(312, sharex=ax1)
+#         ax2.set_title('Low Pass Filtered/Flipped Signal')
+#         plt.plot(dp_range, self.data, 'r-')
+#         plt.grid(True)
+#
+#         ax3 = plt.subplot(313, sharex=ax1)
+#         ax3.set_title('Device Orientation')
+#         filtered_legend = ['Flipped Signal', 'Original Signal']
+#         ax3.set_yticks(np.arange(len(filtered_legend)))
+#         ax3.set_yticklabels(filtered_legend)
+#         plt.plot(dp_range, self.orientation, 'r-')
+#         plt.grid(True)
+#         plt.tight_layout()
+#
+#         if not return_plt:
+#             plt.show()
+#         else:
+#             return plt
+#
+#     @staticmethod
+#     def plot_sigs(start, end, signals):
+#         """
+#         Plots the signal, with additional option to plot other signals that are of the same length
+#         Maybe check if all signals are of the same length?
+#         """
+#         time_range = np.arange(start, end)
+#
+#         fig, axs = plt.subplots(len(signals), sharex='all')
+#         axs = [axs] if len(signals) == 1 else axs
+#
+#         for i, ax in enumerate(axs):
+#             ax.plot(time_range, signals[i][start:end], 'r-')
+#
+#         plt.show()
 
-        Required Parameters:
-        - `accel_path` (str): path to the accelerometer EDF
-        - `label` (str): A label that's associated with the particular accelerometer data
-        - `axis` (int): tells the EDF reader which column of the EDF to access
-
-        Optional Parameters:
-        - `start` (int): starting datapoint to splice data
-        - `end` (int): ending datapoint to splice data
-        - `quiet` (bool): stops printing
-        """
-        if not quiet:
-            print("%s: Reading Accel Data..." % label)
-        self.accel_path_or_obj = accel_path_or_obj
-        self.freq, self.data, self.xz_data, self.timestamps, self.axis = AccelReader.get_accel_data(
-            accel_path_or_obj, axis=axis, start=start, end=end)
-        self.raw_data = self.data.copy()
-        self.start_dp = start
-        self.end_dp = end
-
-        self.label = label
-        self.quiet = quiet
-        self.sig_length = len(self.data)
-
-        if orient_signal:
-            self.flip_signal()
-        if low_pass:
-            self.lowpass_filter()
-
-    @staticmethod
-    def find_dp(path, duration_sec, timestamp_str=None, axis=1):
-        """
-        Gets start and end time based on a timestamp and duration_sec (# data points)
-        """
-        accel_file = pyedflib.EdfReader(path)
-        time_delta = pd.to_timedelta(
-            1 / accel_file.getSampleFrequency(axis), unit='s')
-        start = 0
-        if timestamp_str:
-            start = int((pd.to_datetime(timestamp_str) -
-                         accel_file.getStartdatetime()) / time_delta)
-        end = int(start + pd.to_timedelta(duration_sec, unit='s') / time_delta)
-        accel_file.close()
-        return start, end
-
-    @staticmethod
-    def get_accel_data_path(path, axis=None, start=-1, end=-1):
-        """
-        Gets the accelerometer data from EDF
-        """
-        accel_axes = [0, 1, 2]
-        accel_file = pyedflib.EdfReader(path)
-
-        if not (start > -1 and end > -1):
-            start = 0
-            end = accel_file.getNSamples()[accel_axes[0]]
-
-        if axis is not None:
-            accel_axes.remove(axis)
-            data = accel_file.readSignal(axis, start=start, n=(end - start))
-            xz_data = np.sqrt(
-                accel_file.readSignal(accel_axes[0], start=start, n=(end - start)) ** 2 + accel_file.readSignal(
-                    accel_axes[1], start=start, n=(end - start)) ** 2)
-        else:
-            all_data = np.array([accel_file.readSignal(ax, start=start, n=(end - start)) for ax in accel_axes])
-            axis_index, test_stats = AccelReader.detect_vert(all_data[0:2])  # assumes vertical is 0 or 1
-            other_axes = np.delete(np.arange(all_data.shape[0]), axis_index)
-            axis = accel_axes[axis_index]
-            data = all_data[axis_index]
-            xz_data = np.sqrt((all_data[other_axes] ** 2).sum(axis=0))
-
-        freq = accel_file.getSampleFrequency(axis)
-        start_time = accel_file.getStartdatetime() + timedelta(0, start / freq)
-        end_time = start_time + timedelta(0, accel_file.getFileDuration(
-        )) - timedelta(0, accel_file.getFileDuration() - (end - start) / freq)
-        timestamps = np.asarray(pd.date_range(
-            start=start_time, end=end_time, periods=len(data)))
-
-        accel_file.close()
-        return freq, data, xz_data, timestamps, axis
-
-    @staticmethod
-    def get_accel_data(path_or_obj, axis=None, start=-1, end=-1):
-        """
-
-        Parameters
-        ----------
-        path_or_obj : TYPE
-            DESCRIPTION.
-        axis : TYPE, optional
-            DESCRIPTION. The default is None.
-
-        Returns
-        -------
-        frequency, accelerometer data, xz_data, timestamps, axis
-
-        """
-        if isinstance(path_or_obj, str):
-            return AccelReader.get_accel_data_path(path_or_obj, axis, start, end)
-        all_data = np.array(path_or_obj.signals)
-        accel_axes = [0, 1, 2]
-        if axis is not None:
-            accel_axes.remove(axis)
-            data = all_data[axis]
-            xz_data = np.sqrt(all_data[accel_axes[0]] ** 2 + all_data[accel_axes[1]] ** 2)
-        else:
-            axis_index, test_stats = AccelReader.detect_vert(all_data[0:2])  # assumes vertical is 0 or 1
-            other_axes = np.delete(np.arange(all_data.shape[0]), axis_index)
-            axis = accel_axes[axis_index]
-            data = all_data[axis_index]
-            xz_data = np.sqrt((all_data[other_axes] ** 2).sum(axis=0))
-
-        freq = path_or_obj.signal_headers[axis]['sample_rate']
-        start_time = path_or_obj.header['startdate']
-        file_duration = len(data) / freq
-        end_time = start_time + timedelta(0, file_duration)
-        timestamps = np.asarray(pd.date_range(
-            start=start_time, end=end_time, periods=len(data)))
-
-        return freq, data, xz_data, timestamps, axis
-
-    @staticmethod
-    def detect_vert(axes, method='adg'):
-        """
-
-        NOTE: To improve function when passing in axes:
-                    - remove axes that are unlikely to be the vertical axis
-                    - remove data points that are known to be nonwear or lying down
-                    - OR only pass data from a known bout of standing
-
-        """
-
-        axes_arr = np.array(axes)
-
-        test_stats = None
-        vert_idx = None
-
-        if method == 'mam':
-
-            test_stats = np.mean(np.abs(axes_arr), axis=1)
-            vert_idx = np.argmax(test_stats)
-
-        elif method == 'adg':
-
-            test_stats = np.abs(1 - np.abs(np.mean(axes_arr, axis=1)))
-            vert_idx = np.argmin(test_stats)
-
-        return vert_idx, test_stats
-
-    @staticmethod
-    def sig_init(raw_x, raw_y, raw_z, startdate, freq, **kwargs):
-        """
-        Initialize AccelReader object with raw signals, startdate, and freq
-        raw_x, raw_y, raw_z: list
-        startdate: datetime
-        freq: int
-        ---
-        returns nwdata object
-        """
-
-        class nwdata:
-            def __init__(self):
-                self.header = {}
-                self.signal_headers = []
-                self.signals = []
-
-        data = nwdata()
-        sigs = [raw_x, raw_y, raw_z]
-        data.signals.extend(sigs)
-        data.signal_headers.extend([{'sample_rate': freq}] * len(sigs))
-        data.header['startdate'] = startdate
-
-        return data
-
-    def flip_signal(self):
-        """
-        Finds orientation based on lowpassed signal and flips the signal
-        """
-
-        cutoff_freq = self.freq * 0.005
-        sos = butter(N=1, Wn=cutoff_freq,
-                            btype='low', fs=self.freq, output='sos')
-        orientation = sosfilt(sos, self.data)
-        flip_ind = np.where(orientation < -0.25)
-        self.orientation = orientation
-        self.data[flip_ind] = -self.data[flip_ind]
-
-    # 40Hz butter low pass filter
-    def lowpass_filter(self, order=2, cutoff_ratio=0.17):
-        """
-        Applies a lowpass filter on the accelerometer data
-        """
-        cutoff_freq = self.freq * cutoff_ratio
-        sos = butter(N=order, Wn=cutoff_freq,
-                            btype='low', fs=self.freq, output='sos')
-        self.data = sosfilt(sos, self.data)
-
-    def plot(self, return_plt=False):
-        """
-        Plots the signal, with additional option to plot other signals that are of the same length
-        """
-        dp_range = np.arange(self.start_dp, self.end_dp)
-        ax1 = plt.subplot(311)
-        ax1.set_title('Raw Accelerometer Data')
-        plt.plot(dp_range, self.raw_data, 'r-')
-        plt.grid(True)
-
-        ax2 = plt.subplot(312, sharex=ax1)
-        ax2.set_title('Low Pass Filtered/Flipped Signal')
-        plt.plot(dp_range, self.data, 'r-')
-        plt.grid(True)
-
-        ax3 = plt.subplot(313, sharex=ax1)
-        ax3.set_title('Device Orientation')
-        filtered_legend = ['Flipped Signal', 'Original Signal']
-        ax3.set_yticks(np.arange(len(filtered_legend)))
-        ax3.set_yticklabels(filtered_legend)
-        plt.plot(dp_range, self.orientation, 'r-')
-        plt.grid(True)
-        plt.tight_layout()
-
-        if not return_plt:
-            plt.show()
-        else:
-            return plt
-
-    @staticmethod
-    def plot_sigs(start, end, signals):
-        """
-        Plots the signal, with additional option to plot other signals that are of the same length
-        Maybe check if all signals are of the same length?
-        """
-        time_range = np.arange(start, end)
-
-        fig, axs = plt.subplots(len(signals), sharex='all')
-        axs = [axs] if len(signals) == 1 else axs
-
-        for i, ax in enumerate(axs):
-            ax.plot(time_range, signals[i][start:end], 'r-')
-
-        plt.show()
 
 class StepDetection(AccelReader):
     # increase swing threshold
@@ -1484,16 +1456,125 @@ def gait_stats(bouts, type='daily', single_leg=False):
 
     return gait_stats
 
-def detect_stepping(accelerometer = False, gyroscope = False, bilateral=False):
-    if accelerometer == False & gyroscope == False:
-            print('Signal not defined. Define signal availability to run Step Detection.')
-    elif accelerometer == True & gyroscope == True:
 
+#AccelReader
+def detect_vert(axes, method='adg'):
+        """
+        NOTE: To improve function when passing in axes:
+                    - remove axes that are unlikely to be the vertical axis
+                    - remove data points that are known to be nonwear or lying down
+                    - OR only pass data from a known bout of standing
+
+        Parameters
+        ---
+        axes -> all axs of accelerometer sensors
+        method-> no clue tbh;
+            adg = something with absolute _?_  gravity??
+            mam = something with accelerometer magnitude?
+
+        """
+        axes_arr = np.array(axes)
+
+        test_stats = None
+        vert_idx = None
+
+        if method == 'mam':
+
+            test_stats = np.mean(np.abs(axes_arr), axis=1)
+            vert_idx = np.argmax(test_stats)
+
+        elif method == 'adg':
+
+            test_stats = np.abs(1 - np.abs(np.mean(axes_arr, axis=1)))
+            vert_idx = np.argmin(test_stats)
+
+        return vert_idx, test_stats
+
+def lowpass_filter(acc_data, freq, order=2, cutoff_ratio=0.17):
+        """
+        Applies a lowpass filter on the accelerometer data
+
+        Parameters
+        ---
+        acc_data
+        freq
+        order -> filter order; default is 2nd order
+        cutoff_ratio -> used to determine the cutoff frequency
+
+        Ouput
+        ---
+        acc_data low pass filtered, cutoff_freq
+        """
+        cutoff_freq = freq * cutoff_ratio
+        sos = butter(N=order, Wn=cutoff_freq,
+                            btype='low', fs=freq, output='sos')
+        acc_data = sosfilt(sos, acc_data)
+
+        return acc_data, cutoff_freq
+
+def flip_signal(acc_data, freq):
+        """
+        Finds orientation based on lowpassed signal and flips the signal
+
+        Parameters
+        ---
+        acc_data -> accelerometer np.array
+        freq -> sampling frequency stored in header
+
+        Output
+        ---
+        acc_data
+        """
+
+        cutoff_freq = freq * 0.005
+        sos = butter(N=1, Wn=cutoff_freq, btype='low', fs=freq, output='sos')
+        orientation = sosfilt(sos, acc_data)
+        flip_ind = np.where(orientation < -0.25)
+        acc_data[flip_ind] = -acc_data[flip_ind]
+
+        return acc_data
+
+def get_acc_data(accelerometer=None, axis=None, orient_signal=True, low_pass=True):
+    """
+        Parameters
+        ---
+        obj -> accelerometer object as read by nimbalwear.Device()
+        axis  -> can specific the vertical axis; default is 'None' determines vertical
+        orient_signal -> flips the vertical axis if needed
+        low_pass -> low pass filter to remove noise
+        ---
+        Returns
+        ---
+        frequency, accelerometer data, xz_data, timestamps, axis
+        """
+
+    all_data = np.array(accelerometer.signals)
+    accel_axes = [0, 1, 2]
+    if axis is not None:
+        accel_axes.remove(axis)
+        acc_data = all_data[axis]
+        xz_data = np.sqrt(all_data[accel_axes[0]] ** 2 + all_data[accel_axes[1]] ** 2)
     else:
+        axis_index, test_stats = detect_vert(all_data[0:2])  # assumes vertical is 0 or 1
+        other_axes = np.delete(np.arange(all_data.shape[0]), axis_index)
+        axis = accel_axes[axis_index]
+        acc_data = all_data[axis_index]
+        xz_data = np.sqrt((all_data[other_axes] ** 2).sum(axis=0))
 
+    freq = accelerometer.signal_headers[axis]['sample_rate']
+    start_time = accelerometer.header['start_datetime']
+    file_duration = len(acc_data) / freq
+    end_time = start_time + timedelta(0, file_duration)
+    timestamps = np.asarray(pd.date_range(start=start_time, end=end_time, periods=len(acc_data)))
 
+    if orient_signal:
+        acc_data = flip_signal(acc_data, freq)
 
-    return steps_df
+    if low_pass:
+        acc_data = lowpass_filter(acc_data, freq)
+
+    return freq, acc_data, xz_data, timestamps, axis
+
 
 #############################################################################################################################
 if __name__ == '__main__':
@@ -1508,11 +1589,15 @@ if __name__ == '__main__':
     else:
         ankle_acc.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_AXV6_RAnkle_ACCELEROMETER.edf')
 
-    # TODO: Select the signals that are needed (gyroscope OR accelerometer) for step detection
-    acc = get_accelerometer_signal(data=ankle_acc)
-
+    # Creating step detection algorithm
     # TODO: Run step detection algorithm
-    steps_df = detect_stepping(accelerometer = None, gyroscope = None, bilateral=False)
+    #This is what I imagine the line to look like
+            # steps_df = detect_stepping(accelerometer=ankle_acc, gyroscope=None, bilateral=False)
+    # TODO: Select the signals that are needed (accelerometer) for step detection
+    #freq, acc_data, xz_data, timestamps, axis = get_acc_data(accelerometer=None, axis=None, orient_signal=True, low_pass=True)
+    freq, acc_data, xz_data, timestamps, axis = get_acc_data(accelerometer=ankle_acc, axis=None, orient_signal=True, low_pass=True)
+
+
 
     # TODO: Run steps through to find walking bouts
 
