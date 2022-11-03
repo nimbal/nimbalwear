@@ -99,7 +99,7 @@
       "save": true
     },
     "activity": {
-      "dominant": false,
+      "pref_cutpoint": null,
       "lowpass": 20,
       "epoch_length": 15,
       "cutpoints": [
