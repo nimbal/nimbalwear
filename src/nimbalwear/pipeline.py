@@ -1099,6 +1099,7 @@ class Pipeline:
                     message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for device",
                             level='warning', display=(not quiet), log=log, logger_name=self.log_name)
 
+                # save settings used to derive device bouts and add to nonwear dataframe
                 accel_std_thresh_mg = device_bouts.iloc[0]['accel_std_thresh_mg']
                 low_temperature_cutoff = device_bouts.iloc[0]['low_temperature_cutoff']
                 high_temperature_cutoff = device_bouts.iloc[0]['high_temperature_cutoff']
@@ -1116,6 +1117,7 @@ class Pipeline:
                 daily_nonwear.insert(loc=8, column='temp_dec_roc', value=temp_dec_roc)
                 daily_nonwear.insert(loc=9, column='temp_inc_roc', value=temp_inc_roc)
 
+                # update nonwear collection attribrutes
                 coll.daily_nonwear = pd.concat([coll.daily_nonwear, daily_nonwear], ignore_index=True)
                 device_bouts = device_bouts.drop(columns=['duration'])
                 coll.nonwear_bouts = pd.concat([coll.nonwear_bouts, device_bouts], ignore_index=True)
@@ -1125,6 +1127,7 @@ class Pipeline:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for collection",
                         level='warning', display=(not quiet), log=log, logger_name=self.log_name)
 
+            # save files
             if save:
 
                 # create all file path variables
@@ -1158,6 +1161,7 @@ class Pipeline:
                             logger_name=self.log_name)
                     device_bouts.to_csv(nonwear_csv_path, index=False)
 
+                    # write new daily non-wear summary
                     message(f"Saving {nonwear_daily_csv_path}", level='info', display=(not quiet), log=log,
                         logger_name=self.log_name)
 
