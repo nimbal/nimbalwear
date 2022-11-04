@@ -16,10 +16,10 @@ console:
 
 `pip install git+https://github.com/nimbal/nimbalwear`
 
-To install a specific release, insert `@v#.#.#` after the repository name replacing with the tag associated with that 
-release. For example:
+To install a specific release, insert `M.m` after the repository name to install from the branch associated with that 
+minor release. For example:
 
-`pip install git+https://github.com/nimbal/nimbalwear@v1.0.0`
+`pip install git+https://github.com/nimbal/nimbalwear@0.18`
 
 # Package Dependency
 
@@ -28,7 +28,7 @@ To include the latest release of nimbalwear as a dependency in your Python packa
 
 `install_requires=['nimbalwear@git+https://github.com/nimbal/nimbalwear@[version]']`
 
-To include a specific release, replace `[version]` with the tag associated with that release.
+To include a specific release, replace `[version]` with the branch associated with that minor release.
 
 # Changes by version
 
