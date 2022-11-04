@@ -693,11 +693,22 @@ class Pipeline:
 
     @coll_status
     def nonwear(self, coll, quiet=False, log=True):
+        """Detect wear and non-wear bouts for all devices in the collection.
+
+        Parameters
+        ----------
+        coll : Collection
+            Collection object containing attributes and methods related to the collection
+        quiet : bool, optional
+            Suppress displayed messages (default is False)
+        log : bool, optional
+            Log messages (default is True)
+
+        """
 
         # process nonwear for all devices
         message("Detecting non-wear...", level='info', display=(not quiet), log=log, logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
-
 
         save = self.module_settings['nonwear']['save']
 
@@ -716,10 +727,13 @@ class Pipeline:
             device_location = r['device_location']
 
             # find device body location type
+
+            # get location aliases from settings
             wrist_locations = self.device_locations['rwrist']['aliases'] + self.device_locations['lwrist']['aliases']
             ankle_locations = self.device_locations['rankle']['aliases'] + self.device_locations['lankle']['aliases']
             chest_locations = self.device_locations['chest']['aliases']
 
+            # compare device location to location types
             if device_location.upper() in wrist_locations:
                 location_type = "wrist"
             elif device_location.upper() in ankle_locations:
@@ -727,23 +741,15 @@ class Pipeline:
             elif device_location.upper() in chest_locations:
                 location_type = "chest"
 
+            # get location specific non-wear settings
             accel_std_thresh_mg = self.module_settings['nonwear']['settings'][location_type]['accel_std_thresh_mg']
             low_temperature_cutoff = self.module_settings['nonwear']['settings'][location_type]['low_temperature_cutoff']
             high_temperature_cutoff = self.module_settings['nonwear']['settings'][location_type]['high_temperature_cutoff']
             temp_dec_roc = self.module_settings['nonwear']['settings'][location_type]['temp_dec_roc']
             temp_inc_roc = self.module_settings['nonwear']['settings'][location_type]['temp_inc_roc']
 
+            # current device
             device = coll.devices[i]
-
-            # TODO: Add nonwear detection for other devices
-            # TODO: add wear bouts
-            # TODO: rename from nonwear to wear
-
-            if device_type not in ['BF36', 'AXV6', 'GNOR']:
-                message(f"Cannot detect non-wear for {device_type}_{device_location}",
-                        level='info', display=(not quiet), log=log, logger_name=self.log_name)
-                message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
-                continue
 
             # check for data loaded
             if device is None:
@@ -752,14 +758,20 @@ class Pipeline:
                 message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
                 continue
 
+            # get signal indices
             accel_x_idx = device.get_signal_index('Accelerometer x')
             accel_y_idx = device.get_signal_index('Accelerometer y')
             accel_z_idx = device.get_signal_index('Accelerometer z')
             temperature_idx = device.get_signal_index('Temperature')
 
-            # TODO: call different algorithm based on device_type or signals available??
-            # TODO: log algorithm used
+            # check for all required signals
+            if None in [accel_x_idx, accel_y_idx, accel_z_idx, temperature_idx]:
+                message(f"{device_type}_{device_location} does not contain all signals required to edetect non-wear",
+                        level='info', display=(not quiet), log=log, logger_name=self.log_name)
+                message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+                continue
 
+            # get signals
             accel_x = device.signals[accel_x_idx]
             accel_y = device.signals[accel_y_idx]
             accel_z = device.signals[accel_z_idx]
@@ -767,10 +779,11 @@ class Pipeline:
 
             # TODO: index signals by label - make option to return datetimeindex
 
+            # get sample rates
             accel_fs = device.signal_headers[accel_x_idx]['sample_rate']
             temperature_fs = device.signal_headers[temperature_idx]['sample_rate']
 
-
+            # detect non-wear using DETACH algorithm
             nonwear_bouts, nonwear_array = vert_nonwear(x_values=accel_x, y_values=accel_y, z_values=accel_z,
                                                         temperature_values=temperature, accel_freq=accel_fs,
                                                         temperature_freq=temperature_fs,
@@ -779,20 +792,21 @@ class Pipeline:
                                                         high_temperature_cutoff=high_temperature_cutoff,
                                                         temp_dec_roc=temp_dec_roc, temp_inc_roc=temp_inc_roc,
                                                         quiet=quiet)
-
             algorithm_name = 'DETACH'
 
-
+            # label non-wear bouts as non-wear events
             nonwear_bouts['event'] = "nonwear"
+
             nonwear_bouts.rename(columns={'Start Datapoint': 'start_datapoint', 'End Datapoint': 'end_datapoint'},
                                  inplace=True)
 
+            # count bouts
             bout_count = nonwear_bouts.shape[0]
 
             message(f"Detected {bout_count} nonwear bouts for {device_type} {device_location} ({algorithm_name})",
                     level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-            # convert datapoints to times
+            # convert datapoints to times and insert into dataframe as start and end time for each event
             start_date = device.header['start_datetime']
             sample_rate = device.signal_headers[accel_x_idx]['sample_rate']
             samples = device.signals[accel_x_idx].shape[0]
@@ -808,7 +822,10 @@ class Pipeline:
             nonwear_bouts['start_time'] = nonwear_start_times
             nonwear_bouts['end_time'] = nonwear_end_times
 
+            # select columns
             nonwear_bouts = nonwear_bouts[['event', 'start_time', 'end_time']]
+
+            # calculate wear events and insert between non-wear events
 
             # nonwear end times are wear start times -- nonwear start times are wear end times
             wear_start_times = nonwear_end_times
@@ -820,7 +837,7 @@ class Pipeline:
             # collection end is last wear end
             wear_end_times.append(end_date)
 
-            # remove first wear bout if duration is 0 - started with non-wear
+            # remove first and last wear bout if duration is 0 - started or ended with non-wear with non-wear
             if wear_start_times[0] == wear_end_times[0]:
                 wear_start_times = wear_start_times[1:]
                 wear_end_times = wear_end_times[1:]
@@ -829,16 +846,21 @@ class Pipeline:
                 wear_start_times = wear_start_times[:-1]
                 wear_end_times = wear_end_times[:-1]
 
+            # create wear dataframe
             wear_bouts = pd.DataFrame({'start_time': wear_start_times, 'end_time': wear_end_times, })
             wear_bouts['event'] = 'wear'
 
+            # concatenate with nonwear and sort by start_time
             nonwear_bouts = pd.concat([nonwear_bouts, wear_bouts], ignore_index=True)
             nonwear_bouts = nonwear_bouts.sort_values('start_time')
 
+            # number bouts as id
             nonwear_bouts.insert(loc=0, column='id', value=range(1, nonwear_bouts.shape[0] + 1))
+
+            # calculate daily summary non-wear
             daily_nonwear = nonwear_stats(nonwear_bouts, quiet=quiet)
 
-            # add identifiers
+            # add identifiers and settings to bouts and daily summary
             nonwear_bouts.insert(loc=0, column='study_code', value=study_code)
             nonwear_bouts.insert(loc=1, column='subject_id', value=subject_id)
             nonwear_bouts.insert(loc=2, column='coll_id', value=coll_id)
@@ -865,6 +887,7 @@ class Pipeline:
             coll.nonwear_bouts = pd.concat([coll.nonwear_bouts, nonwear_bouts], ignore_index=True)
             coll.daily_nonwear = pd.concat([coll.daily_nonwear, daily_nonwear], ignore_index=True)
 
+            # save output files
             if save:
 
                 # create all file path variables
@@ -878,17 +901,17 @@ class Pipeline:
                 nonwear_csv_path = self.dirs['nonwear_bouts_standard'] / nonwear_csv_name
                 nonwear_daily_csv_path = self.dirs['nonwear_daily_standard'] / daily_nonwear_csv_name
 
+                # create parent folders if they don't exist
                 nonwear_csv_path.parent.mkdir(parents=True, exist_ok=True)
                 nonwear_daily_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
+                # save files
                 message(f"Saving {nonwear_csv_path}", level='info', display=(not quiet), log=log,
                         logger_name=self.log_name)
-
                 nonwear_bouts.to_csv(nonwear_csv_path, index=False)
 
                 message(f"Saving {nonwear_daily_csv_path}", level='info', display=(not quiet), log=log,
                         logger_name=self.log_name)
-
                 daily_nonwear.to_csv(nonwear_daily_csv_path, index=False)
 
             message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
@@ -949,6 +972,18 @@ class Pipeline:
 
     @coll_status
     def crop(self, coll, quiet=False, log=True):
+        """Crop non-wear from start and end of all devices in the collection.
+
+        Parameters
+        ----------
+        coll : Collection
+            Collection object containing attributes and methods related to the collection
+        quiet : bool, optional
+            Suppress displayed messages (default is False)
+        log : bool, optional
+            Log messages (default is True)
+
+        """
 
         message("Cropping initial and final non-wear...", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
