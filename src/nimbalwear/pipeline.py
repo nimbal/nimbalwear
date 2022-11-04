@@ -574,7 +574,15 @@ class Pipeline:
             device_type = row['device_type']
             device_location = row['device_location']
 
-            if idx > 0:
+            if idx == 0:
+
+                # check if sync_at_config is true and give warning and set to false if config_date after start_date
+                if (sync_at_config) & (coll.devices[idx].header['config_datetime'] > coll.devices[idx].header['start_datetime']):
+                    sync_at_config = False
+                    message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: Invalid config time, could not add as sync time",
+                            level='warning', display=(not quiet), log=log, logger_name=self.log_name)
+
+            else:
 
                 accel_idx = coll.devices[idx].get_signal_index(self.sensors['accelerometer']['signals'][0])
 
@@ -585,15 +593,6 @@ class Pipeline:
                 except ValueError:
                     ds_index = freq - 5
                 signal_ds = round(freq / (5 + ds_index))
-
-                # check if synnc_at_config is true and give warning and set to false if config_ate after start_date
-                if sync_at_config:
-                    if coll.devices[0].header['config_datetime'] > coll.devices[0].header['start_datetime']:
-
-                        sync_at_config = False
-
-                        message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: Invalid config time, could not add as sync time",
-                                    level='warning', display=(not quiet), log=log, logger_name=self.log_name)
 
                 syncs, segments = coll.devices[idx].sync(ref=coll.devices[0],
                                                          sig_labels=tuple(self.sensors['accelerometer']['signals']),
