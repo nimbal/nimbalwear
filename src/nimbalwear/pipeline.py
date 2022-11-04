@@ -1700,6 +1700,8 @@ class Pipeline:
                 coll.activity_daily = pd.concat([coll.activity_daily, activity_daily])
                 coll.avm_second = pd.concat([coll.avm_second, avm_second])
 
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
         # TODO: more detailed log info about what was done, epochs, days, intensities?
         # TODO: info about algortihm and settings, device used, dominant vs non-dominant, in log, methods, or data table
 
