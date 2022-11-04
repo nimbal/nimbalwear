@@ -581,6 +581,7 @@ class Pipeline:
                     sync_at_config = False
                     message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: Invalid config time, could not add as sync time",
                             level='warning', display=(not quiet), log=log, logger_name=self.log_name)
+                    message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
             else:
 
