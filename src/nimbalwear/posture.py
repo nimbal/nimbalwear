@@ -4,6 +4,9 @@ from scipy import signal
 from datetime import timedelta as td
 
 def prep_accelerometer_df(x, y, z, sample_rate, body_location, start_datetime):
+    """
+    Creates the proper dataframe format for an individual accelerometer for the remainder of the posture analysis
+    """
     # Get data
     if body_location == 'chest':
         data_dict = {
@@ -37,6 +40,9 @@ def prep_accelerometer_df(x, y, z, sample_rate, body_location, start_datetime):
 
 
 def get_gait_mask(gait_df, start, end):
+    """
+    creates a list of 0's (no gait) and 1's (gait) with each value representing 1 second.
+    """
     # Read in gait_object
 
     gait_df['start_timestamp'] = pd.DatetimeIndex(gait_df['start_timestamp']).floor('S')
@@ -54,7 +60,7 @@ def get_gait_mask(gait_df, start, end):
     gait_mask = np.zeros(len(epoch_ts), dtype=int)
     start_stamp = epoch_ts[0]
 
-    # Use nimbalwear/gait.py format
+    # Use nimbalwear/gait.py for the correct format
     try:
         for row in gait_df.itertuples():
             start = np.ceil((row.start_timestamp - start_stamp).total_seconds())
@@ -124,7 +130,7 @@ def _get_angles(x, y, z):
 
 
 def _get_transitions(x, y, z, gait_mask, th=0.04):
-    """Classify static movement time points as transition based on a threshold
+    """Classify static movement time as a transition based on a threshold
 
     Args:
         x: time array of the x-axis acceleration values
@@ -152,11 +158,13 @@ def _get_transitions(x, y, z, gait_mask, th=0.04):
 
 
 def create_posture_df_template(data_df, gait_mask, tran_type='jerk', tran_thresh=0.04):
-    """Classify static movement time points as transition based on a threshold
+    """Classify static movement time points as transition based on a threshold. This posture dataframe is then used for
+     input into the wrist/ankle/chest/thigh posture classifiers.
 
     Args:
         data_df: dataframe with timestamps and 3 axes of accelerometer data;
-                 must have columns: timestamp, ant_acc, up_acc, left_acc
+                 must have columns: timestamp, ant_acc, up_acc, left_acc;
+                 can be created using prep_accelerometer_df
         gait_mask: time array of 1s and 0s indicating gait activity
         tran_type: optional; string indicating type of transition to use.
                    Options are 'jerk' and 'ang_vel'
@@ -164,7 +172,7 @@ def create_posture_df_template(data_df, gait_mask, tran_type='jerk', tran_thresh
                      define a period as a transition
 
     Returns:
-        post_df: dataframe of timestamps, preliminary postures, angle data,
+        posture_df: dataframe of timestamps, preliminary postures, angle data,
                  gait mask, and transitions
     """
     # obtain the various components of the posture dataframe
@@ -182,16 +190,16 @@ def create_posture_df_template(data_df, gait_mask, tran_type='jerk', tran_thresh
                         "are: 'jerk' and 'ang_vel'.")
 
     # create the posture dataframe
-    post_df = pd.DataFrame(
+    posture_df = pd.DataFrame(
         {'timestamp': data_df['timestamp'],
          'posture': 'other',
          'ant_ang': ant_ang, 'up_ang': up_ang, 'left_ang': left_ang,
          'gait': gait_mask, 'transition': transitions})
 
-    return post_df
+    return posture_df
 
 
-def classify_ankle_posture(post_df):
+def classify_ankle_posture(posture_df):
     """Determine posture based on ankle angles from each axis.
 
     Posture can be: sitstand, sit, horizontal, or other.
@@ -201,26 +209,26 @@ def classify_ankle_posture(post_df):
         180 degrees: positive axis is pointing downwards (with gravity)
 
     Args:
-        post_df: dataframe of timestamps, angle data, and postures
+        posture_df: dataframe of timestamps, angle data, and postures created in create_posture_df_template
 
     Returns:
-        post_df: dataframe of timestamps, angle data, and updated postures
+        posture_df: copy of the inputted posture_df with and updated postures
     """
     # sit/stand: static with ankle tilt 0-25 degrees
-    post_df.loc[(post_df['up_ang'] < 25), 'posture'] = "sitstand"
+    posture_df.loc[(posture_df['up_ang'] < 25), 'posture'] = "sitstand"
 
     # sit: static with ankle tilt 25-45 degrees
-    post_df.loc[(25 <= post_df['up_ang']) &
-                (post_df['up_ang'] < 70), 'posture'] = "sit"
+    posture_df.loc[(25 <= posture_df['up_ang']) &
+                (posture_df['up_ang'] < 70), 'posture'] = "sit"
 
     # horizontal: static with shank tilt 45-135 degrees
-    post_df.loc[(70 <= post_df['up_ang']) &
-                (post_df['up_ang'] <= 135), 'posture'] = "horizontal"
+    posture_df.loc[(70 <= posture_df['up_ang']) &
+                (posture_df['up_ang'] <= 135), 'posture'] = "horizontal"
 
-    return post_df
+    return posture_df
 
 
-def classify_chest_posture(post_df):
+def classify_chest_posture(posture_df):
     """Determine posture based on chest angles from each axis.
 
     Posture can be: sitstand, reclined, prone, supine, leftside, rightside, or
@@ -230,43 +238,43 @@ def classify_chest_posture(post_df):
         180 degrees: positive axis is pointing downwards (with gravity)
 
     Args:
-        post_df: dataframe of timestamps, angle data, and postures
+        posture_df: dataframe of timestamps, angle data, and postures created in create_posture_df_template
 
     Returns:
-        post_df: dataframe of timestamps, angle data, and updated postures
+        posture_df: copy of the inputted posture_df with and updated postures
     """
     # sit/stand: static with up axis upwards
-    post_df.loc[(post_df['up_ang'] < 45), 'posture'] = "sitstand"
+    posture_df.loc[(posture_df['up_ang'] < 45), 'posture'] = "sitstand"
 
     # prone: static with anterior axis downwards, left axis horizontal
-    post_df.loc[(135 <= post_df['ant_ang']) &
-                (45 <= post_df['left_ang']) & (post_df['left_ang'] <= 135),
+    posture_df.loc[(135 <= posture_df['ant_ang']) &
+                (45 <= posture_df['left_ang']) & (posture_df['left_ang'] <= 135),
                 'posture'] = "prone"
 
     # supine: static with anterior axis upwards, left & up axes horizontal
-    post_df.loc[(post_df['ant_ang'] <= 45) &
-                (70 <= post_df['up_ang']) & (45 <= post_df['left_ang']) &
-                (post_df['left_ang'] <= 135), 'posture'] = "supine"
+    posture_df.loc[(posture_df['ant_ang'] <= 45) &
+                (70 <= posture_df['up_ang']) & (45 <= posture_df['left_ang']) &
+                (posture_df['left_ang'] <= 135), 'posture'] = "supine"
 
     # reclined: static with anterior axis upwards, left axis horizontal,
     # up axis above horizontal
-    post_df.loc[(post_df['ant_ang'] <= 70) &
-                (45 <= post_df['up_ang']) & (post_df['up_ang'] < 70) &
-                (45 <= post_df['left_ang']) & (post_df['left_ang'] <= 135),
+    posture_df.loc[(posture_df['ant_ang'] <= 70) &
+                (45 <= posture_df['up_ang']) & (posture_df['up_ang'] < 70) &
+                (45 <= posture_df['left_ang']) & (posture_df['left_ang'] <= 135),
                 'posture'] = "reclined"
 
     # left side: static with left axis downwards, up axis horizontal
-    post_df.loc[(45 <= post_df['up_ang']) & (post_df['up_ang'] <= 135) &
-                (135 <= post_df['left_ang']), 'posture'] = "leftside"
+    posture_df.loc[(45 <= posture_df['up_ang']) & (posture_df['up_ang'] <= 135) &
+                (135 <= posture_df['left_ang']), 'posture'] = "leftside"
 
     # right side: static with left axis upwards, up axis horizontal
-    post_df.loc[(45 <= post_df['up_ang']) & (post_df['up_ang'] <= 135) &
-                (post_df['left_ang'] < 45), 'posture'] = "rightside"
+    posture_df.loc[(45 <= posture_df['up_ang']) & (posture_df['up_ang'] <= 135) &
+                (posture_df['left_ang'] < 45), 'posture'] = "rightside"
 
-    return post_df
+    return posture_df
 
 
-def classify_thigh_posture(post_df):
+def classify_thigh_posture(posture_df):
     """Determine posture based on thigh angles from each axis.
 
     Posture can be: stand, sitlay, or other.
@@ -276,22 +284,22 @@ def classify_thigh_posture(post_df):
         180 degrees: positive axis is pointing downwards (with gravity)
 
     Args:
-        post_df: dataframe of timestamps, angle data, and postures
+        posture_df: dataframe of timestamps, angle data, and postures created in create_posture_df_template
 
     Returns:
-        post_df: dataframe of timestamps, angle data, and updated postures
+        posture_df: copy of the inputted posture_df with and updated postures
     """
     # stand: thigh tilt 0-45 degrees
-    post_df.loc[(post_df['up_ang'] < 45), 'posture'] = "stand"
+    posture_df.loc[(posture_df['up_ang'] < 45), 'posture'] = "stand"
 
     # sit/lay: static with thigh tilt 45-135 degrees
-    post_df.loc[(45 <= post_df['up_ang']) &
-                (post_df['up_ang'] < 135), 'posture'] = "sitlay"
+    posture_df.loc[(45 <= posture_df['up_ang']) &
+                (posture_df['up_ang'] < 135), 'posture'] = "sitlay"
 
-    return post_df
+    return posture_df
 
 
-def classify_wrist_position(post_df):
+def classify_wrist_position(posture_df):
     """Determine wrist position based on wrist angles from each axis.
 
     Position can be: up, down, supine, prone, and side.
@@ -301,41 +309,40 @@ def classify_wrist_position(post_df):
         180 degrees: positive axis is pointing downwards (with gravity)
 
     Args:
-        post_df: dataframe of timestamps, angle data, and postures
+        posture_df: dataframe of timestamps, angle data, and postures created in create_posture_df_template
 
     Returns:
-        post_df: dataframe of timestamps, angle data, and updated positions
+        posture_df: copy of the inputted posture_df with and updated postures
     """
     # down: up axis upwards
-    post_df.loc[(post_df['up_ang'] < 45), 'posture'] = "down"
+    posture_df.loc[(posture_df['up_ang'] < 45), 'posture'] = "down"
 
     # up: up axis downwards
-    post_df.loc[(135 <= post_df['up_ang']), 'posture'] = "up"
+    posture_df.loc[(135 <= posture_df['up_ang']), 'posture'] = "up"
 
     # prone: left axis upwards
-    post_df.loc[(post_df['left_ang'] < 45), 'posture'] = "palm_down"
+    posture_df.loc[(posture_df['left_ang'] < 45), 'posture'] = "palm_down"
 
     # supine: left axis downwards
-    post_df.loc[(135 <= post_df['left_ang']), 'posture'] = "palm_up"
+    posture_df.loc[(135 <= posture_df['left_ang']), 'posture'] = "palm_up"
 
     # thumb_down: up and left axis horizontal, anterior axis down
-    post_df.loc[(45 <= post_df['up_ang']) & (post_df['up_ang'] < 135) &
-                (45 <= post_df['left_ang']) & (post_df['left_ang'] < 135) &
-                (135 <= (post_df['ant_ang'])), 'posture'] = "thumb_down"
+    posture_df.loc[(45 <= posture_df['up_ang']) & (posture_df['up_ang'] < 135) &
+                (45 <= posture_df['left_ang']) & (posture_df['left_ang'] < 135) &
+                (135 <= (posture_df['ant_ang'])), 'posture'] = "thumb_down"
 
     # thumb_up: up and left axis horizontal, anterior axis up
-    post_df.loc[(45 <= post_df['up_ang']) & (post_df['up_ang'] < 135) &
-                (45 <= post_df['left_ang']) & (post_df['left_ang'] < 135) &
-                (post_df['ant_ang'] < 45), 'posture'] = "thumb_up"
+    posture_df.loc[(45 <= posture_df['up_ang']) & (posture_df['up_ang'] < 135) &
+                (45 <= posture_df['left_ang']) & (posture_df['left_ang'] < 135) &
+                (posture_df['ant_ang'] < 45), 'posture'] = "thumb_up"
 
-    return post_df
+    return posture_df
 
 
 def _crop_posture_dfs(posture_df_dict):
     """
     crops all dfs in the posture_df_dict to the same size by cropping to the latest start and
     earliest end within all posture dataframes
-
     """
     new_start = max([df['timestamp'].values[0] for df in posture_df_dict.values()])  # Latest start time of any df
     new_end = min([df['timestamp'].values[-1] for df in posture_df_dict.values()])  # Earliest end time of any df
@@ -379,7 +386,7 @@ def _clean_transitions(transitions, gap_fill=5):
 
 
 def combine_posture_dfs(posture_df_dict, tran_combo=None, tran_gap_fill=5):
-    """Combine posture dataframes together
+    """Use available posture dataframes to create a summary posture dataframe
 
     Args:
         posture_df_dict: dictionary with keys of the wearable name and values of
@@ -390,8 +397,12 @@ def combine_posture_dfs(posture_df_dict, tran_combo=None, tran_gap_fill=5):
                        transition (default 5)
 
     Returns:
-        post_df: dataframe of timestamps, combined postures, and combined
+        posture_df: dataframe of timestamps, combined postures, and combined
                  transitions
+
+    Notes:
+        - Must have a chest posture dataframe
+        - Does not use wrist data
     """
     print("Combining posture dataframes...", end=" ")
     # Crop dfs to uniform length
@@ -415,7 +426,7 @@ def combine_posture_dfs(posture_df_dict, tran_combo=None, tran_gap_fill=5):
 
     # create new dataframe, initially setting posture as chest posture
     chest_post = new_posture_df_dict['chest']
-    post_df = pd.DataFrame({'timestamp': chest_post['timestamp'],
+    posture_df = pd.DataFrame({'timestamp': chest_post['timestamp'],
                             'posture': chest_post['posture'],
                             'transition': clean_trans,
                             'gait': chest_post['gait']})
@@ -424,16 +435,16 @@ def combine_posture_dfs(posture_df_dict, tran_combo=None, tran_gap_fill=5):
         ankle_post = new_posture_df_dict['ankle']
 
         # chest sit/stand + ankle sit = sit
-        post_df.loc[(chest_post['posture'] == 'sitstand') &
+        posture_df.loc[(chest_post['posture'] == 'sitstand') &
                     (ankle_post['posture'] == 'sit'), 'posture'] = "sit"
 
         # chest sit/stand + ankle horizontal = sitting reclined
-        post_df.loc[(chest_post['posture'] == 'sitstand') &
+        posture_df.loc[(chest_post['posture'] == 'sitstand') &
                     (ankle_post['posture'] == 'horizontal'),
                     'posture'] = "reclined"
 
         # chest laying + ankle sit or sitstand = other
-        post_df.loc[((chest_post['posture'] == 'prone') |
+        posture_df.loc[((chest_post['posture'] == 'prone') |
                      (chest_post['posture'] == 'supine') |
                      (chest_post['posture'] == 'rightside') |
                      (chest_post['posture'] == 'leftside')) &
@@ -445,30 +456,30 @@ def combine_posture_dfs(posture_df_dict, tran_combo=None, tran_gap_fill=5):
         thigh_post = new_posture_df_dict['thigh']
 
         # chest sit/stand + thigh stand = stand
-        post_df.loc[(post_df['posture'] != 'reclined') &
+        posture_df.loc[(posture_df['posture'] != 'reclined') &
                     (chest_post['posture'] == 'sitstand') &
                     (thigh_post['posture'] == 'stand'), 'posture'] = "stand"
 
         # chest sit/stand + thigh sitlay = sit
-        post_df.loc[(post_df['posture'] != 'reclined') &
+        posture_df.loc[(posture_df['posture'] != 'reclined') &
                     (chest_post['posture'] == 'sitstand') &
                     (thigh_post['posture'] == 'sitlay'), 'posture'] = "sit"
 
     # overwrite postures within gait as stand
-    post_df.loc[(post_df['gait']) == 1, 'posture'] = "stand"
+    posture_df.loc[(posture_df['gait']) == 1, 'posture'] = "stand"
 
     # overwrite postures within transition as transition
-    post_df.loc[(post_df['transition']), 'posture'] = "transition"
+    posture_df.loc[(posture_df['transition']), 'posture'] = "transition"
 
     print("Completed.")
-    return post_df
+    return posture_df
 
-def summarize_posture_df(post_df):
+def summarize_posture_df(posture_df):
     """Compresses consecutive rows of the same posture (with/without labels
        into one row of the posture dataframe.
     """
     print("Compressing dataframe...", end=" ")
-    df = post_df.copy()
+    df = posture_df.copy()
     durations = []
     first_diff_idx = 0
     last_idx = df.shape[0] - 1
@@ -513,6 +524,17 @@ def posture(gait_df, wrist_x = None,wrist_y = None,wrist_z = None, wrist_freq = 
             chest_x = None, chest_y = None,chest_z = None, chest_freq = None, chest_start = None,
             thigh_x = None, thigh_y = None, thigh_z = None, thigh_freq = None, thigh_start = None,
             tran_combo=None, tran_gap_fill=5):
+    """
+    Wrapper function to get gait for an individual with multiple sensors
+
+    Args:
+        gait_df: This is a summary dataframe that is created in nimbalwear.gait. It should have the following
+                 columns ['start', 'end', 'number_steps', 'start_timestamp', 'end_timestamp']
+        tran_combo: list of booleans indicating what wearable transitions
+                    should be combined for the overall transition mask
+        tran_gap_fill: maximum gap between transition periods to fill as
+                       transition (default 5)
+    """
     wearables_dict = {}
     if not [x for x in  (wrist_x, wrist_y, wrist_z, wrist_freq, wrist_start) if x is None]:
         wearables_dict['wrist'] = [wrist_x, wrist_y, wrist_z, wrist_freq, wrist_start]
@@ -551,7 +573,7 @@ def posture(gait_df, wrist_x = None,wrist_y = None,wrist_z = None, wrist_freq = 
         elif bodypart == 'wrist':
             posture_dfs_dict['wrist'] = classify_wrist_position(posture_df_temp)
             summary_posture_dfs_dict['wrist'] = summarize_posture_df(posture_dfs_dict['wrist'])
-    combined_df = combine_posture_dfs(posture_dfs_dict)
+    combined_df = combine_posture_dfs(posture_dfs_dict, tran_combo=tran_combo, tran_gap_fill=tran_gap_fill)
     summary_combined_df = summarize_posture_df(combined_df)
 
 
