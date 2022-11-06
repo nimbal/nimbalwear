@@ -256,16 +256,14 @@ class Device:
     def crop(self, new_start_time=None, new_end_time=None, inplace=False):
         """Crops data from start or end of all signals.
 
-        Args:
-            new_start_time (datetime, optional): New start time of cropped data,
-                defaults to None indicating no cropping from start of data.
-            new_end_time (datetime, optional): New end time of cropped data,
-                defaults to None indicating no cropping from end of data.
-            inplace (boolean, optional): Indicates whether current object is modified or a cropped copy is returned,
-                defaults to False indicating that a cropped copy of the object is returned.
-
-        Returns:
-            True if successful, False otherwise.
+        Parameters
+        ----------
+        new_start_time : datetime, optional
+            New start time of cropped data, None indicates no cropping from start of data (default is None)
+        new_end_time : datetime, optional
+            New end time of cropped dat, None indicates no cropping from end of data (default is None)
+        inplace : bool, optional
+            Modify current object in place, if False returns a cropped copy of the object (default is None)
         """
 
         # check to see if data exists

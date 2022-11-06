@@ -87,23 +87,37 @@
       "save": true
     },
     "nonwear": {
-      "accel_std_thresh_mg": 8,
-      "low_temperature_cutoff": 26,
-      "high_temperature_cutoff": 30,
-      "temp_dec_roc": -0.3,
-      "temp_inc_roc": 0.1,
+      "settings": {
+        "wrist": {
+          "accel_std_thresh_mg": 8,
+          "low_temperature_cutoff": 26,
+          "high_temperature_cutoff": 30,
+          "temp_dec_roc": -0.2,
+          "temp_inc_roc": 0.1
+        },
+        "ankle": {
+          "accel_std_thresh_mg": 9,
+          "low_temperature_cutoff": 23,
+          "high_temperature_cutoff": 31.5,
+          "temp_dec_roc": -0.3,
+          "temp_inc_roc": 0.05
+        },
+        "chest": {
+          "accel_std_thresh_mg": 5,
+          "low_temperature_cutoff": 25,
+          "high_temperature_cutoff": 30,
+          "temp_dec_roc": -0.1,
+          "temp_inc_roc": 0.05
+        }
+      },
       "save": true
     },
     "crop": {
-      "min_duration_start": 3,
-      "min_duration_end": 3,
-      "max_time_to_bof": 20,
-      "max_time_to_eof": 20,
       "min_wear_time": 120,
       "save": true
     },
     "activity": {
-      "dominant": false,
+      "dominant":  false,
       "lowpass": 20,
       "epoch_length": 15,
       "cutpoints": [
