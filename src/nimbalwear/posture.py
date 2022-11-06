@@ -534,6 +534,15 @@ def posture(gait_df, wrist_x = None,wrist_y = None,wrist_z = None, wrist_freq = 
                     should be combined for the overall transition mask
         tran_gap_fill: maximum gap between transition periods to fill as
                        transition (default 5)
+
+    Returns:
+        posture_dfs_dict: a dictionary containing a dataframe of postures, timestamps and axis values for each location
+        summary_posture_dfs_dict: Start and stop times for each posture for the dataframes in posture_dfs_dict
+        final_posture_df: Dataframe which combines the different locations to create an optimal posture prediction
+        summary_final_posture_df: Start and stop times for each posture in final_posture_df
+
+    Notes:
+        For the final_posture_df to work, it must have a chest accelerometer provided.
     """
     wearables_dict = {}
     if not [x for x in  (wrist_x, wrist_y, wrist_z, wrist_freq, wrist_start) if x is None]:
@@ -573,8 +582,8 @@ def posture(gait_df, wrist_x = None,wrist_y = None,wrist_z = None, wrist_freq = 
         elif bodypart == 'wrist':
             posture_dfs_dict['wrist'] = classify_wrist_position(posture_df_temp)
             summary_posture_dfs_dict['wrist'] = summarize_posture_df(posture_dfs_dict['wrist'])
-    combined_df = combine_posture_dfs(posture_dfs_dict, tran_combo=tran_combo, tran_gap_fill=tran_gap_fill)
-    summary_combined_df = summarize_posture_df(combined_df)
+    final_posture_df = combine_posture_dfs(posture_dfs_dict, tran_combo=tran_combo, tran_gap_fill=tran_gap_fill)
+    summary_final_posture_df = summarize_posture_df(final_posture_df)
 
 
-    return posture_dfs_dict, summary_posture_dfs_dict, combined_df, summary_combined_df
+    return posture_dfs_dict, summary_posture_dfs_dict, final_posture_df, summary_final_posture_df
