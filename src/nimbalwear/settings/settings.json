@@ -97,7 +97,7 @@
         },
         "ankle": {
           "accel_std_thresh_mg": 9,
-          "low_temperature_cutoff": 26,
+          "low_temperature_cutoff": 23,
           "high_temperature_cutoff": 31.5,
           "temp_dec_roc": -0.3,
           "temp_inc_roc": 0.05
