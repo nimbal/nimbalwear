@@ -1578,7 +1578,7 @@ def get_acc_data(accelerometer=None, axis=None, orient_signal=True, low_pass=Tru
 
 
 # Stepdetector declassed
-def detect_fl_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None):
+def detect_fl_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None,  timestamps=None, xz_data=None):
     '''
     Parameters
     ---
@@ -1612,7 +1612,7 @@ def detect_fl_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=No
 
         return np.array(pushoff_sig_list)
 
-    def export_steps(detect_arr=None, state_arr=None, timestamps=None, step_indices=None, start_dp=None, pushoff_time=None, foot_down_time= ):
+    def export_steps(detect_arr=None, state_arr=None, timestamps=None, step_indices=None, start_dp=None, pushoff_time=None, foot_down_time=None, success=True ):
         """
         Export steps into a dataframe - this includes all potential push-offs and the state that they fail on
         ---
@@ -1660,12 +1660,15 @@ def detect_fl_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=No
         })
         failed_steps = pd.DataFrame({
             'step_time': failed_step_timestamps,
-            'step_index': np.array(failed_step_indices) + self.start_dp,
+            'step_index': np.array(failed_step_indices) + start_dp,
             'step_state': failed_step_state
         })
-        df = pd.concat([successful_steps, failed_steps], sort=True)
-        df = df.sort_values(by='step_index')
-        df = df.reset_index(drop=True)
+        if success == True:
+            df = successful_steps
+        else:
+            df = pd.concat([successful_steps, failed_steps], sort=True)
+            df = df.sort_values(by='step_index')
+            df = df.reset_index(drop=True)
 
         return df
 
@@ -1873,7 +1876,7 @@ def detect_fl_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=No
             return plt
 
     #acc_step_detect_ssc(data=None, start_dp=1, end_dp=-1, pushoff_df=None)
-    def acc_step_detect_ssc(device = None, data=None,  start_dp=1, end_dp=-1, axis=None, pushoff_df=True):
+    def detect_steps_ssc(device = None, data=None,  start_dp=start, end_dp=end, axis=None, pushoff_df=True, timestamps=None, xz_data=None):
         """
         Originally def step_detect(self)
         Detects the steps within the accelerometer data. Based on this paper:
@@ -1989,23 +1992,18 @@ def detect_fl_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=No
         step_lengths = step_lengths
         detect_arr = detect_arr
 
-        return state_arr, step_indices
+        steps_df = export_steps(detect_arr, state_arr, timestamps, step_indices, start_dp, pushoff_time, foot_down_time)
+
+        return steps_df
+
 
 
     if device.header['device_type'] == 'GNAC':
 
         """
-                StepDetection class performs step detection through a steady state controller algorithm
-
-                Required Parameters:
-                accel_reader_obj (AccelReader): Object from AccelReader class
-                pushoff_df (pandas.DataFrame): A dataframe that outlines the mean, std, and min/max for a pushoff
-
-                Optional Parameters:
-                - `quiet` (bool): stops printing
-                """
+        """
         #acc_step_detect_ssc(data=None, start_dp=1, end_dp=-1, pushoff_df=None)
-        steps_df = acc_step_detect_ssc(device = ankle_acc, data= data,  start_dp=100000, end_dp=100000, axis=axis, pushoff_df=True)
+        steps_df = detect_steps_ssc(device = ankle_acc, data= data,  start_dp=100000, end_dp=100000, axis=axis, pushoff_df=True, timestamps=timestamps, xz_data=xz_data)
 
     elif device.header['device_type'] == 'AXV6':
         print(f"Device set: {device.header['device_type']} detecting steps using gryoscope.")
@@ -2042,10 +2040,11 @@ if __name__ == '__main__':
             # steps_df = detect_stepping(accelerometer=ankle_acc, gyroscope=None, bilateral=False)
     # TODO: Select the signals that are needed (accelerometer) for step detection
     #freq, acc_data, xz_data, timestamps, axis = get_acc_data(accelerometer=None, axis=None, orient_signal=True, low_pass=True)
+    #all outcomes need to be pushed into the detect_fl_steps
     freq, acc_data, xz_data, timestamps, axis = get_acc_data(accelerometer=ankle_acc, axis=1, orient_signal=True, low_pass=True)
 
     #def detect_fl_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None):
-   steps_df = detect_fl_steps(device = ankle_acc, data = acc_data[0], start=100000, end=200000,  freq=freq, axis=axis)
+   steps_df = detect_fl_steps(device = ankle_acc, data = acc_data[0], start=100000, end=200000,  freq=freq, axis=axis, timestamps=timestamps, xz_data=xz_data)
 
 
 
