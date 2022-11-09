@@ -1578,7 +1578,7 @@ def get_acc_data(accelerometer=None, axis=None, orient_signal=True, low_pass=Tru
 
 
 # Stepdetector declassed
-def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
+def detect_fl_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None):
     '''
     Parameters
     ---
@@ -1591,7 +1591,7 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
 
     # function definitions
     def get_pushoff_sigs(step_obj, peaks=None, quiet=False):
-        """
+        """TODO: This needs the inputs from the step_obj used here pushoff time, freq, puhoff len, etc.
         Creates average pushoff dataframe that is used to find pushoff data
         ---
         Parameters
@@ -1612,7 +1612,7 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
 
         return np.array(pushoff_sig_list)
 
-    def export_steps(self):
+    def export_steps(detect_arr=None, state_arr=None, timestamps=None, step_indices=None, start_dp=None, pushoff_time=None, foot_down_time= ):
         """
         Export steps into a dataframe - this includes all potential push-offs and the state that they fail on
         ---
@@ -1620,41 +1620,41 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
         ---
 
         """
-        assert len(self.detect_arr) == len(self.timestamps)
-        failed_step_indices = np.where(self.detect_arr > 0)[0]
-        failed_step_timestamps = self.timestamps[failed_step_indices]
+        assert len(detect_arr) == len(timestamps)
+        failed_step_indices = np.where(detect_arr > 0)[0]
+        failed_step_timestamps = timestamps[failed_step_indices]
 
         error_mapping = {1: 'swing_down', 2: 'swing_up',
                          3: 'heel_strike_too_small', 4: 'too_close_to_next_i',
                          5: 'too_far_from_pushoff_mean', 6: 'mid_swing_peak_not_detected'}
-        failed_step_state = list(map(error_mapping.get, self.detect_arr[failed_step_indices]))
+        failed_step_state = list(map(error_mapping.get, detect_arr[failed_step_indices]))
 
-        step_timestamps = self.timestamps[self.step_indices]
+        step_timestamps = timestamps[step_indices]
 
-        swing_start = np.where((self.state_arr == 1) & (np.roll(self.state_arr, -1) == 2))[0]
-        mid_swing = np.where((self.state_arr == 2) & (np.roll(self.state_arr, -1) == 3))[0]
-        heel_strike = np.where((self.state_arr == 3) & (np.roll(self.state_arr, -1) == 4))[0]
+        swing_start = np.where((state_arr == 1) & (np.roll(state_arr, -1) == 2))[0]
+        mid_swing = np.where((state_arr == 2) & (np.roll(state_arr, -1) == 3))[0]
+        heel_strike = np.where((state_arr == 3) & (np.roll(state_arr, -1) == 4))[0]
 
-        pushoff_start = swing_start - int(self.pushoff_time * self.freq)
-        gait_cycle_end = heel_strike + int(self.foot_down_time * self.freq)
-        step_lengths = (gait_cycle_end - pushoff_start) / self.freq
-        avg_speed = [np.mean(self.xz_data[i:i + int(lengths * self.freq)]) * 9.81 * lengths for i, lengths in
-                     zip(self.step_indices, step_lengths)]
+        pushoff_start = swing_start - int(pushoff_time * freq)
+        gait_cycle_end = heel_strike + int(foot_down_time * freq)
+        step_lengths = (gait_cycle_end - pushoff_start) / freq
+        avg_speed = [np.mean(xz_data[i:i + int(lengths * freq)]) * 9.81 * lengths for i, lengths in
+                     zip(step_indices, step_lengths)]
 
-        assert len(self.step_indices) == len(swing_start)
-        assert len(self.step_indices) == len(mid_swing)
-        assert len(self.step_indices) == len(heel_strike)
+        assert len(step_indices) == len(swing_start)
+        assert len(step_indices) == len(mid_swing)
+        assert len(step_indices) == len(heel_strike)
 
         successful_steps = pd.DataFrame({
             'step_time': step_timestamps,
-            'step_index': np.array(self.step_indices) + self.start_dp,
+            'step_index': np.array(step_indices) + start_dp,
             'step_state': 'success',
-            'swing_start_time': self.timestamps[swing_start],
-            'mid_swing_time': self.timestamps[mid_swing],
-            'heel_strike_time': self.timestamps[heel_strike],
-            'swing_start_accel': self.data[swing_start],
-            'mid_swing_accel': self.data[mid_swing],
-            'heel_strike_accel': self.data[heel_strike],
+            'swing_start_time': timestamps[swing_start],
+            'mid_swing_time': timestamps[mid_swing],
+            'heel_strike_time': timestamps[heel_strike],
+            'swing_start_accel': data[swing_start],
+            'mid_swing_accel': data[mid_swing],
+            'heel_strike_accel': data[heel_strike],
             'step_length': step_lengths,
             'avg_speed': avg_speed
         })
@@ -1672,6 +1672,12 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
     def get_pushoff_stats(accel_path, start_end_times=[(-1, -1)], axis=None, quiet=True):
         """
         Calculate push-off  for step detection - uses default if many steps are not found. (20 minimum)
+
+        This function creates a pushoff_df when there is no pushoff_df defined. Essentially it will use
+        the current pushoff_df to find steps, then create a new pushoff_df from those steps that were found.
+
+        We will define the pushoff_df in the acc_find_steps function and therefore
+        TODO: Create a new function that can find pushoffs from raw data without calling acc_step_detect
         ---
         Parameters
         ---
@@ -1692,9 +1698,9 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
         pushoff_df = pd.read_csv(os.path.join(dir_path, 'data', 'pushoff_OND07_left.csv'))
 
         for start, end in start_end_times:
-            # TODO: Where does StepDetection come from...is it step_detect?
-            step = StepDetection(accel_path_or_obj=accel_path, label='get_pushoff_stats',
-                                 axis=axis, start=start, end=end, quiet=True, pushoff_df=pushoff_df)
+            # TODO: Where does StepDetection come from...is it step_detect? This is just a step object - so it has all the parameters within it
+            # step = StepDetection(accel_path_or_obj=accel_path, label='get_pushoff_stats',
+            #                      axis=axis, start=start, end=end, quiet=True, pushoff_df=pushoff_df)
             pushoff_sig = get_pushoff_sigs(step, quiet=quiet)
             step_summary = export_steps(step)
             toe_offs = step_summary.loc[step_summary['step_state'] == 'success', 'swing_start_time']
@@ -1763,11 +1769,10 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
 
         return cc
 
-    def push_off_detection(data, pushoff_df, push_off_threshold, freq, quiet=True):
+    def push_off_detection(data=None, pushoff_df=None, push_off_threshold=None, freq=None):
         """
         Detects the steps based on the pushoff_df
         """
-
         pushoff_avg = pushoff_df['avg']
 
         cc_list = window_correlate(data, pushoff_avg)
@@ -1777,7 +1782,7 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
 
         return pushoff_ind
 
-    def mid_swing_peak_detect(data, pushoff_ind, swing_phase_time):
+    def mid_swing_peak_detect(data=None, pushoff_ind=None, swing_phase_time=None):
         swing_detect = int(freq * swing_phase_time)  # length to check for swing
         detect_window = data[pushoff_ind:pushoff_ind + swing_detect]
         peaks, prop = find_peaks(-detect_window,
@@ -1814,10 +1819,12 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
 
         return (swing_down_cc, swing_up_cc)
 
-    def heel_strike_detect(data, heel_strike_detect_time, window_ind):
+    def heel_strike_detect(data=None, heel_strike_detect_time=None, window_ind=None, freq=None):
         """
         Detects a heel strike based on the change in acceleration over time.
         """
+        type(freq)
+        type(heel_strike_detect_time)
         heel_detect = int(freq * heel_strike_detect_time)
         detect_window = data[window_ind:window_ind + heel_detect]
         accel_t_plus1 = np.append(
@@ -1865,7 +1872,8 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
         else:
             return plt
 
-    def acc_step_detect_ssc(data=None, pushoff_df=None, start_dp=1, end_dp=-1):
+    #acc_step_detect_ssc(data=None, start_dp=1, end_dp=-1, pushoff_df=None)
+    def acc_step_detect_ssc(device = None, data=None,  start_dp=1, end_dp=-1, axis=None, pushoff_df=True):
         """
         Originally def step_detect(self)
         Detects the steps within the accelerometer data. Based on this paper:
@@ -1888,12 +1896,15 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
         states = {1: 'stance', 2: 'push-off',
                   3: 'swing-up', 4: 'swing-down', 5: 'footdown'}
         state = states[1]
-        pushoff_df = get_pushoff_stats(data,
-                                                     start_end_times=[(start_dp, end_dp)],
-                                                     axis=axis) if pushoff_df is None else pushoff_df
+        #this says if pushoff_df is None then run "get_push_off_stats" if pushoff_df is defined then pushoff_df=pushoff_df
+        if pushoff_df == True:
+            dir_path = os.path.dirname(os.path.realpath(__file__))
+            pushoff_df = pd.read_csv(os.path.join(dir_path, 'data', 'pushoff_OND07_left.csv'))
+        else:
+            pushoff_df = get_pushoff_stats(data, start_end_times=[(start_dp, end_dp)], axis=axis)
+            # pushoff_df = get_pushoff_stats(start_end_times=[(-1, -1)])
         swing_peaks = []
 
-        # set threshold values
         if {'swing_down_mean', 'swing_down_std', 'swing_up_mean', 'swing_up_std', 'heel_strike_mean',
             'heel_strike_std'}.issubset(pushoff_df.columns):
             swing_phase_time = pushoff_df['swing_down_mean'].iloc[0] + pushoff_df['swing_down_std'].iloc[
@@ -1904,8 +1915,7 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
             heel_strike_threshold = -3 - pushoff_df['heel_strike_mean'].iloc[0] / (
                     2 * heel_strike_threshold)
 
-        pushoff_df = get_pushoff_stats(start_end_times=[(-1, -1)])
-        pushoff_ind = push_off_detection(pushoff_df, push_off_threshold, freq)
+        pushoff_ind = push_off_detection(data, pushoff_df, push_off_threshold, freq)
         end_pushoff_ind = pushoff_ind + pushoff_len
         state_arr = np.zeros(data.size)
         detects = {'push_offs': len(end_pushoff_ind), 'mid_swing_peak': [], 'swing_up': [], 'swing_down': [
@@ -1932,8 +1942,8 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
                 detects['pushoff_mean'].append(i - 1)
                 continue
 
-            # midswing peak detection
-            mid_swing_i = mid_swing_peak_detect(i)
+            # midswing peak detection -> mid_swing_peak_detect(data=None, pushoff_ind=None, swing_phase_time=None):
+            mid_swing_i = mid_swing_peak_detect(data, i, swing_phase_time)
             if mid_swing_i is None:
                 detects['mid_swing_peak'].append(i - 1)
                 continue
@@ -1949,8 +1959,8 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
             #     detects['swing_up'].append(i - 1)
             #     continue
 
-            # heel-strike, state = 4
-            accel_derivatives = heel_strike_detect(mid_swing_i)
+            # heel-strike, state = 4 -> def heel_strike_detect(data=None, heel_strike_detect_time=None, window_ind=None, freq=None):
+            accel_derivatives = heel_strike_detect(data, heel_strike_detect_time, mid_swing_i, freq)
             accel_threshold_list = np.where(
                 accel_derivatives < heel_strike_threshold)[0]
             if len(accel_threshold_list) == 0:
@@ -1982,7 +1992,6 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
         return state_arr, step_indices
 
 
-
     if device.header['device_type'] == 'GNAC':
 
         """
@@ -1995,8 +2004,8 @@ def detect_fl_steps(device=None, data=None,  freq=None, axis=None):
                 Optional Parameters:
                 - `quiet` (bool): stops printing
                 """
-
-        steps_df = acc_step_detect_ssc(data,  freq, axis)
+        #acc_step_detect_ssc(data=None, start_dp=1, end_dp=-1, pushoff_df=None)
+        steps_df = acc_step_detect_ssc(device = ankle_acc, data= data,  start_dp=100000, end_dp=100000, axis=axis, pushoff_df=True)
 
     elif device.header['device_type'] == 'AXV6':
         print(f"Device set: {device.header['device_type']} detecting steps using gryoscope.")
@@ -2035,7 +2044,10 @@ if __name__ == '__main__':
     #freq, acc_data, xz_data, timestamps, axis = get_acc_data(accelerometer=None, axis=None, orient_signal=True, low_pass=True)
     freq, acc_data, xz_data, timestamps, axis = get_acc_data(accelerometer=ankle_acc, axis=1, orient_signal=True, low_pass=True)
 
-   steps_df = detect_fl_steps(device = ankle_acc, data = acc_data, freq=freq, axis=axis)
+    #def detect_fl_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None):
+   steps_df = detect_fl_steps(device = ankle_acc, data = acc_data[0], start=100000, end=200000,  freq=freq, axis=axis)
+
+
 
     # TODO: Run steps through to find walking bouts
 
