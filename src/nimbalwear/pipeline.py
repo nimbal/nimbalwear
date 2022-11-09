@@ -1877,6 +1877,14 @@ class Pipeline:
 
         return sleep_device_index, dominant
 
+    def add_custom_events(self, file_path, quiet=False):
+        """Import properly formatted csv of events."""
+
+        file_path = Path(file_path)
+
+        new_events = pd.read_csv(file_path)
+
+
     def identify_df(self, coll, df):
         df.insert(loc=0, column='study_code', value=self.study_code)
         df.insert(loc=1, column='subject_id', value=coll.subject_id)
