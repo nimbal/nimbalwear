@@ -305,7 +305,7 @@ class Pipeline:
         device_index = []
 
         if single_stage == 'activity':
-            activity_device_index, activity_dominant = self.select_activity_device(coll=coll)
+            activity_device_index = self.select_activity_device(coll=coll, quiet=quiet, log=log)
             device_index += activity_device_index
         elif single_stage == 'gait':
             r_gait_device_index, l_gait_device_index = self.select_gait_device(coll=coll)
@@ -586,7 +586,7 @@ class Pipeline:
                     ds_index = freq - 5
                 signal_ds = round(freq / (5 + ds_index))
 
-                # check if synnc_at_config is true and give warning and set to false if config_ate after start_date
+                # check if sync_at_config is true and give warning and set to false if config_ate after start_date
                 if sync_at_config:
                     if coll.devices[0].header['config_datetime'] > coll.devices[0].header['start_datetime']:
 
@@ -988,6 +988,7 @@ class Pipeline:
         message("Cropping initial and final non-wear...", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
 
         # get crop settings
         min_wear_time = self.module_settings['crop']['min_wear_time']
@@ -1641,96 +1642,125 @@ class Pipeline:
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
+        pref_cutpoint = self.module_settings['activity']['pref_cutpoint']
         save = self.module_settings['activity']['save']
         epoch_length = self.module_settings['activity']['epoch_length']
         sedentary_gait = self.module_settings['activity']['sedentary_gait']
 
-        coll.activity_epochs = pd.DataFrame()
+        dominant_hand = coll.subject_info['dominant_hand'].lower()
 
-        activity_device_index, dominant = self.select_activity_device(coll=coll)
+        # select all wrist devices
+        activity_device_index = self.select_activity_device(coll=coll, quiet=quiet, log=log)
 
         if len(activity_device_index) == 0:
-            raise NWException(f"{coll.subject_id}_{coll.coll_id}: Wrist device not found in device list")
+            raise NWException(f"{coll.subject_id}_{coll.coll_id}: No eligible wrist devices found in device list")
 
-        activity_device_index = activity_device_index[0]
 
-        # checks to see if files exist
-        if not coll.devices[activity_device_index]:
-            raise NWException(f'{coll.subject_id}_{coll.coll_id}: Wrist device data is missing')
+        for c, i in enumerate(activity_device_index):
 
-        accel_x_sig = coll.devices[activity_device_index].get_signal_index('Accelerometer x')
-        accel_y_sig = coll.devices[activity_device_index].get_signal_index('Accelerometer y')
-        accel_z_sig = coll.devices[activity_device_index].get_signal_index('Accelerometer z')
+            # checks to see if data exists
+            if not coll.devices[i]:
+                message(f'{coll.subject_id}_{coll.coll_id}: Wrist device data is missing', level='warning',
+                        display=(not quiet), log=log, logger_name=self.log_name)
+                message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+                continue
 
-        message(f"Calculating {epoch_length}-second epoch activity...", level='info', display=(not quiet), log=log,
-                logger_name=self.log_name)
+            device_type = coll.device_info.loc[i]['device_type']
+            device_location = coll.device_info.loc[i]['device_location']
 
-        cutpoint_ages = pd.DataFrame(self.module_settings['activity']['cutpoints'])
+            accel_x_sig = coll.devices[i].get_signal_index('Accelerometer x')
+            accel_y_sig = coll.devices[i].get_signal_index('Accelerometer y')
+            accel_z_sig = coll.devices[i].get_signal_index('Accelerometer z')
 
-        subject_age = int(coll.subject_info['age'])
-        lowpass = int(self.module_settings['activity']['lowpass'])
+            message(f"Calculating {epoch_length}-second epoch activity for {device_type}_{device_location}...",
+                    level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        cutpoint = cutpoint_ages['type'].loc[(cutpoint_ages['min_age'] <= subject_age)
-                                             & (cutpoint_ages['max_age'] >= subject_age)].item()
+            cutpoint_ages = pd.DataFrame(self.module_settings['activity']['cutpoints'])
 
-        # get nonwear for activity_device
-        device_nonwear = coll.nonwear_bouts.loc[(coll.nonwear_bouts['study_code'] == coll.study_code) &
-                                                (coll.nonwear_bouts['subject_id'] == coll.subject_id) &
-                                                (coll.nonwear_bouts['coll_id'] == coll.coll_id) &
-                                                (coll.nonwear_bouts['device_type'] ==
-                                                 coll.device_info.iloc[activity_device_index]['device_type']) &
-                                                (coll.nonwear_bouts['device_location'] ==
-                                                 coll.device_info.iloc[activity_device_index]['device_location']) &
-                                                (coll.nonwear_bouts['event'] == 'nonwear')]
+            subject_age = int(coll.subject_info['age'])
+            lowpass = int(self.module_settings['activity']['lowpass'])
 
-        sptw = coll.sptw
-        sleep_bouts =  coll.sleep_bouts.loc[coll.sleep_bouts['bout_detect'] == 't8a4']
+            cutpoint = cutpoint_ages['type'].loc[(cutpoint_ages['min_age'] <= subject_age)
+                                                 & (cutpoint_ages['max_age'] >= subject_age)].item()
 
-        e, b, avm, vm, avm_sec = activity_wrist_avm(x=coll.devices[activity_device_index].signals[accel_x_sig],
-                                                    y=coll.devices[activity_device_index].signals[accel_y_sig],
-                                                    z=coll.devices[activity_device_index].signals[accel_z_sig],
-                                                    sample_rate=coll.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
-                                                    start_datetime=coll.devices[activity_device_index].header['start_datetime'],
-                                                    lowpass=lowpass, epoch_length=epoch_length, cutpoint=cutpoint,
-                                                    dominant=dominant, sedentary_gait=sedentary_gait,
-                                                    gait=coll.gait_bouts, nonwear=device_nonwear, sptw=sptw,
-                                                    sleep_bouts=sleep_bouts, quiet=quiet)
+            # select dominant or non-dominant cutpoint
+            if pref_cutpoint == "dominant":
+                dominant = True
+            elif pref_cutpoint == "non-dominant":
+                dominant = False
+            else:
+                if dominant_hand in ['right', 'left']:
+                    dominant_wrist = dominant_hand[0] + 'wrist'
+                    dominant = device_location.upper() in self.device_locations[dominant_wrist]['aliases']
+                else:
+                    dominant = True
 
-        coll.activity_epochs = e
-        coll.activity_bouts = b
 
-        # prepare avm dataframe
-        coll.avm_sec = pd.DataFrame()
-        coll.avm_sec['avm_num'] = np.arange(1, len(avm_sec) + 1)
-        coll.avm_sec['avm'] = avm_sec
-        coll.avm_sec.insert(loc=0, column='device_location',
-                            value=coll.devices[activity_device_index].header['device_location'])
-        coll.avm_sec = self.identify_df(coll, coll.avm_sec)
+            # get nonwear for activity_device
+            device_nonwear = coll.nonwear_bouts.loc[(coll.nonwear_bouts['study_code'] == coll.study_code) &
+                                                    (coll.nonwear_bouts['subject_id'] == coll.subject_id) &
+                                                    (coll.nonwear_bouts['coll_id'] == coll.coll_id) &
+                                                    (coll.nonwear_bouts['device_type'] == device_type) &
+                                                    (coll.nonwear_bouts['device_location'] == device_location) &
+                                                    (coll.nonwear_bouts['event'] == 'nonwear')]
 
-        message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log,
-                logger_name=self.log_name)
-        coll.activity_daily = activity_stats(coll.activity_bouts, quiet=quiet)
+            sptw = coll.sptw
+            sleep_bouts =  coll.sleep_bouts.loc[coll.sleep_bouts['bout_detect'] == 't8a4']
 
-        coll.activity_epochs.insert(loc=1, column='device_location',
-                                    value=coll.devices[activity_device_index].header['device_location'])
-        coll.activity_epochs.insert(loc=2, column='dominant_hand', value=dominant)
-        coll.activity_epochs.insert(loc=3, column='cutpoint_type', value=cutpoint)
+            e, b, avm, vm, avm_sec = activity_wrist_avm(x=coll.devices[i].signals[accel_x_sig],
+                                                        y=coll.devices[i].signals[accel_y_sig],
+                                                        z=coll.devices[i].signals[accel_z_sig],
+                                                        sample_rate=coll.devices[i].signal_headers[accel_x_sig]['sample_rate'],
+                                                        start_datetime=coll.devices[i].header['start_datetime'],
+                                                        lowpass=lowpass, epoch_length=epoch_length, cutpoint=cutpoint,
+                                                        dominant=dominant, sedentary_gait=sedentary_gait,
+                                                        gait=coll.gait_bouts, nonwear=device_nonwear, sptw=sptw,
+                                                        sleep_bouts=sleep_bouts, quiet=quiet)
 
-        coll.activity_bouts.insert(loc=1, column='device_location',
-                                   value=coll.devices[activity_device_index].header['device_location'])
-        coll.activity_bouts.insert(loc=2, column='dominant_hand', value=dominant)
-        coll.activity_bouts.insert(loc=3, column='cutpoint_type', value=cutpoint)
+            activity_epochs = e
+            activity_bouts = b
 
-        coll.activity_epochs = self.identify_df(coll, coll.activity_epochs)
-        coll.activity_bouts = self.identify_df(coll, coll.activity_bouts)
+            # prepare avm dataframe
+            avm_second = pd.DataFrame()
+            avm_second['avm_num'] = np.arange(1, len(avm_sec) + 1)
+            avm_second['avm'] = avm_sec
+            avm_second.insert(loc=0, column='device_location', value=device_location)
+            avm_second = self.identify_df(coll, avm_second)
 
-        coll.activity_daily.insert(loc=2, column='device_location',
-                                   value=coll.devices[activity_device_index].header['device_location'])
-        coll.activity_daily.insert(loc=3, column='dominant_hand', value=dominant)
-        coll.activity_daily.insert(loc=4, column='cutpoint_type', value=cutpoint)
-        coll.activity_daily.insert(loc=5, column='type', value='daily')
+            message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log,
+                    logger_name=self.log_name)
+            activity_daily = activity_stats(activity_bouts, quiet=quiet)
 
-        coll.activity_daily = self.identify_df(coll, coll.activity_daily)
+            activity_epochs.insert(loc=1, column='device_location',value=device_location)
+            activity_epochs.insert(loc=2, column='cutpoint_type', value=cutpoint)
+            activity_epochs.insert(loc=3, column='cutpoint_dominant', value=dominant)
+
+            activity_bouts.insert(loc=1, column='device_location', value=device_location)
+            activity_bouts.insert(loc=2, column='cutpoint_type', value=cutpoint)
+            activity_bouts.insert(loc=3, column='cutpoint_dominant', value=dominant)
+
+            activity_epochs = self.identify_df(coll, activity_epochs)
+            activity_bouts = self.identify_df(coll, activity_bouts)
+
+            activity_daily.insert(loc=2, column='device_location', value=device_location)
+            activity_daily.insert(loc=3, column='cutpoint_type', value=cutpoint)
+            activity_daily.insert(loc=4, column='cutpoint_dominant', value=dominant)
+            activity_daily.insert(loc=5, column='type', value='daily')
+
+            activity_daily = self.identify_df(coll, activity_daily)
+
+            if c == 0:
+                coll.activity_epochs = activity_epochs
+                coll.activity_bouts = activity_bouts
+                coll.activity_daily = activity_daily
+                coll.avm_second = avm_second
+            else:
+                coll.activity_epochs = pd.concat([coll.activity_epochs, activity_epochs])
+                coll.activity_bouts = pd.concat([coll.activity_bouts, activity_bouts])
+                coll.activity_daily = pd.concat([coll.activity_daily, activity_daily])
+                coll.avm_second = pd.concat([coll.avm_second, avm_second])
+
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         # TODO: more detailed log info about what was done, epochs, days, intensities?
         # TODO: info about algortihm and settings, device used, dominant vs non-dominant, in log, methods, or data table
@@ -1774,76 +1804,77 @@ class Pipeline:
 
             message(f"Saving {avm_csv_path}", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
-            coll.avm_sec.to_csv(avm_csv_path, index=False)
+            coll.avm_second.to_csv(avm_csv_path, index=False)
 
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
-    def select_activity_device(self, coll):
+    def select_activity_device(self, coll, quiet=False, log=True):
 
-        # select which device to use for activity level
-
-        dominant = self.module_settings['activity']['dominant']
-        dominant_hand = coll.subject_info['dominant_hand'].lower()
-
+        # select devices to use for activity level
         device_info_copy = coll.device_info.copy()
+
+        # convert device location to upper case
         device_info_copy['device_location'] = [x.upper() for x in device_info_copy['device_location']]
 
         # select eligible device types and locations
         activity_device_types = ['GNOR', 'AXV6']
         activity_locations = self.device_locations['rwrist']['aliases'] + self.device_locations['lwrist']['aliases']
 
-        # get index of all eligible devices
+        # get index of all eligible devices based on type and location
         activity_device_index = device_info_copy.loc[(device_info_copy['device_type'].isin(activity_device_types)) &
                                                      (device_info_copy['device_location'].isin(activity_locations))].index.values.tolist()
 
-        # if multiple eligible devices we will try to choose one
-        if len(activity_device_index) > 1:
+        # select device from list based on wrist preference
+        # if (pref_wrist != 'all') & (len(activity_device_index) > 1):
+        #
+        #     # select dominant or non-dominant based on argument
+        #     if (pref_wrist == 'dominant') & (dominant_hand in ['right', 'left']):
+        #             pref_wrist = dominant_hand
+        #     elif (pref_wrist == 'non-dominant') & (dominant_hand in ['right', 'left']):
+        #             pref_wrist = {'left': "right", 'right': "left"}[dominant_hand]
+        #
+        #     # if no dominant hand info display warning and take first device
+        #     if pref_wrist in ['dominant', 'non-dominant']:
+        #         message(f"Preferred wrist is {pref_wrist} but no dominant hand info found - selecting first eligible device...",
+        #                 level='warning', display=(not quiet), log=log, logger_name=self.log_name)
+        #         activity_device_index = [activity_device_index[0]]
+        #
+        #     else:
+        #
+        #         wrist = pref_wrist[0] + 'wrist'
+        #
+        #         # select devices at locations based on dominance
+        #         activity_locations = self.device_locations[wrist]['aliases']
+        #         activity_device_index = device_info_copy.loc[
+        #             (device_info_copy['device_type'].isin(activity_device_types)) &
+        #             (device_info_copy['device_location'].isin(activity_locations))].index.values.tolist()
+        #
+        #         # if still multiple eligible devices, take first one
+        #         if len(activity_device_index) > 1:
+        #             activity_device_index = [activity_device_index[0]]
+        #
+        #         # if no eligible devices, go back and take first one from list of all eligible
+        #         elif len(activity_device_index) < 1:
+        #             activity_locations = self.device_locations['rwrist']['aliases'] + self.device_locations['lwrist']['aliases']
+        #             activity_device_index = device_info_copy.loc[
+        #                 (device_info_copy['device_type'].isin(activity_device_types)) &
+        #                 (device_info_copy['device_location'].isin(activity_locations))].index.values.tolist()
+        #             activity_device_index = [activity_device_index[0]]
 
-            # if dominant hand is info is available we will choose based on dominant argument
-            if dominant_hand in ['right', 'left']:
-
-                # select dominant or non-dominant based on argument
-                if dominant:
-                    wrist = 'rwrist' if dominant_hand == 'right' else 'lwrist'
-                else:
-                    wrist = 'lwrist' if dominant_hand == 'right' else 'rwrist'
-
-                # select devices at locations based on dominance
-                activity_locations = self.device_locations[wrist]['aliases']
-                activity_device_index = device_info_copy.loc[
-                    (device_info_copy['device_type'].isin(activity_device_types)) &
-                    (device_info_copy['device_location'].isin(activity_locations))].index.values.tolist()
-
-                # if still multiple eligible devices, take first one
-                if len(activity_device_index) > 1:
-                    activity_device_index = [activity_device_index[0]]
-
-                # if no eligible devices, go back and take first one from list of all eligible
-                elif len(activity_device_index) < 1:
-                    activity_locations = self.device_locations['rwrist']['aliases'] + self.device_locations['lwrist']['aliases']
-                    activity_device_index = device_info_copy.loc[
-                        (device_info_copy['device_type'].isin(activity_device_types)) &
-                        (device_info_copy['device_location'].isin(activity_locations))].index.values.tolist()
-                    activity_device_index = [activity_device_index[0]]
-
-            # if no dominant hand info take first from list
-            else:
-                activity_device_index = [activity_device_index[0]]
-
-        # if only one device determine, if it is dominant
-        elif len(activity_device_index) == 1:
-
-            # if dominant hand info is available we will determine dominance
-            if dominant_hand in ['right', 'left']:
-                dominant_wrist = dominant_hand[0] + 'wrist'
-                dominant = device_info_copy.loc[activity_device_index]['device_location'].item() in \
-                           self.device_locations[dominant_wrist]['aliases']
+        # # if only one device determine, if it is dominant
+        # elif len(activity_device_index) == 1:
+        #
+        #     # if dominant hand info is available we will determine dominance
+        #     if dominant_hand in ['right', 'left']:
+        #         dominant_wrist = dominant_hand[0] + 'wrist'
+        #         dominant = device_info_copy.loc[activity_device_index]['device_location'].item() in \
+        #                    self.device_locations[dominant_wrist]['aliases']
 
             # if no dominant hand info available, assume dominant argument is correct
 
-        return activity_device_index, dominant
+        return activity_device_index
 
     def select_gait_device(self, coll):
 
