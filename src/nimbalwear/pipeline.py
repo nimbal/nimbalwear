@@ -8,6 +8,7 @@ from functools import wraps
 import json
 import operator
 
+import toml
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
@@ -18,6 +19,7 @@ from .nonwear import vert_nonwear, nonwear_stats
 from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
 from .gait import AccelReader, WalkingBouts, get_gait_bouts, create_timestamps, gait_stats
 from .activity import activity_wrist_avm, activity_stats
+from .utils import convert_json_to_toml
 
 from .__version__ import __version__
 
@@ -32,38 +34,48 @@ class Pipeline:
         # initialize folder structure
         self.study_dir = Path(study_dir)
 
-        self.settings_path = Path(settings_path) if settings_path is not None else settings_path
-
-        if (self.settings_path is None) or (not self.settings_path.is_file()):
-            self.settings_path = self.study_dir / 'pipeline/settings/settings.json'
-            self.settings_path.parent.mkdir(parents=True, exist_ok=True)
-
-        if not self.settings_path.is_file():
-            settings_src = Path(__file__).parent.absolute() / 'settings/settings.json'
-            shutil.copy(settings_src, self.settings_path)
-
         # get study code
         self.study_code = self.study_dir.name
 
-        # read json file
-        with open(self.settings_path, 'r') as f:
-            settings_json = json.load(f)
+        # convert settings_path to Path if not None
+        self.settings_path = Path(settings_path) if settings_path is not None else settings_path
 
-        self.dirs = settings_json['pipeline']['dirs']
+        # if settings path is None or doesn't exist than set settings_path to default settings file
+        if (self.settings_path is None) or (not self.settings_path.is_file()):
+            self.settings_path = self.study_dir / 'pipeline/settings/settings.toml'
+            self.settings_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # if default settings file doesn't exist in this study then add it
+            if not self.settings_path.is_file():
+                settings_src = Path(__file__).parent.absolute() / 'settings/settings.toml'
+                shutil.copy(settings_src, self.settings_path)
+
+        # if a json file is passed in read it as is but convert it to toml for next time
+        # - this provides and option for backward compatibility to run the pipeline with the existing json file
+        # the first time after upgrading to version 0.19 that uses toml
+        if self.settings_path.suffix == ".json":
+            settings_dict = convert_json_to_toml(settings_path, settings_path.with_suffix(".toml"))
+        else: # read toml file
+
+            with open(self.settings_path, 'r') as f:
+                settings_dict = toml.load(f)
+
+        # parse specific settings into Pipeline attributes
+        self.dirs = settings_dict['pipeline']['dirs']
         self.dirs = {key: self.study_dir / value for key, value in self.dirs.items()}
 
-        # pipeline data files
+        self.stages = settings_dict['pipeline']['stages']
+        self.sensors = settings_dict['pipeline']['sensors']
+        self.device_locations = settings_dict['pipeline']['device_locations']
+        self.module_settings = settings_dict['modules']
+
+        # pipeline data file paths
         self.device_info_path = self.dirs['pipeline'] / 'devices.csv'
         self.subject_info_path = self.dirs['pipeline'] / 'subjects.csv'
-        # self.log_file_path = self.dirs['logs'] / 'processing.log'
         self.status_path = self.dirs['pipeline'] / 'status.csv'
 
-        self.stages = settings_json['pipeline']['stages']
-        self.sensors = settings_json['pipeline']['sensors']
-        self.device_locations = settings_json['pipeline']['device_locations']
-        self.module_settings = settings_json['modules']
-
-        self.settings_str = json.dumps(settings_json, indent=4)
+        # dump settings to str that can be printed in log
+        self.settings_str = toml.dumps(settings_dict)
 
         with open(Path(__file__).parent.absolute() / 'settings/data_dicts.json', 'r') as f:
             self.data_dicts = json.load(f)
@@ -560,7 +572,7 @@ class Pipeline:
 
         sync_type = self.module_settings['sync']['type']
         sync_at_config = self.module_settings['sync']['sync_at_config']
-        search_radius = self.module_settings['sync']['search_radius']
+        search_radius = self.module_settings['sync'].get('search_radius', None)
 
         if not coll.device_info.empty:
             ref_device_type = coll.device_info.iloc[0]['device_type']
@@ -1227,7 +1239,7 @@ class Pipeline:
         # TODO: axis needs to be set based on orientation of device
 
         step_detect_type = self.module_settings['gait']['step_detect_type']
-        axis = self.module_settings['gait']['axis']
+        axis = self.module_settings['gait'].get('axis', None)
         save = self.module_settings['gait']['save']
 
         message(f"Detecting steps and walking bouts using {step_detect_type} data...", level='info', display=(not quiet), log=log,
@@ -1642,7 +1654,7 @@ class Pipeline:
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        pref_cutpoint = self.module_settings['activity']['pref_cutpoint']
+        pref_cutpoint = self.module_settings['activity'].get('pref_cutpoint', None)
         save = self.module_settings['activity']['save']
         epoch_length = self.module_settings['activity']['epoch_length']
         sedentary_gait = self.module_settings['activity']['sedentary_gait']
