@@ -71,7 +71,7 @@ class Pipeline:
 
         # pipeline data file paths
         self.device_info_path = self.dirs['pipeline'] / 'devices.csv'
-        self.subject_info_path = self.dirs['pipeline'] / 'subjects.csv'
+        self.collection_info_path = self.dirs['pipeline'] / 'collections.csv'
         self.status_path = self.dirs['pipeline'] / 'status.csv'
 
         # dump settings to str that can be printed in log
@@ -86,10 +86,10 @@ class Pipeline:
         self.device_info = pd.read_csv(self.device_info_path, dtype=str).fillna('')
 
         # read subject level info
-        if self.subject_info_path.exists():
-            self.subject_info = pd.read_csv(self.subject_info_path, dtype=str).fillna('')
+        if self.collection_info_path.exists():
+            self.collection_info = pd.read_csv(self.collection_info_path, dtype=str).fillna('')
         else:
-            self.subject_info = None
+            self.collection_info = None
 
         # TODO: Check devices.csv and subjects.csv integrity
         # - ensure study code same for all rows (required) and matches study_dir (warning)
@@ -201,8 +201,8 @@ class Pipeline:
             if single_stage is not None:
                 message(f"Single stage: {single_stage}", level='info', display=(not self.quiet), log=self.log,
                         logger_name=self.log_name)
-            if not isinstance(self.subject_info, pd.DataFrame):
-                message("Missing subjects info file in meta folder `subjects.csv`", level='warning',
+            if not isinstance(self.collection_info, pd.DataFrame):
+                message("Missing collection info file in meta folder `collections.csv`", level='warning',
                         display=(not self.quiet), log=self.log, logger_name=self.log_name)
             message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
             message(f"Settings: {self.settings_path}\n\n {self.settings_str}", level='info', display=(not self.quiet),
@@ -217,9 +217,10 @@ class Pipeline:
                 coll_device_list_df.reset_index(inplace=True, drop=True)
 
                 coll_subject_dict = {}
-                if isinstance(self.subject_info, pd.DataFrame):
-                    coll_subject_df = self.subject_info.loc[(self.subject_info['study_code'] == self.study_code) &
-                                                            (self.subject_info['subject_id'] == subject_id)]
+                if isinstance(self.collection_info, pd.DataFrame):
+                    coll_subject_df = self.collection_info.loc[(self.collection_info['study_code'] == self.study_code) &
+                                                               (self.collection_info['subject_id'] == subject_id) &
+                                                               (self.collection_info['coll_id'] == coll_id)]
                     coll_subject_df.reset_index(inplace=True, drop=True)
                     coll_subject_dict = coll_subject_df.iloc[0].to_dict() if coll_subject_df.shape[0] > 0 else {}
 
@@ -227,7 +228,7 @@ class Pipeline:
                 coll = Collection(study_code=self.study_code, subject_id=subject_id, coll_id=coll_id)
 
                 coll.device_info = coll_device_list_df
-                coll.subject_info = coll_subject_dict
+                coll.collection_info = coll_subject_dict
 
                 self.process_collection(coll=coll, single_stage=single_stage)
 
@@ -1659,7 +1660,7 @@ class Pipeline:
         epoch_length = self.module_settings['activity']['epoch_length']
         sedentary_gait = self.module_settings['activity']['sedentary_gait']
 
-        dominant_hand = coll.subject_info['dominant_hand'].lower()
+        dominant_hand = coll.collection_info['dominant_hand'].lower()
 
         # select all wrist devices
         activity_device_index = self.select_activity_device(coll=coll, quiet=quiet, log=log)
@@ -1689,7 +1690,7 @@ class Pipeline:
 
             cutpoint_ages = pd.DataFrame(self.module_settings['activity']['cutpoints'])
 
-            subject_age = int(coll.subject_info['age'])
+            subject_age = int(coll.collection_info['age'])
             lowpass = int(self.module_settings['activity']['lowpass'])
 
             cutpoint = cutpoint_ages['type'].loc[(cutpoint_ages['min_age'] <= subject_age)
@@ -1918,7 +1919,7 @@ class Pipeline:
         # select which device to use for activity level
 
         dominant = self.module_settings['sleep']['dominant']
-        dominant_hand = coll.subject_info['dominant_hand'].lower()
+        dominant_hand = coll.collection_info['dominant_hand'].lower()
 
         device_info_copy = coll.device_info.copy()
         device_info_copy['device_location'] = [x.upper() for x in device_info_copy['device_location']]
@@ -2076,7 +2077,7 @@ class Pipeline:
 
     def get_collections(self):
 
-        collections = [(row['subject_id'], row['coll_id']) for i, row in self.device_info.iterrows()]
+        collections = [(row['subject_id'], row['coll_id']) for i, row in self.collection_info.iterrows()]
 
         collections = list(set(collections))
         collections.sort()
