@@ -2018,30 +2018,33 @@ def detect_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None,
 
 
 # Walkingbouts declassed
-def get_walking_bouts(left_steps_df=None, right_steps_df=None, start_time=None, duration_sec=None, bout_num_df=None,
-                 legacy_alg=False, left_kwargs={}, right_kwargs={}):
+def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None, left_device=None, duration_sec=15, bout_num_df=None,
+                      legacy_alg=False, left_kwargs={}, right_kwargs={}):
+    """
+
+    """
 
     def find_dp(path, duration_sec, timestamp_str=None, axis=1):
-            """
-            Gets start and end time based on a timestamp and duration_sec (# data points)
-            """
-            accel_file = pyedflib.EdfReader(path)
-            time_delta = pd.to_timedelta(
-                1 / accel_file.getSampleFrequency(axis), unit='s')
-            start = 0
-            if timestamp_str:
-                start = int((pd.to_datetime(timestamp_str) -
-                             accel_file.getStartdatetime()) / time_delta)
-            end = int(start + pd.to_timedelta(duration_sec, unit='s') / time_delta)
-            accel_file.close()
+        """
+        Gets start and end time based on a timestamp and duration_sec (# data points)
+        """
+        accel_file = pyedflib.EdfReader(path)
+        time_delta = pd.to_timedelta(
+            1 / accel_file.getSampleFrequency(axis), unit='s')
+        start = 0
+        if timestamp_str:
+            start = int((pd.to_datetime(timestamp_str) -
+                         accel_file.getStartdatetime()) / time_delta)
+        end = int(start + pd.to_timedelta(duration_sec, unit='s') / time_delta)
+        accel_file.close()
 
-            return start, end
+        return start, end
 
     def identify_bouts_one(steps_df, freq):
 
-        steps = steps_df['step_index']#step_detector.step_indices
-        timestamps = steps_df['timestamps']#step_detector.timestamps[steps]
-        step_lengths = steps_df['steps_length']#step_detector.step_lengths
+        steps = steps_df['step_index']  # step_detector.step_indices
+        timestamps = steps_df['timestamps']  # step_detector.timestamps[steps]
+        step_lengths = steps_df['steps_length']  # step_detector.step_lengths
 
         steps_df = pd.DataFrame({'step_index': steps, 'timestamp': timestamps, 'step_length': step_lengths})
         steps_df = steps_df.sort_values(by=['step_index'], ignore_index=True)
@@ -2124,7 +2127,7 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, start_time=None, 
             df = df.drop(['overlaps'], axis=1)
             return df
         else:
-            return find_overlapping_times(df, pd.DataFrame()) #makes an empty dataframe to compare
+            return find_overlapping_times(df, pd.DataFrame())  # makes an empty dataframe to compare
 
     def identify_bouts(left_stepdetector, right_stepdetector):
         """
@@ -2230,14 +2233,13 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, start_time=None, 
 
         return bout_step_summary
 
-    def verbose_bout_output(self, bout_output):
-        bout_step_summary = self.export_steps()
+    def verbose_bout_output(bout_output, bout_step_summary):
 
         for i, bout in bout_step_summary.groupby('gait_bout_num'):
             bout_output.loc[bout_output['gait_bout_num'] == i, 'success_left_step_count'] = \
-            bout.loc[(bout['step_state'] == 'success') & (bout['foot'] == 'left')].shape[0]
+                bout.loc[(bout['step_state'] == 'success') & (bout['foot'] == 'left')].shape[0]
             bout_output.loc[bout_output['gait_bout_num'] == i, 'success_right_step_count'] = \
-            bout.loc[(bout['step_state'] == 'success') & (bout['foot'] == 'right')].shape[0]
+                bout.loc[(bout['step_state'] == 'success') & (bout['foot'] == 'right')].shape[0]
 
             bout_output.loc[bout_output['gait_bout_num'] == i, 'mean_left_heel_strike_accel'] = np.mean(
                 bout.loc[(bout['step_state'] == 'success') & (bout['foot'] == 'left'), 'heel_strike_accel'])
@@ -2282,49 +2284,56 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, start_time=None, 
             ['day_num', 'date', 'longest_bout_length_secs', 'num_bouts_over_3mins', 'total_steps']]
         return daily_gait_df
 
-        # # helps synchronize both bouts Not needed for WalkingBouts but could be useful for steps_df
-        # if duration_sec:
-        #     l_start, l_end = find_dp(left_accel_path, duration_sec, timestamp_str=start_time)
-        #     r_start, r_end = find_dp(right_accel_path, duration_sec, timestamp_str=start_time)
-        #     left_kwargs['start'], left_kwargs['end'] = l_start, l_end
-        #     right_kwargs['start'], right_kwargs['end'] = r_start, r_end
+    # # helps synchronize both bouts Not needed for WalkingBouts but could be useful for steps_df
+    # if duration_sec:
+    #     l_start, l_end = find_dp(left_accel_path, duration_sec, timestamp_str=start_time)
+    #     r_start, r_end = find_dp(right_accel_path, duration_sec, timestamp_str=start_time)
+    #     left_kwargs['start'], left_kwargs['end'] = l_start, l_end
+    #     right_kwargs['start'], right_kwargs['end'] = r_start, r_end
 
-        # left_stepdetector = StepDetection(accel_path_or_obj=left_accel_path, **left_kwargs)
-        # right_stepdetector = StepDetection(accel_path_or_obj=right_accel_path,
-        #                                    **right_kwargs) if left_accel_path != right_accel_path else left_stepdetector
-        # self.left_step_df = left_stepdetector.export_steps()
-        # self.right_step_df = right_stepdetector.export_steps()
-        left_steps_df['step_time'] = pd.to_datetime(left_steps_df['step_time'])
-        right_steps_df['step_time'] = pd.to_datetime(right_steps_df['step_time'])
-        left_steps_df['foot'] = 'left'
-        right_steps_df['foot'] = 'right'
+    # left_stepdetector = StepDetection(accel_path_or_obj=left_accel_path, **left_kwargs)
+    # right_stepdetector = StepDetection(accel_path_or_obj=right_accel_path,
+    #                                    **right_kwargs) if left_accel_path != right_accel_path else left_stepdetector
+    # self.left_step_df = left_stepdetector.export_steps()
+    # self.right_step_df = right_stepdetector.export_steps()
 
-        if device.header['device_type'] == 'GNAC':
-            left_states = left_stepdetector.state_arr
-            right_states = right_stepdetector.state_arr
-            left_steps_failed = left_stepdetector.detect_arr
-            right_steps_failed = right_stepdetector.detect_arr
-        right_freq = right_device.signal_headers[axis]['sample_rate'] # TODO: check if frequencies are the same
-        left_freq = left_device.signal_headers[axis]['sample_rate']
+    left_steps_df = right_steps_df if left_steps_df is None else left_steps_df
+    right_steps_df = left_steps_df if right_steps_df is None else right_steps_df
 
-        assert right_freq == left_freq
-        if legacy_alg:
-            bout_num_df = identify_bouts(left_stepdetector,
-                                                           right_stepdetector) if bout_num_df is None else bout_num_df
-        else:
-            left_bouts = identify_bouts_one(left_steps_df)
-            right_bouts = identify_bouts_one(right_steps_df)
-            bout_num_df = find_overlapping_times(left_bouts, right_bouts)
+    left_steps_df['step_time'] = pd.to_datetime(left_steps_df['step_time'])
+    right_steps_df['step_time'] = pd.to_datetime(right_steps_df['step_time'])
+    left_steps_df['foot'] = 'left'
+    right_steps_df['foot'] = 'right'
 
-        # #for plotting
-        # self.sig_length = min(left_stepdetector.sig_length, right_stepdetector.sig_length)
-        # self.left_data = left_stepdetector.data
-        # self.right_data = right_stepdetector.data
-        # self.start_dp = left_stepdetector.start_dp
-        # self.end_dp = left_stepdetector.end_dp
-        # self.timestamps = min([left_stepdetector.timestamps, right_stepdetector.timestamps], key=len)
+    # if device.header['device_type'] == 'GNAC':
+    #     left_states = left_steps_df['state_arr']'.state_arr
+    #     right_states = right_stepdetector.state_arr
+    #     left_steps_failed = left_stepdetector.detect_arr
+    #     right_steps_failed = right_stepdetector.detect_arr
 
-    return steps_df, bouts_df
+    right_freq = right_device.signal_headers[axis]['sample_rate'] if right_device is not None else left_device
+    left_freq = left_device.signal_headers[axis]['sample_rate'] if left_device is not None else left_device
+
+    #assert right_freq == left_freq
+    if legacy_alg:
+        bout_num_df = identify_bouts(left_steps_df,
+                                     right_steps_df) if bout_num_df is None else bout_num_df
+    else:
+        left_bouts = identify_bouts_one(left_steps_df)
+        right_bouts = identify_bouts_one(right_steps_df)
+        bout_num_df = find_overlapping_times(left_bouts, right_bouts)
+
+    bout_steps_df = export_bout_steps(bout_num_df, left_steps_df, right_steps_df)
+
+    # #for plotting
+    # self.sig_length = min(left_stepdetector.sig_length, right_stepdetector.sig_length)
+    # self.left_data = left_stepdetector.data
+    # self.right_data = right_stepdetector.data
+    # self.start_dp = left_stepdetector.start_dp
+    # self.end_dp = left_stepdetector.end_dp
+    # self.timestamps = min([left_stepdetector.timestamps, right_stepdetector.timestamps], key=len)
+
+    return bout_steps_df, bout_num_df
 
 
 
@@ -2358,8 +2367,11 @@ if __name__ == '__main__':
     freq, acc_data, xz_data, timestamps, axis = get_acc_data(accelerometer=ankle_acc, axis=1, orient_signal=True, low_pass=True)
 
     #def detect_fl_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None):
-   steps_df = detect_steps(device = ankle_acc, data = acc_data[0], start=100000, end=200000,  freq=freq, axis=axis, timestamps=timestamps, xz_data=xz_data)
+   #steps_df = detect_steps(device = ankle_acc, data = acc_data[0], start=100000, end=200000,  freq=freq, axis=axis, timestamps=timestamps, xz_data=xz_data)
 
     # TODO: Run steps through to find walking bouts
+    steps_df = pd.read_csv(r'W:\dev\gait\sample_steps.csv')
 
+    #def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None, left_device=None, duration_sec=15, bout_num_df=None, legacy_alg=False, left_kwargs={}, right_kwargs={}):
+    bouts_steps_df, bouts_df = get_walking_bouts(left_steps_df=steps_df, left_device=ankle_acc)
     # TODO: Run walking bouts through spatiotemporal characteristics that are available for that person
