@@ -1970,6 +1970,8 @@ class Pipeline:
         ----------
         file_path : str or Path
             Path to properly formatted csv of new events.
+        quiet : bool, optional
+            Suppress displayed messages (default is False)
 
         """
 
@@ -2021,7 +2023,6 @@ class Pipeline:
             events_csv_name = f"{collection[0]}_{collection[1]}_{collection[2]}_EVENTS_CUSTOM.csv"
             events_csv_path = custom_events_dir / events_csv_name
 
-
             if events_csv_path.is_file():       # custom events csv already exists
 
                 # read csv
@@ -2044,7 +2045,6 @@ class Pipeline:
             else:       # custom events csv doesn't exist
 
                 events = new_collection_events
-
 
             # save custom events csv
             if not quiet:
