@@ -1,0 +1,147 @@
+[pipeline]
+stages = [ "convert", "nonwear", "crop", "save_sensors", "gait", "sleep", "activity",]
+
+[pipeline.dirs]
+pipeline = "pipeline"
+logs = "pipeline/logs"
+device_raw = "wearables/raw"
+device_edf_standard = "wearables/device_edf_standard"
+device_edf_cropped = "wearables/device_edf_cropped"
+sensor_edf = "wearables/sensor_edf"
+calib = "analytics/calib"
+sync = "analytics/sync"
+nonwear_bouts_standard = "analytics/nonwear/bouts_standard"
+nonwear_bouts_cropped = "analytics/nonwear/bouts_cropped"
+nonwear_daily_standard = "analytics/nonwear/daily_standard"
+nonwear_daily_cropped = "analytics/nonwear/daily_cropped"
+activity_epochs = "analytics/activity/epochs"
+activity_bouts = "analytics/activity/bouts"
+activity_daily = "analytics/activity/daily"
+activity_avm = "analytics/activity/avm"
+gait_steps = "analytics/gait/steps"
+gait_bouts = "analytics/gait/bouts"
+gait_daily = "analytics/gait/daily"
+sleep_sptw = "analytics/sleep/sptw"
+sleep_bouts = "analytics/sleep/bouts"
+sleep_daily = "analytics/sleep/daily"
+events_custom = "analytics/events/custom"
+reports_collection = "reports/collection"
+reports_patient = "reports/patient"
+reports_feedback = "reports/feedback"
+
+[pipeline.sensors]
+
+[pipeline.sensors.accelerometer]
+signals = [ "Accelerometer x", "Accelerometer y", "Accelerometer z",]
+
+[pipeline.sensors.gyroscope]
+signals = [ "Gyroscope x", "Gyroscope y", "Gyroscope z",]
+
+[pipeline.sensors.ecg]
+signals = [ "ECG",]
+
+[pipeline.sensors.plsox]
+signals = [ "Pulse", "SpO2",]
+
+[pipeline.sensors.temperature]
+signals = [ "Temperature",]
+
+[pipeline.sensors.light]
+signals = [ "Light",]
+
+[pipeline.sensors.button]
+signals = [ "Button",]
+
+[pipeline.device_locations]
+
+[pipeline.device_locations.lankle]
+aliases = [ "LA", "LEFTANKLE", "LANKLE",]
+
+[pipeline.device_locations.lwrist]
+aliases = [ "LW", "LEFTWRIST", "LWRIST",]
+
+[pipeline.device_locations.rwrist]
+aliases = [ "RW", "RIGHTWRIST", "RWRIST",]
+
+[pipeline.device_locations.rankle]
+aliases = [ "RA", "RIGHTANKLE", "RANKLE",]
+
+[pipeline.device_locations.chest]
+aliases = [ "CHEST",]
+
+[modules]
+
+[modules.read]
+overwrite_header = true
+
+[modules.convert]
+sync = true
+autocal = true
+adj_start = ""
+
+[modules.autocal]
+save = true
+
+[modules.sync]
+type = "flip"
+sync_at_config = true
+search_radius = 60
+save = true
+
+[modules.nonwear]
+save = true
+
+[modules.nonwear.settings]
+
+[modules.nonwear.settings.wrist]
+accel_std_thresh_mg = 8
+low_temperature_cutoff = 26
+high_temperature_cutoff = 30
+temp_dec_roc = -0.2
+temp_inc_roc = 0.1
+
+[modules.nonwear.settings.ankle]
+accel_std_thresh_mg = 9
+low_temperature_cutoff = 23
+high_temperature_cutoff = 31.5
+temp_dec_roc = -0.3
+temp_inc_roc = 0.05
+
+[modules.nonwear.settings.chest]
+accel_std_thresh_mg = 5
+low_temperature_cutoff = 25
+high_temperature_cutoff = 30
+temp_dec_roc = -0.1
+temp_inc_roc = 0.05
+
+
+[modules.crop]
+min_wear_time = 120
+save = true
+
+[modules.activity]
+#pref_cutpoint
+lowpass = 20
+epoch_length = 15
+sedentary_gait = true
+save = true
+
+[[modules.activity.cutpoints]]
+min_age = 0
+max_age = 59
+type = "Powell"
+
+[[modules.activity.cutpoints]]
+min_age = 60
+max_age = 999
+type = "Fraysse"
+
+[modules.sleep]
+dominant = false
+save = true
+
+[modules.gait]
+step_detect_type = "gyro"
+#axis
+save = true
+
