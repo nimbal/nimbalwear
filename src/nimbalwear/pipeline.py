@@ -1963,6 +1963,99 @@ class Pipeline:
 
         return sleep_device_index, dominant
 
+    def add_custom_events(self, file_path, quiet=False):
+        """Import properly formatted csv of events.
+
+        Parameters
+        ----------
+        file_path : str or Path
+            Path to properly formatted csv of new events.
+        quiet : bool, optional
+            Suppress displayed messages (default is False)
+
+        """
+
+        file_path = Path(file_path)
+
+        # read new events from csv
+        index_cols = ['study_code', 'subject_id', 'coll_id', 'event', 'id', ]
+        dtype_cols = {'study_code': str, 'subject_id': str, 'coll_id': str, 'event': str, 'id': pd.Int64Dtype(),
+                      'details': str,
+                      'notes': str, }
+        date_cols = ['start_time', 'end_time', ]
+
+        if not file_path.is_file():
+            print(f"{file_path} does not exist.")
+            return False
+
+        if not quiet:
+            print(f"Reading new events file: {file_path}\n")
+
+        new_events = pd.read_csv(file_path, index_col=index_cols, dtype=dtype_cols, parse_dates=date_cols)
+
+        # ensure new events have unique index
+        if not new_events.index.is_unique:
+            print("Events could not be added because some events could not be uniquely identified by study_code, "
+                  "subject_id, coll_id, event, id columns.\n")
+            return False
+
+        # ensure start_time is not blank
+        if any(new_events['start_time'].isnull()):
+            print("Events could not be added because start_time is required and some were blank.\n")
+            return False
+
+        # ensure study code of all events matches
+        if any(new_events.index.get_level_values('study_code') != self.study_code):
+            print("Events could not be added because some study codes did not match current study.\n")
+            return False
+
+        custom_events_dir = self.dirs['events_custom']
+
+        unique_new_collections = new_events.reset_index().set_index(['study_code', 'subject_id', 'coll_id']).index.unique()
+
+        # loop through unique collections in new events file
+        for collection in unique_new_collections:
+
+            # get events for this collection only
+            new_collection_events = new_events.loc[([collection[0]], [collection[1]], [collection[2]])]
+
+            # generate custom events csv path
+            events_csv_name = f"{collection[0]}_{collection[1]}_{collection[2]}_EVENTS_CUSTOM.csv"
+            events_csv_path = custom_events_dir / events_csv_name
+
+            if events_csv_path.is_file():       # custom events csv already exists
+
+                # read csv
+                if not quiet:
+                    print(f"Reading custom events file: {events_csv_path}")
+                events = pd.read_csv(events_csv_path, index_col=index_cols, dtype=dtype_cols, parse_dates=date_cols)
+
+                # determine new event types being added and remove any events of those type that already exist
+                # - this is done to avoid confusion within a type of event - best to remove all of a type and re-add them
+                new_event_types = new_collection_events.index.unique('event').values
+
+                if not quiet:
+                    print(f"Replacing or adding events of following types: {', '.join(new_event_types)}.")
+
+                events = events[~events.index.get_level_values('event').isin(new_event_types)]
+
+                # add new events
+                events = pd.concat([events, new_collection_events])
+
+            else:       # custom events csv doesn't exist
+
+                events = new_collection_events
+
+            # save custom events csv
+            if not quiet:
+                print(f"Saving {events_csv_path}\n")
+
+            events = events.sort_values(by='start_time')
+            events_csv_path.parent.mkdir(parents=True, exist_ok=True)
+            events.to_csv(events_csv_path)
+
+        return True
+
     def identify_df(self, coll, df):
         df.insert(loc=0, column='study_code', value=self.study_code)
         df.insert(loc=1, column='subject_id', value=coll.subject_id)
