@@ -23,6 +23,7 @@
       "sleep_sptw": "analytics/sleep/sptw",
       "sleep_bouts": "analytics/sleep/bouts",
       "sleep_daily": "analytics/sleep/daily",
+      "events_custom": "analytics/events/custom",
       "reports_collection": "reports/collection",
       "reports_feedback": "reports/feedback"
     },
