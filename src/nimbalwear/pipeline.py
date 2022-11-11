@@ -1,3 +1,23 @@
+"""Run wearable data through the nimbalwear pipeline.
+
+Classes
+-------
+Pipeline
+    A study on which the pipeline can be run.
+Collection
+    A single data collection.
+
+Exceptions
+----------
+NWException
+
+Functions
+---------
+message(msg, level, display, log, logger_name)
+    Displays or logs a message.
+
+"""
+
 import os
 import shutil
 import datetime as dt
@@ -25,7 +45,47 @@ from .__version__ import __version__
 
 
 class Pipeline:
+    """"Represents a study on which the pipeline can be run.
 
+    Attributes
+    ----------
+    quiet : bool
+        Suppress displayed messages.
+    log : bool
+        Log messages.
+    study_dir : Path or str
+        Directory where study is stored.
+    study_code : str
+        Unique study identifier.
+    settings_path : Path or str
+        Path to the file containing settings for the pipeline.
+    dirs : dict
+        Dictionary of directories within the study_dir used by the pipeline to store data.
+    stages : list
+        List of stages in the pipeline.
+    sensors : dict
+        Dictionary of sensor type and the signal labels they contain.
+    device_locations : dict
+        Dictionary of device locations and aliases for each.
+    module_settings
+        Dictionary of modules with settings for each.
+    device_info_path : Path or str
+        Path to file containing information about each device in each collection in the study.
+    collection_info_path : Path or str
+        Path to file containing information about each collection in the study.
+    status_path : Path or str
+        Path to file containing information about the pipeline status of each collection.
+    settings_str : str
+        String version of settings toml file, for use in logs.
+    data_dicts : dict
+        Dictionary of data dictionaries to be written to each data folder.
+    device_info : DataFrame
+        Information about each device in each collection in the study.
+    collection_info : DataFram
+        Information about each collection in the study.
+
+
+    """
     def __init__(self, study_dir, settings_path=None):
 
         self.quiet = False
@@ -244,7 +304,6 @@ class Pipeline:
         return
 
     def process_collection(self, coll, single_stage=None):
-
         """Processes the collection
 
         Args:
