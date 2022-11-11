@@ -81,12 +81,23 @@ class Pipeline:
         Dictionary of data dictionaries to be written to each data folder.
     device_info : DataFrame
         Information about each device in each collection in the study.
-    collection_info : DataFram
+    collection_info : DataFrame
         Information about each collection in the study.
 
 
     """
     def __init__(self, study_dir, settings_path=None):
+        """Read settings, devices, and collections file to construct Pipeline instance.
+
+        Parameters
+        ----------
+        study_dir : Path or str
+            Directory where study is stored.
+        settings_path : Path or str, optional
+            Path to the file containing settings for the pipeline, defaults to None in which default settings file
+            path relative to study_dir is used.
+
+        """
 
         self.quiet = False
         self.log = True
