@@ -1,3 +1,23 @@
+"""Run wearable data through the nimbalwear pipeline.
+
+Classes
+-------
+Pipeline
+    A study on which the pipeline can be run.
+Collection
+    A single data collection.
+
+Exceptions
+----------
+NWException
+
+Functions
+---------
+message(msg, level, display, log, logger_name)
+    Displays or logs a message.
+
+"""
+
 import os
 import shutil
 import datetime as dt
@@ -8,6 +28,7 @@ from functools import wraps
 import json
 import operator
 
+import toml
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
@@ -18,13 +39,65 @@ from .nonwear import vert_nonwear, nonwear_stats
 from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
 from .gait import AccelReader, WalkingBouts, get_gait_bouts, create_timestamps, gait_stats
 from .activity import activity_wrist_avm, activity_stats
+from .utils import convert_json_to_toml
 
 from .__version__ import __version__
 
 
 class Pipeline:
+    """"Represents a study on which the pipeline can be run.
 
+    Attributes
+    ----------
+    quiet : bool
+        Suppress displayed messages.
+    log : bool
+        Log messages.
+    study_dir : Path or str
+        Directory where study is stored.
+    study_code : str
+        Unique study identifier.
+    settings_path : Path or str
+        Path to the file containing settings for the pipeline.
+    dirs : dict
+        Dictionary of directories within the study_dir used by the pipeline to store data.
+    stages : list
+        List of stages in the pipeline.
+    sensors : dict
+        Dictionary of sensor type and the signal labels they contain.
+    device_locations : dict
+        Dictionary of device locations and aliases for each.
+    module_settings
+        Dictionary of modules with settings for each.
+    device_info_path : Path or str
+        Path to file containing information about each device in each collection in the study.
+    collection_info_path : Path or str
+        Path to file containing information about each collection in the study.
+    status_path : Path or str
+        Path to file containing information about the pipeline status of each collection.
+    settings_str : str
+        String version of settings toml file, for use in logs.
+    data_dicts : dict
+        Dictionary of data dictionaries to be written to each data folder.
+    device_info : DataFrame
+        Information about each device in each collection in the study.
+    collection_info : DataFrame
+        Information about each collection in the study.
+
+
+    """
     def __init__(self, study_dir, settings_path=None):
+        """Read settings, devices, and collections file to construct Pipeline instance.
+
+        Parameters
+        ----------
+        study_dir : Path or str
+            Directory where study is stored.
+        settings_path : Path or str, optional
+            Path to the file containing settings for the pipeline, defaults to None in which default settings file
+            path relative to study_dir is used.
+
+        """
 
         self.quiet = False
         self.log = True
@@ -32,38 +105,48 @@ class Pipeline:
         # initialize folder structure
         self.study_dir = Path(study_dir)
 
-        self.settings_path = Path(settings_path) if settings_path is not None else settings_path
-
-        if (self.settings_path is None) or (not self.settings_path.is_file()):
-            self.settings_path = self.study_dir / 'pipeline/settings/settings.json'
-            self.settings_path.parent.mkdir(parents=True, exist_ok=True)
-
-        if not self.settings_path.is_file():
-            settings_src = Path(__file__).parent.absolute() / 'settings/settings.json'
-            shutil.copy(settings_src, self.settings_path)
-
         # get study code
         self.study_code = self.study_dir.name
 
-        # read json file
-        with open(self.settings_path, 'r') as f:
-            settings_json = json.load(f)
+        # convert settings_path to Path if not None
+        self.settings_path = Path(settings_path) if settings_path is not None else settings_path
 
-        self.dirs = settings_json['pipeline']['dirs']
+        # if settings path is None or doesn't exist than set settings_path to default settings file
+        if (self.settings_path is None) or (not self.settings_path.is_file()):
+            self.settings_path = self.study_dir / 'pipeline/settings/settings.toml'
+            self.settings_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # if default settings file doesn't exist in this study then add it
+            if not self.settings_path.is_file():
+                settings_src = Path(__file__).parent.absolute() / 'settings/settings.toml'
+                shutil.copy(settings_src, self.settings_path)
+
+        # if a json file is passed in read it as is but convert it to toml for next time
+        # - this provides and option for backward compatibility to run the pipeline with the existing json file
+        # the first time after upgrading to version 0.19 that uses toml
+        if self.settings_path.suffix == ".json":
+            settings_dict = convert_json_to_toml(settings_path, settings_path.with_suffix(".toml"))
+        else: # read toml file
+
+            with open(self.settings_path, 'r') as f:
+                settings_dict = toml.load(f)
+
+        # parse specific settings into Pipeline attributes
+        self.dirs = settings_dict['pipeline']['dirs']
         self.dirs = {key: self.study_dir / value for key, value in self.dirs.items()}
 
-        # pipeline data files
+        self.stages = settings_dict['pipeline']['stages']
+        self.sensors = settings_dict['pipeline']['sensors']
+        self.device_locations = settings_dict['pipeline']['device_locations']
+        self.module_settings = settings_dict['modules']
+
+        # pipeline data file paths
         self.device_info_path = self.dirs['pipeline'] / 'devices.csv'
-        self.subject_info_path = self.dirs['pipeline'] / 'subjects.csv'
-        # self.log_file_path = self.dirs['logs'] / 'processing.log'
+        self.collection_info_path = self.dirs['pipeline'] / 'collections.csv'
         self.status_path = self.dirs['pipeline'] / 'status.csv'
 
-        self.stages = settings_json['pipeline']['stages']
-        self.sensors = settings_json['pipeline']['sensors']
-        self.device_locations = settings_json['pipeline']['device_locations']
-        self.module_settings = settings_json['modules']
-
-        self.settings_str = json.dumps(settings_json, indent=4)
+        # dump settings to str that can be printed in log
+        self.settings_str = toml.dumps(settings_dict)
 
         with open(Path(__file__).parent.absolute() / 'settings/data_dicts.json', 'r') as f:
             self.data_dicts = json.load(f)
@@ -74,10 +157,10 @@ class Pipeline:
         self.device_info = pd.read_csv(self.device_info_path, dtype=str).fillna('')
 
         # read subject level info
-        if self.subject_info_path.exists():
-            self.subject_info = pd.read_csv(self.subject_info_path, dtype=str).fillna('')
+        if self.collection_info_path.exists():
+            self.collection_info = pd.read_csv(self.collection_info_path, dtype=str).fillna('')
         else:
-            self.subject_info = None
+            self.collection_info = None
 
         # TODO: Check devices.csv and subjects.csv integrity
         # - ensure study code same for all rows (required) and matches study_dir (warning)
@@ -189,8 +272,8 @@ class Pipeline:
             if single_stage is not None:
                 message(f"Single stage: {single_stage}", level='info', display=(not self.quiet), log=self.log,
                         logger_name=self.log_name)
-            if not isinstance(self.subject_info, pd.DataFrame):
-                message("Missing subjects info file in meta folder `subjects.csv`", level='warning',
+            if not isinstance(self.collection_info, pd.DataFrame):
+                message("Missing collection info file in meta folder `collections.csv`", level='warning',
                         display=(not self.quiet), log=self.log, logger_name=self.log_name)
             message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
             message(f"Settings: {self.settings_path}\n\n {self.settings_str}", level='info', display=(not self.quiet),
@@ -205,9 +288,10 @@ class Pipeline:
                 coll_device_list_df.reset_index(inplace=True, drop=True)
 
                 coll_subject_dict = {}
-                if isinstance(self.subject_info, pd.DataFrame):
-                    coll_subject_df = self.subject_info.loc[(self.subject_info['study_code'] == self.study_code) &
-                                                            (self.subject_info['subject_id'] == subject_id)]
+                if isinstance(self.collection_info, pd.DataFrame):
+                    coll_subject_df = self.collection_info.loc[(self.collection_info['study_code'] == self.study_code) &
+                                                               (self.collection_info['subject_id'] == subject_id) &
+                                                               (self.collection_info['coll_id'] == coll_id)]
                     coll_subject_df.reset_index(inplace=True, drop=True)
                     coll_subject_dict = coll_subject_df.iloc[0].to_dict() if coll_subject_df.shape[0] > 0 else {}
 
@@ -215,7 +299,7 @@ class Pipeline:
                 coll = Collection(study_code=self.study_code, subject_id=subject_id, coll_id=coll_id)
 
                 coll.device_info = coll_device_list_df
-                coll.subject_info = coll_subject_dict
+                coll.collection_info = coll_subject_dict
 
                 self.process_collection(coll=coll, single_stage=single_stage)
 
@@ -231,7 +315,6 @@ class Pipeline:
         return
 
     def process_collection(self, coll, single_stage=None):
-
         """Processes the collection
 
         Args:
@@ -560,7 +643,7 @@ class Pipeline:
 
         sync_type = self.module_settings['sync']['type']
         sync_at_config = self.module_settings['sync']['sync_at_config']
-        search_radius = self.module_settings['sync']['search_radius']
+        search_radius = self.module_settings['sync'].get('search_radius', None)
 
         if not coll.device_info.empty:
             ref_device_type = coll.device_info.iloc[0]['device_type']
@@ -1227,7 +1310,7 @@ class Pipeline:
         # TODO: axis needs to be set based on orientation of device
 
         step_detect_type = self.module_settings['gait']['step_detect_type']
-        axis = self.module_settings['gait']['axis']
+        axis = self.module_settings['gait'].get('axis', None)
         save = self.module_settings['gait']['save']
 
         message(f"Detecting steps and walking bouts using {step_detect_type} data...", level='info', display=(not quiet), log=log,
@@ -1642,12 +1725,12 @@ class Pipeline:
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        pref_cutpoint = self.module_settings['activity']['pref_cutpoint']
+        pref_cutpoint = self.module_settings['activity'].get('pref_cutpoint', None)
         save = self.module_settings['activity']['save']
         epoch_length = self.module_settings['activity']['epoch_length']
         sedentary_gait = self.module_settings['activity']['sedentary_gait']
 
-        dominant_hand = coll.subject_info['dominant_hand'].lower()
+        dominant_hand = coll.collection_info['dominant_hand'].lower()
 
         # select all wrist devices
         activity_device_index = self.select_activity_device(coll=coll, quiet=quiet, log=log)
@@ -1677,7 +1760,7 @@ class Pipeline:
 
             cutpoint_ages = pd.DataFrame(self.module_settings['activity']['cutpoints'])
 
-            subject_age = int(coll.subject_info['age'])
+            subject_age = int(coll.collection_info['age'])
             lowpass = int(self.module_settings['activity']['lowpass'])
 
             cutpoint = cutpoint_ages['type'].loc[(cutpoint_ages['min_age'] <= subject_age)
@@ -1906,7 +1989,7 @@ class Pipeline:
         # select which device to use for activity level
 
         dominant = self.module_settings['sleep']['dominant']
-        dominant_hand = coll.subject_info['dominant_hand'].lower()
+        dominant_hand = coll.collection_info['dominant_hand'].lower()
 
         device_info_copy = coll.device_info.copy()
         device_info_copy['device_location'] = [x.upper() for x in device_info_copy['device_location']]
@@ -2064,7 +2147,7 @@ class Pipeline:
 
     def get_collections(self):
 
-        collections = [(row['subject_id'], row['coll_id']) for i, row in self.device_info.iterrows()]
+        collections = [(row['subject_id'], row['coll_id']) for i, row in self.collection_info.iterrows()]
 
         collections = list(set(collections))
         collections.sort()
