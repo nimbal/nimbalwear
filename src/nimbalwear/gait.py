@@ -1640,16 +1640,16 @@ def detect_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None,
 
         pushoff_start = swing_start - int(pushoff_time * freq)
         gait_cycle_end = heel_strike + int(foot_down_time * freq)
-        step_lengths = (gait_cycle_end - pushoff_start) / freq
+        step_durations = (gait_cycle_end - pushoff_start) / freq
         avg_speed = [np.mean(xz_data[i:i + int(lengths * freq)]) * 9.81 * lengths for i, lengths in
-                     zip(step_indices, step_lengths)]
+                     zip(step_indices, step_durations)]
 
         assert len(step_indices) == len(swing_start)
         assert len(step_indices) == len(mid_swing)
         assert len(step_indices) == len(heel_strike)
 
         successful_steps = pd.DataFrame({
-            'step_time': step_timestamps,
+            'step_timestamp': step_timestamps,
             'step_index': np.array(step_indices) + start_dp,
             'step_state': 'success',
             'swing_start_time': timestamps[swing_start],
@@ -1658,7 +1658,7 @@ def detect_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None,
             'swing_start_accel': data[swing_start],
             'mid_swing_accel': data[mid_swing],
             'heel_strike_accel': data[heel_strike],
-            'step_length': step_lengths,
+            'step_duration': step_durations,
             'avg_speed': avg_speed
         })
         failed_steps = pd.DataFrame({
@@ -2043,8 +2043,8 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
     def identify_bouts_one(steps_df, freq):
 
         steps = steps_df['step_index']  # step_detector.step_indices
-        timestamps = steps_df['timestamps']  # step_detector.timestamps[steps]
-        step_lengths = steps_df['steps_length']  # step_detector.step_lengths
+        timestamps = steps_df['step_timestamp']  # step_detector.timestamps[steps]
+        step_lengths = steps_df['step_duration']  # step_detector.step_lengths
 
         steps_df = pd.DataFrame({'step_index': steps, 'timestamp': timestamps, 'step_length': step_lengths})
         steps_df = steps_df.sort_values(by=['step_index'], ignore_index=True)
@@ -2129,7 +2129,7 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
         else:
             return find_overlapping_times(df, pd.DataFrame())  # makes an empty dataframe to compare
 
-    def identify_bouts(left_stepdetector, right_stepdetector):
+    def identify_bouts(left_stepdetector, right_stepdetector, freq):
         """
         Identifies the bouts within the left and right acceleromter datas.
         The algorithm finds bouts that have 3 bilateral steps within a 15 second window
@@ -2300,8 +2300,8 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
     left_steps_df = right_steps_df if left_steps_df is None else left_steps_df
     right_steps_df = left_steps_df if right_steps_df is None else right_steps_df
 
-    left_steps_df['step_time'] = pd.to_datetime(left_steps_df['step_time'])
-    right_steps_df['step_time'] = pd.to_datetime(right_steps_df['step_time'])
+    left_steps_df['step_timestamp'] = pd.to_datetime(left_steps_df['step_timestamp'])
+    right_steps_df['step_timestamp'] = pd.to_datetime(right_steps_df['step_timestamp'])
     left_steps_df['foot'] = 'left'
     right_steps_df['foot'] = 'right'
 
@@ -2319,8 +2319,8 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
         bout_num_df = identify_bouts(left_steps_df,
                                      right_steps_df) if bout_num_df is None else bout_num_df
     else:
-        left_bouts = identify_bouts_one(left_steps_df)
-        right_bouts = identify_bouts_one(right_steps_df)
+        left_bouts = identify_bouts_one(left_steps_df, left_freq)
+        right_bouts = identify_bouts_one(right_steps_df, right_freq)
         bout_num_df = find_overlapping_times(left_bouts, right_bouts)
 
     bout_steps_df = export_bout_steps(bout_num_df, left_steps_df, right_steps_df)
