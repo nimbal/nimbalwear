@@ -2078,7 +2078,7 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
                     bout_dict['number_steps'].append(step_count)
                     bout_dict['start_time'].append(start_step['timestamp'])
                     bout_dict['end_time'].append(
-                        curr_step['timestamp'] + pd.Timedelta(curr_step['step_length'] / freq, unit='sec'))
+                        curr_step['timestamp'] + pd.Timedelta(curr_step['step_duration'] / freq, unit='sec'))
 
                 # resets state and creates new bout
                 step_count = 1
