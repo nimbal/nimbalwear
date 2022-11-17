@@ -90,10 +90,9 @@ rest_min = 2
 rest_max = 15
 rest_sens = 0.12
 flip_max = 2
-min_flips=4
-reject_above_ae=0.2
-req_tgt_corr=0.8
-
+min_flips = 4
+reject_above_ae = 0.2
+req_tgt_corr = 0.8
 save = true
 
 [modules.nonwear]
