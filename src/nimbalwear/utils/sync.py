@@ -186,9 +186,9 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
 
     ref_sync_sig_idx, ref_sync_windows = iw
 
-    syncs = pd.DataFrame(columns=['ref_sig_idx', 'ref_start_idx', 'ref_end_idx', 'ref_flips',
-                                  'ref_ae', 'tgt_sig_idx', 'tgt_start_idx', 'tgt_end_idx',
-                                  'tgt_corr'])
+    syncs = None
+    sync_cols = ['ref_sig_idx', 'ref_start_idx', 'ref_end_idx', 'ref_flips', 'ref_ae', 'tgt_sig_idx', 'tgt_start_idx',
+                 'tgt_end_idx', 'tgt_corr']
 
     for s in tqdm(ref_sync_windows[0], desc="Searching target for detected sync flips...", leave=False):
 
@@ -224,9 +224,11 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
                 new_sync = pd.DataFrame([[int(ref_sync_sig_idx), int(s[0]), int(s[1]), int(s[2]), round(s[3], 3),
                                           int(tgt_sync_sig_idx), int(tgt_sync[0] + start_i), int(tgt_sync[1] + start_i),
                                           round(tgt_sync[2], 2)]],
-                                        index=syncs.columns)
-
-                syncs = pd.concat([syncs, new_sync], ignore_index=True)
+                                        columns=sync_cols)
+                if syncs is None:
+                    syncs = new_sync
+                else:
+                    syncs = pd.concat([syncs, new_sync], ignore_index=True)
 
     return syncs
 
