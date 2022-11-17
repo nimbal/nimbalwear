@@ -401,8 +401,8 @@ class Device:
 
     def sync(self, ref, sig_labels=('Accelerometer x', 'Accelerometer y', 'Accelerometer z'), sync_type='flip',
              sync_at_config=True, search_radius=None, signal_ds=1, rest_min=2, rest_max=15, rest_sens=0.12, flip_max=2,
-                 min_flips=4, reject_above_ae=0.2, req_tgt_corr=0.8, plot_detect_ref=False, plot_quality_ref=False,
-                 plot_detect_tgt=False):
+             min_flips=4, reject_above_ae=0.2, req_tgt_corr=0.8, plot_detect_ref=False, plot_quality_ref=False,
+             plot_detect_tgt=False):
 
         syncs = None
         segments = None
