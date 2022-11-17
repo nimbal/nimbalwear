@@ -226,7 +226,7 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
                                       round(tgt_sync[2] ,2)],
                                      index=syncs.columns)
 
-                syncs = syncs.append(new_sync, ignore_index=True)
+                syncs = pd.concat([syncs, new_sync], ignore_index=True)
 
     return syncs
 
