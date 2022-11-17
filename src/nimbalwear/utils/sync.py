@@ -221,10 +221,10 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
                                                                      plot_detect_tgt=plot_detect_tgt)
 
             if tgt_sync_sig_idx is not None:
-                new_sync = pd.Series([int(ref_sync_sig_idx), int(s[0]), int(s[1]), int(s[2]), round(s[3], 3),
-                                      int(tgt_sync_sig_idx), int(tgt_sync[0] + start_i), int(tgt_sync[1] + start_i),
-                                      round(tgt_sync[2], 2)],
-                                     index=syncs.columns)
+                new_sync = pd.DataFrame([[int(ref_sync_sig_idx), int(s[0]), int(s[1]), int(s[2]), round(s[3], 3),
+                                          int(tgt_sync_sig_idx), int(tgt_sync[0] + start_i), int(tgt_sync[1] + start_i),
+                                          round(tgt_sync[2], 2)]],
+                                        index=syncs.columns)
 
                 syncs = pd.concat([syncs, new_sync], ignore_index=True)
 
