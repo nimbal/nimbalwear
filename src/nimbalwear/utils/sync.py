@@ -179,12 +179,12 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
                             req_tgt_corr=0.8, plot_detect_ref=False, plot_quality_ref=False, plot_detect_tgt=False):
 
     # detect reference syncs
-    ref_sync_sig_idx, ref_sync_windows = detect_sync_flips_ref_accel(ref_accel, ref_freq, signal_ds=signal_ds,
-                                                         rest_min=rest_min, rest_max=rest_max, rest_sens=rest_sens,
-                                                         flip_max=flip_max, min_flips=min_flips,
-                                                         reject_above_ae=reject_above_ae,
-                                                         plot_detect_ref=plot_detect_ref,
-                                                         plot_quality_ref=plot_quality_ref)
+    iw = detect_sync_flips_ref_accel(ref_accel, ref_freq, signal_ds=signal_ds, rest_min=rest_min, rest_max=rest_max,
+                                     rest_sens=rest_sens, flip_max=flip_max, min_flips=min_flips,
+                                     reject_above_ae=reject_above_ae, plot_detect_ref=plot_detect_ref,
+                                     plot_quality_ref=plot_quality_ref)
+
+    ref_sync_sig_idx, ref_sync_windows = iw
 
     syncs = pd.DataFrame(columns=['ref_sig_idx', 'ref_start_idx', 'ref_end_idx', 'ref_flips',
                                   'ref_ae', 'tgt_sig_idx', 'tgt_start_idx', 'tgt_end_idx',
@@ -232,7 +232,7 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
 
 
 def detect_sync_flips_ref_accel(accel, signal_freq, signal_ds=1, rest_min=2, rest_max=15, rest_sens=0.12, flip_max=2,
-                                 min_flips=4, reject_above_ae=0.2, plot_detect_ref=False, plot_quality_ref=False):
+                                min_flips=4, reject_above_ae=0.2, plot_detect_ref=False, plot_quality_ref=False):
 
     ref_sync_sig_idx = None
     ref_sync_windows = None
@@ -457,6 +457,8 @@ def detect_sync_flips_tgt_accel(tgt_accel, ref_sync, tgt_freq, ref_freq, req_cor
         Sampling frequency of the reference accelerometer
     req_corr : float
         Required correlation for sync to be accepted as a match
+    plot_detect_tgt : bool
+        Display plot showing sync matches for each axis
 
     """
     tgt_sync_sig_idx = None
@@ -472,11 +474,15 @@ def detect_sync_flips_tgt_accel(tgt_accel, ref_sync, tgt_freq, ref_freq, req_cor
         axis_tgt_corr = axis_tgt_sync[2]
 
         cond1 = axis_tgt_corr >= req_corr
-        cond2 = axis_tgt_corr > prev_tgt_corr
+        if prev_tgt_corr is None:
+            cond2 = True
+        else:
+            cond2 = axis_tgt_corr > prev_tgt_corr
 
         if cond1 and cond2:
-            prev_tgt_corr = tgt_sync = axis_tgt_corr
+            prev_tgt_corr = axis_tgt_corr
             tgt_sync_sig_idx = t_i
+            tgt_sync = axis_tgt_sync
 
     return tgt_sync_sig_idx, tgt_sync
 
