@@ -2044,9 +2044,11 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
 
         steps = steps_df['step_index']  # step_detector.step_indices
         timestamps = steps_df['step_timestamp']  # step_detector.timestamps[steps]
-        step_lengths = steps_df['step_duration']  # step_detector.step_lengths
+        step_durations = steps_df['step_duration']  # step_detector.step_lengths
 
-        steps_df = pd.DataFrame({'step_index': steps, 'timestamp': timestamps, 'step_length': step_lengths})
+        freq=int(freq)
+
+        steps_df = pd.DataFrame({'step_index': steps, 'timestamp': timestamps, 'step_duration': step_durations})
         steps_df = steps_df.sort_values(by=['step_index'], ignore_index=True)
 
         # assumes Hz are the same
@@ -2071,8 +2073,9 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
             else:
                 # stores bout
                 if step_count >= 3:
+                    print(curr_step)
                     start_ind = start_step['step_index']
-                    end_ind = curr_step['step_index'] + curr_step['step_length']
+                    end_ind = curr_step['step_index'] + curr_step['step_duration']
                     bout_dict['start'].append(start_ind)
                     bout_dict['end'].append(end_ind)
                     bout_dict['number_steps'].append(step_count)
@@ -2311,8 +2314,8 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
     #     left_steps_failed = left_stepdetector.detect_arr
     #     right_steps_failed = right_stepdetector.detect_arr
 
-    right_freq = right_device.signal_headers[axis]['sample_rate'] if right_device is not None else left_device
-    left_freq = left_device.signal_headers[axis]['sample_rate'] if left_device is not None else left_device
+    right_freq = right_device.signal_headers[axis]['sample_rate'] if right_device is not None else left_device.signal_headers[axis]['sample_rate']
+    left_freq = left_device.signal_headers[axis]['sample_rate'] if left_device is not None else right_device.signal_headers[axis]['sample_rate']
 
     #assert right_freq == left_freq
     if legacy_alg:
