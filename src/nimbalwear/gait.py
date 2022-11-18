@@ -853,7 +853,7 @@ def detect_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None,
             # single IMU only - no need for this step atm
 
             # 5a: Get timestamps for all steps for output with dataframe
-            step_events_df['Peak_times'] = timestamps[step_events_df['Step_index']]
+            step_events_df['Step_timestamp'] = timestamps[step_events_df['Step_index']]
 
             # 5b: Remove gait events that were one or less steps
             gait_bouts_df = remove_single_step_bouts(df=step_events_df, steps_length=bout_steps)
@@ -879,6 +879,8 @@ def detect_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None,
             # 6c: need to look at th3 th4 to determine whether we should keep or reject step
 
             # 7: add a plotting function
+
+            step_events_df.columns = ['step_number', 'step_index','bout_number', 'step_timestamp']
 
             return step_events_df, peak_heights #gait_bouts_df,
 
@@ -934,11 +936,10 @@ def detect_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None,
         #run
         timestamps, indexes = create_timestamps(data_start_time, data_len, fs=gyro_freq, start_time=None, end_time=None)
 
-        step_df, peak_heights = get_gait_bouts(data=gyro_data, sample_freq=gyro_freq, timestamps=timestamps, break_sec=2, bout_steps=3,
+        steps_df, peak_heights = get_gait_bouts(data=gyro_data, sample_freq=gyro_freq, timestamps=timestamps, break_sec=2, bout_steps=3,
                                                       start_ind=0, end_ind=None)
 
-
-        return steps_df
+        return steps_df #TODO - remove the bouting and only output step_num, step_index, _step_timestamp to feed into steps_df
 
     if device.header['device_type'] == 'GNAC':
         print(f"Device set: {device.header['device_type']} detecting steps using accelerometer.")
