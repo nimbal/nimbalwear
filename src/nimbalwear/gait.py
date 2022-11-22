@@ -11,11 +11,14 @@ import nimbalwear
 
 
 # Stepdetector declassed
-def detect_steps(device=None, bilateral_wear=False, start=0, end=-1, ):
+def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
     '''
     Parameters
     ---
     device -> input nw.Device() object; default is None
+    bilateral_wear -> is the person wearing devices on both ankles? True or False
+    start -> where do you want to start your step detection
+    end -> where do you want step detection to end
     ---
     Returns
     ---
@@ -104,7 +107,6 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1, ):
             ---
             acc_data
             """
-
             cutoff_freq = freq * 0.005
             sos = butter(N=1, Wn=cutoff_freq, btype='low', fs=freq, output='sos')
             orientation = sosfilt(sos, acc_data)
@@ -113,7 +115,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1, ):
 
             return acc_data
 
-        all_data = np.array(accelerometer.signals)
+        all_data = np.array(device.signals)
         accel_axes = [0, 1, 2]
         if axis is not None:
             accel_axes.remove(axis)
@@ -126,8 +128,8 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1, ):
             acc_data = all_data[axis_index]
             xz_data = np.sqrt((all_data[other_axes] ** 2).sum(axis=0))
 
-        freq = accelerometer.signal_headers[axis]['sample_rate']
-        start_time = accelerometer.header['start_datetime']
+        freq = device.signal_headers[axis]['sample_rate']
+        start_time = device.header['start_datetime']
         file_duration = len(acc_data) / freq
         end_time = start_time + timedelta(0, file_duration)
         timestamps = np.asarray(pd.date_range(start=start_time, end=end_time, periods=len(acc_data)))
@@ -140,7 +142,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1, ):
 
         return freq, acc_data, xz_data, timestamps, axis
 
-    def detect_steps_ssc(device = None, data=None,  start_dp=start, end_dp=end, axis=None, pushoff_df=True, timestamps=None, xz_data=None):
+    def detect_steps_ssc(device=None, data=None,  start_dp=start, end_dp=end, axis=None, pushoff_df=True, timestamps=None, xz_data=None):
         """
         Originally def step_detect(self)
         Detects the steps within the accelerometer data. Based on this paper:
@@ -548,18 +550,18 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1, ):
 
         return steps_df
 
-    def detect_steps_gyro(device=None, data=None):
+    def detect_steps_gyro(device=None, start_dp=None, end_dp=None):
 
         #define functions for gyroscope step detection
-        def create_timestamps(data_start_time, data_len, fs, start_time=None, end_time=None):
+        def create_timestamps(data_start=None, data_length=None, fs=None, start_time=None, end_time=None):
 
-            start_time = data_start_time if start_time is None else start_time
-            end_time = data_start_time + timedelta(seconds=(data_len / fs)) if end_time is None else end_time
+            start_time = data_start if start_time is None else start_time
+            end_time = data_start + timedelta(seconds=(data_length / fs)) if end_time is None else end_time
 
-            indexes = [int((start_time - data_start_time).total_seconds() * fs),
-                       int((end_time - data_start_time).total_seconds() * fs)]
+            indexes = [int((start_time - data_start).total_seconds() * fs),
+                       int((end_time - data_start).total_seconds() * fs)]
             length = indexes[1]-indexes[0]
-            timestamps = pd.date_range(start=start_time, periods=length, freq=f'{1/fs}S')
+            timestamps = pd.date_range(start=data_start, periods=length, freq=f'{1/fs}S')
 
             return timestamps, indexes
 
@@ -904,7 +906,6 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1, ):
             return gait_stats
 
         #define parameters
-        freq = int(device.signal_headers[0]['sample_rate'])
         ## get signal labels
         index_dict = {"gyro_x": device.get_signal_index('Gyroscope x'),
                       "gyro_y": device.get_signal_index('Gyroscope y'),
@@ -913,15 +914,19 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1, ):
                       "accel_y": device.get_signal_index('Accelerometer y'),
                       "accel_z": device.get_signal_index('Accelerometer z')}
         ##get signal frequnecies needed for step detection
-        gyro_freq = int(device.signal_headers[index_dict['gyro_x']]['sample_rate'])
+        gyro_freq = device.signal_headers[index_dict['gyro_x']]['sample_rate']
 
         ##get start stamp
         data_start_time = device.header["start_datetime"] if start is None else start
         ## get data for gyro step detection
         gyro_data = device.signals[index_dict['gyro_z']]
         data_len = len(gyro_data)
+        print(data_start_time)
+        print(type(data_len))
+        print(type(data_start_time))
+        print(type(gyro_freq))
 
-        timestamps, indexes = create_timestamps(data_start_time, data_len, fs=gyro_freq, start_time=None, end_time=None)
+        timestamps, indexes = create_timestamps(data_start=data_start_time, data_length=data_len, fs=gyro_freq, start_time=None, end_time=None)
 
         steps_df, peak_heights = get_gait_bouts(data=gyro_data, sample_freq=gyro_freq, timestamps=timestamps, break_sec=2, bout_steps=3,
                                                       start_ind=0, end_ind=None)
@@ -934,12 +939,12 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1, ):
         """
 
         freq, acc_data, xz_data, timestamps, axis = get_acc_data_ssc(device=ankle, axis=None, orient_signal=True, low_pass=True)
-        steps_df = detect_steps_ssc(device = ankle, data= acc_data,  start_dp=100000, end_dp=100000, axis=axis, pushoff_df=True, timestamps=timestamps, xz_data=xz_data)
+        steps_df = detect_steps_ssc(device=device, data=acc_data,  start_dp=100000, end_dp=100000, axis=axis, pushoff_df=True, timestamps=timestamps, xz_data=xz_data)
 
     elif device.header['device_type'] == 'AXV6':
         print(f"Device set: {device.header['device_type']} detecting steps using gryoscope.")
 
-        steps_df = detect_steps_gyro(device=None)
+        steps_df = detect_steps_gyro(device=device, start)
 
     else:
         print("Device not defined. State space step detector not run.")
