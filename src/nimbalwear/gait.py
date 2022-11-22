@@ -906,6 +906,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             return gait_stats
 
         #define parameters
+        all_data = np.array(device.signals)
         ## get signal labels
         index_dict = {"gyro_x": device.get_signal_index('Gyroscope x'),
                       "gyro_y": device.get_signal_index('Gyroscope y'),
@@ -916,17 +917,13 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
         ##get signal frequnecies needed for step detection
         gyro_freq = device.signal_headers[index_dict['gyro_x']]['sample_rate']
 
-        ##get start stamp
-        data_start_time = device.header["start_datetime"] if start is None else start
-        ## get data for gyro step detection
         gyro_data = device.signals[index_dict['gyro_z']]
-        data_len = len(gyro_data)
-        print(data_start_time)
-        print(type(data_len))
-        print(type(data_start_time))
-        print(type(gyro_freq))
 
-        timestamps, indexes = create_timestamps(data_start=data_start_time, data_length=data_len, fs=gyro_freq, start_time=None, end_time=None)
+        data_start_time = device.header["start_datetime"] #if start is None else start
+        data_len = len(gyro_data)
+        file_duration = data_len / gyro_freq
+        end_time = data_start_time + timedelta(0, file_duration)
+        timestamps = np.asarray(pd.date_range(start=data_start_time, end=end_time, periods=len(gyro_data)))
 
         steps_df, peak_heights = get_gait_bouts(data=gyro_data, sample_freq=gyro_freq, timestamps=timestamps, break_sec=2, bout_steps=3,
                                                       start_ind=0, end_ind=None)
@@ -944,7 +941,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
     elif device.header['device_type'] == 'AXV6':
         print(f"Device set: {device.header['device_type']} detecting steps using gryoscope.")
 
-        steps_df = detect_steps_gyro(device=device, start)
+        steps_df = detect_steps_gyro(device=device)
 
     else:
         print("Device not defined. State space step detector not run.")
@@ -1303,8 +1300,10 @@ if __name__ == '__main__':
                             start=100000, end=200000)
     steps_df.to_csv(r'W:\dev\gait\gyro_sample_steps.csv')
     # TODO: Run steps through to find walking bouts
-    #steps_df = pd.read_csv(r'W:\dev\gait\sample_steps.csv')
+    #steps_df = pd.read_csv(r'W:\dev\gait\sample_steps._dfcsv')
 
     #def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None, left_device=None, duration_sec=15, bout_num_df=None, legacy_alg=False, left_kwargs={}, right_kwargs={}):
-    #bouts_steps_df, bouts_df = get_walking_bouts(left_steps_df=steps_df, left_device=ankle_acc)
+    bouts_steps_df, bouts_df = get_walking_bouts(left_steps_df=steps_df, left_device=ankle)
+    bouts_steps_df.to_csv(r'W:\dev\gait\gyro_sample_bouts_steps_df.csv')
+    steps_df.to_csv(r'W:\dev\gait\gyro_sample_bouts_df.csv')
     # TODO: Run walking bouts through spatiotemporal characteristics that are available for that person
