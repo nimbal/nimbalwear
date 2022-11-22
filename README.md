@@ -32,6 +32,10 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v0.19.1
+- add minimum correlation option for sync
+- bug fix: references to settings.json instead of settings.toml on install
+
 v0.19.0
 - subjects.csv renamed to collections.csv and coll_id column added
 - settings.toml replaces settings.json
