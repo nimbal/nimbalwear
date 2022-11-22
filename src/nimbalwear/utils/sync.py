@@ -458,11 +458,14 @@ def detect_sync_flips_tgt_accel(tgt_accel, ref_sync, tgt_freq, ref_freq, req_cor
     ref_freq : int
         Sampling frequency of the reference accelerometer
     req_corr : float
-        Required correlation for sync to be accepted as a match
+        Required correlation for sync to be accepted as a match (must be between 0 and 1)
     plot_detect_tgt : bool
         Display plot showing sync matches for each axis
 
     """
+    if (req_corr < 0) or (req_corr > 1):
+        raise ValueError("req_corr must be between 0 and 1")
+
     tgt_sync_sig_idx = None
     tgt_sync = (None, None, None)
 
