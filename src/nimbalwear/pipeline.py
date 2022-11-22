@@ -644,6 +644,13 @@ class Pipeline:
         sync_type = self.module_settings['sync']['type']
         sync_at_config = self.module_settings['sync']['sync_at_config']
         search_radius = self.module_settings['sync'].get('search_radius', None)
+        rest_min = self.module_settings['sync']['rest_min']
+        rest_max = self.module_settings['sync']['rest_max']
+        rest_sens = self.module_settings['sync']['rest_sens']
+        flip_max = self.module_settings['sync']['flip_max']
+        min_flips = self.module_settings['sync']['min_flips']
+        reject_above_ae = self.module_settings['sync']['reject_above_ae']
+        req_tgt_corr = self.module_settings['sync']['req_tgt_corr']
 
         if not coll.device_info.empty:
             ref_device_type = coll.device_info.iloc[0]['device_type']
@@ -680,10 +687,11 @@ class Pipeline:
 
                 syncs, segments = coll.devices[idx].sync(ref=coll.devices[0],
                                                          sig_labels=tuple(self.sensors['accelerometer']['signals']),
-                                                         type=sync_type,
-                                                         sync_at_config=sync_at_config,
-                                                         search_radius=search_radius,
-                                                         signal_ds=signal_ds)
+                                                         sync_type=sync_type, sync_at_config=sync_at_config,
+                                                         search_radius=search_radius, signal_ds=signal_ds,
+                                                         rest_min=rest_min, rest_max=rest_max, rest_sens=rest_sens,
+                                                         flip_max=flip_max, min_flips=min_flips,
+                                                         reject_above_ae=reject_above_ae, req_tgt_corr=req_tgt_corr)
 
 
                 message(f"Synchronized {device_type} {device_location} to {ref_device_type} {ref_device_location} at {syncs.shape[0]} sync points",
