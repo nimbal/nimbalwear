@@ -869,8 +869,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             # 6c: need to look at th3 th4 to determine whether we should keep or reject step
 
             # 7: add a plotting function
-
-            step_events_df.columns = ['step_number', 'step_index','bout_number', 'step_timestamp']
+            step_events_df.columns = ['step_number', 'step_index','bout_number', 'step_timestamp'] #TODO: need step duration for bout function
 
             return step_events_df, peak_heights #gait_bouts_df,
 
@@ -1002,7 +1001,8 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
                 curr_step = next_steps.iloc[0]
                 step_count += 1
             else:
-                # stores bout
+                # stores bout #TODO: from gyro we have no step duration - therefore needed OR a work around since we don't have step duration the same way from ssc, work around could be to not report the end of bout - rather the end is the last step time (what I did before - I could copy and paste down here)
+
                 if step_count >= 3:
                     print(curr_step)
                     start_ind = start_step['step_index']
@@ -1244,7 +1244,10 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
     #     right_states = right_stepdetector.state_arr
     #     left_steps_failed = left_stepdetector.detect_arr
     #     right_steps_failed = right_stepdetector.detect_arr
-
+    if left_device.header['device_type'] == 'GNAC':
+        axis = 0
+    else:
+        axis = 3
     right_freq = right_device.signal_headers[axis]['sample_rate'] if right_device is not None else left_device.signal_headers[axis]['sample_rate']
     left_freq = left_device.signal_headers[axis]['sample_rate'] if left_device is not None else right_device.signal_headers[axis]['sample_rate']
 
