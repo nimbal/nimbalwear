@@ -154,7 +154,7 @@ def detect_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None,
         """
         # state space controller function definitions
         def get_pushoff_sigs(step_obj, peaks=None, quiet=False):
-            """TODO: This needs the inputs from the step_obj used here pushoff time, freq, puhoff len, etc.
+            """TODO: Postponed -- This needs the inputs from the step_obj used here pushoff time, freq, puhoff len, etc.
             Creates average pushoff dataframe that is used to find pushoff data
             ---
             Parameters
@@ -244,7 +244,7 @@ def detect_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None,
             the current pushoff_df to find steps, then create a new pushoff_df from those steps that were found.
 
             We will define the pushoff_df in the acc_find_steps function and therefore
-            TODO: Create a new function that can find pushoffs from raw data without calling acc_step_detect
+            TODO: Postponed -- Create a new function that can find pushoffs from raw data without calling acc_step_detect
             ---
             Parameters
             ---
@@ -265,7 +265,7 @@ def detect_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None,
             pushoff_df = pd.read_csv(os.path.join(dir_path, 'data', 'pushoff_OND07_left.csv'))
 
             for start, end in start_end_times:
-                # TODO: Where does StepDetection come from...is it step_detect? This is just a step object - so it has all the parameters within it
+                # This "StepDectection" below creates the "step" object  that has all the parameters for finding steps. What it does is find steps that are used to find a new "pushoff_df"
                 # step = StepDetection(accel_path_or_obj=accel_path, label='get_pushoff_stats',
                 #                      axis=axis, start=start, end=end, quiet=True, pushoff_df=pushoff_df)
                 pushoff_sig = get_pushoff_sigs(step, quiet=quiet)
@@ -344,7 +344,7 @@ def detect_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None,
 
             cc_list = window_correlate(data, pushoff_avg)
 
-            # TODO: DISTANCE CAN BE ADJUSTED FOR THE LENGTH OF ONE STEP RIGHT NOW ASSUMPTION IS THAT A PERSON CANT TAKE 2 STEPS WITHIN 0.5s
+            # TODO: Postponed -- DISTANCE CAN BE ADJUSTED FOR THE LENGTH OF ONE STEP RIGHT NOW ASSUMPTION IS THAT A PERSON CANT TAKE 2 STEPS WITHIN 0.5s
             pushoff_ind, _ = find_peaks(cc_list, height=push_off_threshold, distance=max(0.2 * freq, 1))
 
             return pushoff_ind
@@ -939,14 +939,14 @@ def detect_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None,
         steps_df, peak_heights = get_gait_bouts(data=gyro_data, sample_freq=gyro_freq, timestamps=timestamps, break_sec=2, bout_steps=3,
                                                       start_ind=0, end_ind=None)
 
-        return steps_df #TODO - remove the bouting and only output step_num, step_index, _step_timestamp to feed into steps_df
+        return steps_df #TODO - remove the bouting  because this version of steps_df ONLY has bouted steps. Output should step_num, step_index, _step_timestamp to feed into steps_df
 
     if device.header['device_type'] == 'GNAC':
         print(f"Device set: {device.header['device_type']} detecting steps using accelerometer.")
         """
         """
         #acc_step_detect_ssc(data=None, start_dp=1, end_dp=-1, pushoff_df=None)
-        steps_df = detect_steps_ssc(device = ankle_acc, data= data,  start_dp=100000, end_dp=100000, axis=axis, pushoff_df=True, timestamps=timestamps, xz_data=xz_data)
+        steps_df = detect_steps_ssc(device = ankle, data= data,  start_dp=100000, end_dp=100000, axis=axis, pushoff_df=True, timestamps=timestamps, xz_data=xz_data)
 
     elif device.header['device_type'] == 'AXV6':
         print(f"Device set: {device.header['device_type']} detecting steps using gryoscope.")
@@ -1287,33 +1287,41 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
 #############################################################################################################################
 if __name__ == '__main__':
     #setup subject and filepath
-    ankle_acc = nimbalwear.Device()
+    ankle = nimbalwear.Device()
+
     #AXV6
     subj = "OND09_0011_01"
     ankle_path = fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf'
     if os.path.exists(ankle_path):
-         ankle_acc.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf')
+         ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf')
     else:
-         ankle_acc.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_RAnkle.edf')
+         ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_RAnkle.edf')
+
     # #GNAC
     # subj = "OND06_1027_01"
     # ankle_path = fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf'
     # if os.path.exists(ankle_path):
-    #     ankle_acc.import_edf(file_path=fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf')
+    #     ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf')
     # else:
-    #     ankle_acc.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_GNAC_RAnkle.edf')
+    #     ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_GNAC_RAnkle.edf')
 
     # Creating step detection algorithm
-    # TODO: Run step detection algorithm
     #This is what I imagine the line to look like
             # steps_df = detect_stepping(accelerometer=ankle_acc, gyroscope=None, bilateral=False)
-    # TODO: Select the signals that are needed (accelerometer) for step detection
-    #freq, acc_data, xz_data, timestamps, axis = get_acc_data(accelerometer=None, axis=None, orient_signal=True, low_pass=True)
-    #all outcomes need to be pushed into the detect_fl_steps
-   # freq, acc_data, xz_data, timestamps, axis = get_acc_data(accelerometer=ankle_acc, axis=1, orient_signal=True, low_pass=True)
 
-    #def detect_fl_steps(device=None, data=None, start=0, end=-1,  freq=None, axis=None):
-   #steps_df = detect_steps(device = ankle_acc, data = acc_data[0], start=100000, end=200000,  freq=freq, axis=axis, timestamps=timestamps, xz_data=xz_data)
+    #Input for detect steps is "Device" obj
+    steps_df = detect_steps(device=ankle, start = 100000, end = 200000, freq = freq, axis = axis, timestamps = timestamps, xz_data = xz_data)
+
+
+    # steps_df = detect_steps(device = ankle,
+    #                         bilateral_wear = False,
+    #                         data = acc[0], #this can be found from Device in the function
+    #                         export_bouts
+    #                         start=100000, end=200000,
+    #                         freq=freq, #can be created from DEVICE
+    #                         axis=axis, #can be hardcoded based on algorithm employed
+    #                         timestamps=timestamps, #
+    #                         xz_data=xz_data)
 
     # TODO: Run steps through to find walking bouts
     #steps_df = pd.read_csv(r'W:\dev\gait\sample_steps.csv')
