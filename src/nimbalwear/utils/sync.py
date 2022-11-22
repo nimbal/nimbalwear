@@ -1,4 +1,3 @@
-import inspect
 from statistics import mean, StatisticsError
 
 from matplotlib import pyplot as plt
@@ -12,7 +11,9 @@ mstyle.use('fast')
 
 
 def sync_devices(tgt_device, ref_device, sig_labels=('Accelerometer x', 'Accelerometer y', 'Accelerometer z'),
-                 last_sync=None, search_radius=None, quiet=False, **kwargs):
+                 last_sync=None, search_radius=None, signal_ds=1, rest_min=2, rest_max=15, rest_sens=0.12, flip_max=2,
+                 min_flips=4, reject_above_ae=0.2, req_tgt_corr=0.8, plot_detect_ref=False, plot_quality_ref=False,
+                 plot_detect_tgt=False):
 
     """Synchronize tgt_device to ref_device based on detection of sync flips.
 
@@ -22,11 +23,18 @@ def sync_devices(tgt_device, ref_device, sig_labels=('Accelerometer x', 'Acceler
     ref_device
     sig_labels
     last_sync
-    quiet
-    kwargs
-
-
-
+    search_radius
+    signal_ds
+    rest_min
+    rest_max
+    rest_sens
+    flip_max
+    min_flips
+    reject_above_ae
+    req_tgt_corr
+    plot_detect_ref
+    plot_quality_ref
+    plot_detect_tgt
     """
 
     # get start and sample rate
@@ -50,7 +58,11 @@ def sync_devices(tgt_device, ref_device, sig_labels=('Accelerometer x', 'Acceler
     tgt_freq = round(tgt_device.signal_headers[tgt_sig_idx[0]]['sample_rate'])
 
     syncs = detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=offset,
-                                    search_radius=search_radius, **kwargs)
+                                    search_radius=search_radius, signal_ds=signal_ds, rest_min=rest_min,
+                                    rest_max=rest_max, rest_sens=rest_sens, flip_max=flip_max, min_flips=min_flips,
+                                    reject_above_ae=reject_above_ae, req_tgt_corr=req_tgt_corr,
+                                    plot_detect_ref=plot_detect_ref, plot_quality_ref=plot_quality_ref,
+                                    plot_detect_tgt=plot_detect_tgt)
 
     # if not syncs.empty:
     #     syncs['ref_start_time'] = [ref_start_time + timedelta(seconds=(x['ref_start_idx'] / ref_freq))
@@ -162,20 +174,21 @@ def sync_devices(tgt_device, ref_device, sig_labels=('Accelerometer x', 'Acceler
     return syncs, segments
 
 
-def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, search_radius=None, **kwargs):
-
-    ref_args = [k for k, v in inspect.signature(detect_sync_flips_ref_signal).parameters.items()]
-    ref_dict = {k: kwargs.pop(k) for k in dict(kwargs) if k in ref_args}
-
-    tgt_args = [k for k, v in inspect.signature(detect_sync_flips_tgt_signal).parameters.items()]
-    tgt_dict = {k: kwargs.pop(k) for k in dict(kwargs) if k in tgt_args}
+def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, search_radius=None, signal_ds=1,
+                            rest_min=2, rest_max=15, rest_sens=0.12, flip_max=2, min_flips=4, reject_above_ae=0.2,
+                            req_tgt_corr=0.8, plot_detect_ref=False, plot_quality_ref=False, plot_detect_tgt=False):
 
     # detect reference syncs
-    ref_sync_sig_idx, ref_sync_windows = detect_sync_flips_ref_accel(ref_accel, ref_freq, **ref_dict)
+    iw = detect_sync_flips_ref_accel(ref_accel, ref_freq, signal_ds=signal_ds, rest_min=rest_min, rest_max=rest_max,
+                                     rest_sens=rest_sens, flip_max=flip_max, min_flips=min_flips,
+                                     reject_above_ae=reject_above_ae, plot_detect_ref=plot_detect_ref,
+                                     plot_quality_ref=plot_quality_ref)
 
-    syncs = pd.DataFrame(columns=['ref_sig_idx', 'ref_start_idx', 'ref_end_idx', 'ref_flips',
-                                  'ref_ae', 'tgt_sig_idx', 'tgt_start_idx', 'tgt_end_idx',
-                                  'tgt_corr'])
+    ref_sync_sig_idx, ref_sync_windows = iw
+
+    syncs = None
+    sync_cols = ['ref_sig_idx', 'ref_start_idx', 'ref_end_idx', 'ref_flips', 'ref_ae', 'tgt_sig_idx', 'tgt_start_idx',
+                 'tgt_end_idx', 'tgt_corr']
 
     for s in tqdm(ref_sync_windows[0], desc="Searching target for detected sync flips...", leave=False):
 
@@ -204,19 +217,24 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
         if start_i != end_i:
 
             tgt_sync_sig_idx, tgt_sync = detect_sync_flips_tgt_accel(tgt_accel_window, ref_sync, tgt_freq, ref_freq,
-                                                                     **tgt_dict)
+                                                                     req_corr=req_tgt_corr,
+                                                                     plot_detect_tgt=plot_detect_tgt)
 
-            new_sync = pd.Series([int(ref_sync_sig_idx), int(s[0]), int(s[1]), int(s[2]), round(s[3], 3),
-                                  int(tgt_sync_sig_idx), int(tgt_sync[0] + start_i), int(tgt_sync[1] + start_i),
-                                  round(tgt_sync[2] ,2)],
-                                 index=syncs.columns)
-
-            syncs = syncs.append(new_sync, ignore_index=True)
+            if tgt_sync_sig_idx is not None:
+                new_sync = pd.DataFrame([[int(ref_sync_sig_idx), int(s[0]), int(s[1]), int(s[2]), round(s[3], 3),
+                                          int(tgt_sync_sig_idx), int(tgt_sync[0] + start_i), int(tgt_sync[1] + start_i),
+                                          round(tgt_sync[2], 2)]],
+                                        columns=sync_cols)
+                if syncs is None:
+                    syncs = new_sync
+                else:
+                    syncs = pd.concat([syncs, new_sync], ignore_index=True)
 
     return syncs
 
 
-def detect_sync_flips_ref_accel(accel, signal_freq, **kwargs):
+def detect_sync_flips_ref_accel(accel, signal_freq, signal_ds=1, rest_min=2, rest_max=15, rest_sens=0.12, flip_max=2,
+                                min_flips=4, reject_above_ae=0.2, plot_detect_ref=False, plot_quality_ref=False):
 
     ref_sync_sig_idx = None
     ref_sync_windows = None
@@ -225,7 +243,12 @@ def detect_sync_flips_ref_accel(accel, signal_freq, **kwargs):
     for ref_signal in tqdm(accel, desc="Searching reference axes for sync flips...", leave=False):
 
         # detect reference sync
-        axis_sync_windows = detect_sync_flips_ref_signal(ref_signal, signal_freq, **kwargs)
+        axis_sync_windows = detect_sync_flips_ref_signal(ref_signal, signal_freq, signal_ds=signal_ds,
+                                                         rest_min=rest_min, rest_max=rest_max, rest_sens=rest_sens,
+                                                         flip_max=flip_max, min_flips=min_flips,
+                                                         reject_above_ae=reject_above_ae,
+                                                         plot_detect_ref=plot_detect_ref,
+                                                         plot_quality_ref=plot_quality_ref)
 
         try:
             axis_mean_ae = mean([asw[3] for asw in axis_sync_windows[0]])
@@ -421,25 +444,50 @@ def detect_sync_flips_ref_signal(signal, signal_freq, signal_ds=1, rest_min=2, r
     return accepted_sync_flips, rejected_sync_flips
 
 
-def detect_sync_flips_tgt_accel(tgt_accel, ref_sync, tgt_freq, ref_freq, **kwargs):
+def detect_sync_flips_tgt_accel(tgt_accel, ref_sync, tgt_freq, ref_freq, req_corr=0.8, plot_detect_tgt=False):
+    """Detect a reference sync flip in any axis of a target accelerometer using cross-corelation.
+
+    Parameters
+    ----------
+    tgt_accel : list
+        List of array-like, each representing one accelerometer signal
+    ref_sync : array-like
+        Array-like representing the sync signal from the reference device
+    tgt_freq : int
+        Sampling frequency of the target accelerometer
+    ref_freq : int
+        Sampling frequency of the reference accelerometer
+    req_corr : float
+        Required correlation for sync to be accepted as a match (must be between 0 and 1)
+    plot_detect_tgt : bool
+        Display plot showing sync matches for each axis
+
+    """
+    if (req_corr < 0) or (req_corr > 1):
+        raise ValueError("req_corr must be between 0 and 1")
 
     tgt_sync_sig_idx = None
     tgt_sync = (None, None, None)
 
-    prev_tgt_corr = 0
-    t_i = 0
-    for tgt_signal in tqdm(tgt_accel, desc="Searching target axes for sync flips...", leave=False):
+    prev_tgt_corr = None
 
-        axis_tgt_sync = detect_sync_flips_tgt_signal(tgt_signal, ref_sync, tgt_freq, ref_freq, **kwargs)
+    for t_i, tgt_signal in enumerate(tqdm(tgt_accel, desc="Searching target axes for sync flips...", leave=False)):
+
+        axis_tgt_sync = detect_sync_flips_tgt_signal(tgt_signal, ref_sync, tgt_freq, ref_freq,
+                                                     plot_detect_tgt=plot_detect_tgt)
 
         axis_tgt_corr = axis_tgt_sync[2]
 
-        if axis_tgt_corr > prev_tgt_corr:
+        cond1 = axis_tgt_corr >= req_corr
+        if prev_tgt_corr is None:
+            cond2 = True
+        else:
+            cond2 = axis_tgt_corr > prev_tgt_corr
+
+        if cond1 and cond2:
             prev_tgt_corr = axis_tgt_corr
             tgt_sync_sig_idx = t_i
             tgt_sync = axis_tgt_sync
-
-        t_i += 1
 
     return tgt_sync_sig_idx, tgt_sync
 
