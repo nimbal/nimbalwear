@@ -974,7 +974,7 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
 
         steps = steps_df['step_index']  # step_detector.step_indices
         timestamps = steps_df['step_timestamp']  # step_detector.timestamps[steps]
-        step_durations = steps_df['step_duration']  # step_detector.step_lengths
+        step_durations = steps_df['step_duration'] if 'step_durations' in steps_df.columns else None  # step_detector.step_lengths
 
         freq=int(freq)
 
@@ -1001,18 +1001,17 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
                 curr_step = next_steps.iloc[0]
                 step_count += 1
             else:
-                # stores bout #TODO: from gyro we have no step duration - therefore needed OR a work around since we don't have step duration the same way from ssc, work around could be to not report the end of bout - rather the end is the last step time (what I did before - I could copy and paste down here)
 
                 if step_count >= 3:
                     print(curr_step)
                     start_ind = start_step['step_index']
-                    end_ind = curr_step['step_index'] + curr_step['step_duration']
+                    end_ind = curr_step['step_index'] + curr_step['step_duration'] if 'step_durations' in curr_step.index else curr_step['step_index']
                     bout_dict['start'].append(start_ind)
                     bout_dict['end'].append(end_ind)
                     bout_dict['number_steps'].append(step_count)
                     bout_dict['start_time'].append(start_step['timestamp'])
                     bout_dict['end_time'].append(
-                        curr_step['timestamp'] + pd.Timedelta(curr_step['step_duration'] / freq, unit='sec'))
+                        curr_step['timestamp'] + pd.Timedelta(curr_step['step_duration'] / freq, unit='sec')) if 'step_durations' in curr_step.index else bout_dict['end_time'].append(curr_step['timestamp'])
 
                 # resets state and creates new bout
                 step_count = 1
@@ -1262,14 +1261,6 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
 
     bout_steps_df = export_bout_steps(bout_num_df, left_steps_df, right_steps_df)
 
-    # #for plotting
-    # self.sig_length = min(left_stepdetector.sig_length, right_stepdetector.sig_length)
-    # self.left_data = left_stepdetector.data
-    # self.right_data = right_stepdetector.data
-    # self.start_dp = left_stepdetector.start_dp
-    # self.end_dp = left_stepdetector.end_dp
-    # self.timestamps = min([left_stepdetector.timestamps, right_stepdetector.timestamps], key=len)
-
     return bout_steps_df, bout_num_df
 
 ########################################################################################################################
@@ -1284,7 +1275,6 @@ if __name__ == '__main__':
          ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf')
     else:
          ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_RAnkle.edf')
-
     # #GNAC
     # subj = "OND06_1027_01"
     # ankle_path = fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf'
@@ -1293,20 +1283,12 @@ if __name__ == '__main__':
     # else:
     #     ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_GNAC_RAnkle.edf')
 
-    # Creating step detection algorithm
-    #This is what I imagine the line to look like
-            # steps_df = detect_stepping(accelerometer=ankle_acc, gyroscope=None, bilateral=False)
-
     #Input for detect steps is "Device" obj
-    steps_df = detect_steps(device = ankle,
-                            bilateral_wear = False,
-                            start=100000, end=200000)
-    steps_df.to_csv(r'W:\dev\gait\gyro_sample_steps.csv')
-    # TODO: Run steps through to find walking bouts
-    #steps_df = pd.read_csv(r'W:\dev\gait\sample_steps._dfcsv')
+    steps_df = detect_steps(device = ankle, bilateral_wear = False, start=100000, end=200000)
+    steps_df.to_csv(r'W:\dev\gait\gyro_steps_df.csv')
 
     #def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None, left_device=None, duration_sec=15, bout_num_df=None, legacy_alg=False, left_kwargs={}, right_kwargs={}):
-    bouts_steps_df, bouts_df = get_walking_bouts(left_steps_df=steps_df, left_device=ankle)
+    bouts_steps_df, bouts_num_df = get_walking_bouts(left_steps_df=steps_df, left_device=ankle)
     bouts_steps_df.to_csv(r'W:\dev\gait\gyro_sample_bouts_steps_df.csv')
-    steps_df.to_csv(r'W:\dev\gait\gyro_sample_bouts_df.csv')
+    bouts_num_df.to_csv(r'W:\dev\gait\gyro_sample_bouts_num_df.csv')
     # TODO: Run walking bouts through spatiotemporal characteristics that are available for that person
