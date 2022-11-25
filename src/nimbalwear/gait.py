@@ -826,25 +826,30 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
         steps_df, peak_heights = get_gait_bouts(data=gyro_data, sample_freq=gyro_freq, timestamps=timestamps, break_sec=2, bout_steps=3,
                                                       start_ind=0, end_ind=None)
 
-        return steps_df #TODO - remove the bouting  because this version of steps_df ONLY has bouted steps. Output should step_num, step_index, _step_timestamp to feed into steps_df
+        return steps_df
+
 
     if device.header['device_type'] == 'GNAC':
         print(f"Device set: {device.header['device_type']} detecting steps using accelerometer.")
-        """
-        """
 
-        freq, acc_data, xz_data, timestamps, axis = get_acc_data_ssc(device=device, axis=None, orient_signal=True, low_pass=True)
-        steps_df = detect_steps_ssc(device=device, data=acc_data,  start_dp=100000, end_dp=100000, axis=axis, pushoff_df=True, timestamps=timestamps, xz_data=xz_data)
+        if bilateral_wear is False:
+            freq, acc_data, xz_data, timestamps, axis = get_acc_data_ssc(device=device, axis=None, orient_signal=True, low_pass=True)
+            steps_df = detect_steps_ssc(device=device, data=acc_data,  start_dp=100000, end_dp=100000, axis=axis, pushoff_df=True, timestamps=timestamps, xz_data=xz_data)
+        else:
+            print(f"Study code: {device.header['study_code']}. Device set: {device.header['device_type']} currently has no bilateral ankle worn sensors datasets.")
 
     elif device.header['device_type'] == 'AXV6':
         print(f"Device set: {device.header['device_type']} detecting steps using gryoscope.")
 
-        steps_df = detect_steps_gyro(device=device)
+        if bilateral_wear is False:
+            steps_df = detect_steps_gyro(device=device)
+        else:
+
 
     else:
         print("Device not defined. State space step detector not run.")
 
-    return steps_df
+    return steps_df, bouts_df
 
 # Walkingbouts declassed
 def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None, left_device=None, duration_sec=15, bout_num_df=None,
@@ -1186,13 +1191,13 @@ if __name__ == '__main__':
          ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf')
     else:
          ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_RAnkle.edf')
-    # #GNAC
-    # subj = "OND06_1027_01"
-    # ankle_path = fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf'
-    # if os.path.exists(ankle_path):
-    #     ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf')
-    # else:
-    #     ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_GNAC_RAnkle.edf')
+    #GNAC
+    subj = "OND06_1027_01"
+    ankle_path = fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf'
+    if os.path.exists(ankle_path):
+        ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf')
+    else:
+        ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_GNAC_RAnkle.edf')
 
 
     #Input for detect steps is "Device" obj
