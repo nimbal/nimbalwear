@@ -112,11 +112,9 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             xz_data = np.sqrt(all_data[accel_axes[0]] ** 2 + all_data[accel_axes[1]] ** 2)
         else:
             axis_index, test_stats = detect_vert(all_data[0:2])  # assumes vertical is 0 or 1
-            print(axis_index)
             other_axes = np.delete(np.arange(all_data.shape[0]), axis_index)
             axis = accel_axes[axis_index]
             acc_data = all_data[axis_index]
-            print(acc_data)
             xz_data = np.sqrt((all_data[other_axes] ** 2).sum(axis=0))
 
         freq = device.signal_headers[axis]['sample_rate']
@@ -127,12 +125,10 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
 
         if orient_signal:
             acc_data = flip_signal(acc_data, freq)
-        print("After orient signal")
-        print(acc_data)
+
         if low_pass:
             acc_data, _ = lowpass_filter(acc_data, freq)
-        print("After lowpass")
-        print(acc_data)
+
         return freq, acc_data, xz_data, timestamps, axis
 
     def detect_steps_ssc(device=None, data=None,  start_dp=start, end_dp=end, axis=None, pushoff_df=True, timestamps=None, xz_data=None):
@@ -334,8 +330,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             Detects the steps based on the pushoff_df, uses window correlate and cc threshold  to accept/reject pushoffs
             """
             pushoff_avg = pushoff_df['avg']
-            print("before window_correlate")
-            print(data)
+
             cc_list = window_correlate(data, pushoff_avg)
 
             # TODO: Postponed -- DISTANCE CAN BE ADJUSTED FOR THE LENGTH OF ONE STEP RIGHT NOW ASSUMPTION IS THAT A PERSON CANT TAKE 2 STEPS WITHIN 0.5s
@@ -472,8 +467,6 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             heel_strike_threshold = -3 - pushoff_df['heel_strike_mean'].iloc[0] / (
                     2 * heel_strike_threshold)
 
-        print("Before input to push off detection")
-        print(data)
         pushoff_ind = push_off_detection(data, pushoff_df, push_off_threshold, freq)
         end_pushoff_ind = pushoff_ind + pushoff_len
         state_arr = np.zeros(data.size)
@@ -631,9 +624,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             bout_list = df['Bout_number'].unique()
             bout_df = pd.DataFrame(columns=['Bout_number', 'Step_count', 'Start_time', 'End_time', 'Start_idx', 'End_idx'])
             for count, val in enumerate(bout_list):
-                # print(f'count:{count}, value:{val}')
                 temp = df[df['Bout_number'] == bout_list[count]]
-                # print(temp)
                 step_count = len(temp)
                 start_time = np.min(temp['Peak_times'])
                 end_time = np.max(temp['Peak_times'])
@@ -653,14 +644,6 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             min_swing_idx = sample_freq * min_swing_t
             max_swing_idx = sample_freq * max_swing_t
 
-            # 1: low-pass at 5hz
-            # data=bw_filter(data=data, fs=sample_freq, fc=5, order=5)
-            # plt.plot(data)
-            # 2: Adaptive threshold as per:
-
-            # ic = []
-            # tc = []
-            # frequency = []
             peaks = []
             gyro_mean = []
             thresholds = []
@@ -669,14 +652,8 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
 
             initial_contacts = []
             terminal_contacts = []
-            # for i in range(len(gait_bouts_df)):
-            #         # In each iteration, add an empty list to the main list
-            #         initial_contacts.append([])
-            #         terminal_contacts.append([])
 
             for row in gait_bouts_df.itertuples():
-
-                # print(row)
                 gyro_z_mean = np.mean(data[int(row[5]):int(row[6])])
                 gyro_mean.append(gyro_z_mean)
                 th2 = 0.8 * (1 / (sum(data[int(row[5]):int(row[6])] > gyro_z_mean)))
@@ -690,20 +667,13 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
                                             height=th2, distance=sample_freq * 0.5)
                 # correct peak_idx
                 peak_idx = peak_idx - 1 + int(row[5])
-                # print(peak_idx)
                 peaks.append(peak_idx)
-
-                # plt.plot((data[int(row[5]):int(row[6])]))
-                # plt.axhline(th2, ls='--', c='red')
-                # plt.scatter(x=peak_idx, y=data[int(row[5]):int(row[6])][peak_idx], marker='x', color='orange')
 
                 ics = []
                 tcs = []
 
                 for i in range(len(peak_idx)):
-                    # print(i)
                     window_len = math.floor(0.4 * sample_freq)
-                    # plt.plot(data[int(peak_idx[i]-window_len):peak_idx[i+1]])
 
                     # adaptation to the Fraccaro, P., Coyle, L., Doyle, J., & O'Sullivan, D. (2014) description of this algorithm
                     # final contacts (toe-down or flat foot) doesn't always pick off the middle peak, specifically with spikes at initail contact
@@ -713,11 +683,6 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
 
                     tc = np.argmin(data[int(peak_idx[i] - window_len):peak_idx[i]]) + peak_idx[i] - window_len
                     ic = np.argmin(data[peak_idx[i]:int(peak_idx[i] + window_len)]) + peak_idx[i]
-                    # tc = np.argmin(data[int(peak_idx[i] - window_len):peak_idx[i]]) + int(row[5]) + (
-                    #                 (peak_idx[i] - window_len) - int(row[5]))
-                    # ic = np.argmin(data[peak_idx[i]:int(peak_idx[i] + window_len)]) + int(row[5]) + (
-                    #                 peak_idx[i] - int(row[5]))
-                    # print(tc, peak_idx[i], ic)
 
                     if max_swing_idx < ic - tc < min_swing_idx:
                         continue
@@ -745,9 +710,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
                 # plt.tight_layout()
 
                 temp_mnf = sum(freqs * psd) / sum(psd)
-                # print(MNF)
                 temp_mdf = freqs[np.argmin(np.abs(np.cumsum(psd) - (0.5 * sum(psd))))]
-                # print(MDF)
                 mnf.append(temp_mnf)
                 mdf.append(temp_mdf)
 
@@ -759,7 +722,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             gait_bouts_df['Mean power freq'] = mnf
             gait_bouts_df['Median power freq'] = mdf
 
-            # need to correct start idx and end idx (plus timestamps
+            # need to correct start idx and end idx (plus timestamps)
 
             return gait_bouts_df
 
@@ -818,8 +781,6 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
                     bouts[(ind_ge_diff[count - 1] + 1):ind_ge_diff[count]+1] = count + 1
                     bouts[ind_ge_diff[count] + 1:] = count + 2
 
-            # print(bouts)
-
             step_count = range(1, len(idx_peaks) + 1)
             step_events_df = pd.DataFrame({'Step': step_count, 'Step_index': idx_peaks, 'Bout_number': bouts})
 
@@ -828,16 +789,15 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
 
             #get step timestamps
             step_events_df['Step_timestamp'] = timestamps[step_events_df['Step_index']]
-
-            bouted_steps_df = remove_single_step_bouts(df=step_events_df, steps_length=bout_steps)
-
+            gait_bouts_df = remove_single_step_bouts(df=step_events_df, steps_length=bout_steps)
+            gait_bouts_df = get_bouts_data(df=gait_bouts_df)
             # renumber the bouts in steps_df
             step_events_df['Bout_number'] = 0
-            for i in range(len(bouted_steps_df)):
-                bool = (step_events_df.Step_index >= bouted_steps_df.Start_idx[i]) & (
-                            step_events_df.Step_index <= bouted_steps_df.End_idx[i])
+            for i in range(len(gait_bouts_df)):
+                bool = (step_events_df.Step_index >= gait_bouts_df.Start_idx[i]) & (
+                            step_events_df.Step_index <= gait_bouts_df.End_idx[i])
                 idx = step_events_df.index[bool]
-                step_events_df.Bout_number.iloc[idx] = bouted_steps_df.Bout_number[i]
+                step_events_df.Bout_number.iloc[idx] = gait_bouts_df.Bout_number[i]
 
             step_events_df.columns = ['step_number', 'step_index','bout_number', 'step_timestamp']
 
@@ -874,8 +834,6 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
         """
 
         freq, acc_data, xz_data, timestamps, axis = get_acc_data_ssc(device=device, axis=None, orient_signal=True, low_pass=True)
-        print("After output")
-        print(acc_data)
         steps_df = detect_steps_ssc(device=device, data=acc_data,  start_dp=100000, end_dp=100000, axis=axis, pushoff_df=True, timestamps=timestamps, xz_data=xz_data)
 
     elif device.header['device_type'] == 'AXV6':
@@ -944,7 +902,6 @@ def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None
             else:
 
                 if step_count >= 3:
-                    print(curr_step)
                     start_ind = start_step['step_index']
                     end_ind = curr_step['step_index'] + curr_step['step_duration'] if 'step_durations' in curr_step.index else curr_step['step_index']
                     bout_dict['start'].append(start_ind)
@@ -1240,11 +1197,11 @@ if __name__ == '__main__':
 
     #Input for detect steps is "Device" obj
     steps_df = detect_steps(device = ankle, bilateral_wear = False, start=100000, end=200000)
-    steps_df.to_csv(r'W:\dev\gait\gyro_steps_df.csv')
+    steps_df.to_csv(r'W:\dev\gait\acc_steps_df.csv')
 
     #def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None, left_device=None, duration_sec=15, bout_num_df=None, legacy_alg=False, left_kwargs={}, right_kwargs={}):
-    bouts_steps_df, bouts_num_df, bouts_stats = get_walking_bouts(left_steps_df=steps_df, left_device=ankle)
-    bouts_steps_df.to_csv(r'W:\dev\gait\gyro_sample_bouts_steps_df.csv')
-    bouts_num_df.to_csv(r'W:\dev\gait\gyro_sample_bouts_num_df.csv')
-    bouts_stats.to_csv(r'W:\dev\gait\gyro_sample_bouts_stats.csv')
+    bouts_steps_df, bouts_df, bouts_stats = get_walking_bouts(left_steps_df=steps_df, left_device=ankle)
+    bouts_steps_df.to_csv(r'W:\dev\gait\acc_sample_bouts_steps_df.csv')
+    bouts_df.to_csv(r'W:\dev\gait\acc_sample_bouts_num_df.csv')
+    bouts_stats.to_csv(r'W:\dev\gait\acc_sample_bouts_stats.csv')
     # TODO: Run walking bouts through spatiotemporal characteristics that are available for that person
