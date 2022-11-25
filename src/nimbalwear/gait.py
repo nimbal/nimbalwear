@@ -74,17 +74,6 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
         def lowpass_filter(acc_data, freq, order=2, cutoff_ratio=0.17):
             """
             Applies a lowpass filter on the accelerometer data
-
-            Parameters
-            ---
-            acc_data
-            freq
-            order -> filter order; default is 2nd order
-            cutoff_ratio -> used to determine the cutoff frequency
-            ---
-            Ouput
-            ---
-            acc_data low pass filtered, cutoff_freq
             """
             cutoff_freq = freq * cutoff_ratio
             sos = butter(N=order, Wn=cutoff_freq,
@@ -96,15 +85,6 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
         def flip_signal(acc_data, freq):
             """
             Finds orientation based on lowpassed signal and flips the signal
-            ---
-            Parameters
-            ---
-            acc_data -> accelerometer np.array
-            freq -> sampling frequency stored in header
-            ---
-            Output
-            ---
-            acc_data
             """
             cutoff_freq = freq * 0.005
             sos = butter(N=1, Wn=cutoff_freq, btype='low', fs=freq, output='sos')
@@ -164,9 +144,9 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
         Parameters
         ---
         device = nimbalwear.Device() obj
-        data, xz_data = accelerometer data from the "get_acc_data_ssc" function
+        data, xz_data = accelerometer data (acc_data, xz_data) from "get_acc_data_ssc"
         start_dp, end_dp -> indexed for start of step and end of step detection
-        axis = axis for vertical accelertion; default None but uses output from "get_acc"data_ssc"
+        axis = axis for vertical acceleration; default None but uses output from "get_acc_data_ssc"
         pushoff_df = dataframe for pushoff detect; default is True to import premade pushoff df
         timestamps = timestamps for data from "get_acc_data_ssc"
         ---
@@ -176,8 +156,10 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
         """
         # define state space controller functions
         def get_pushoff_sigs(step_obj, peaks=None, quiet=False):
-            """TODO: Postponed -- This needs the inputs from the step_obj used here pushoff time, freq, puhoff len, etc.
-            Creates average pushoff dataframe that is used to find pushoff data
+            """
+            Creates average pushoff dataframe that is used to find pushoff data from found push_off values
+            Purpose is to develop pushoff values/slopes that are custom to data
+                TODO: This needs the inputs from the original StepDetector obj used here pushoff time, freq, pushoff len, etc.
             """
             pushoff_sig_list = []
             pushoff_len = step_obj.pushoff_time * step_obj.freq
@@ -195,7 +177,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
         def export_steps(detect_arr=None, state_arr=None, timestamps=None, step_indices=None, start_dp=None,
                          pushoff_time=None, foot_down_time=None, success=True):
             """
-            Export steps into a dataframe - this includes all potential push-offs and the state that they fail on
+            Export steps into a dataframe -  includes all potential push-offs and the state that they fail on
             """
             assert len(detect_arr) == len(timestamps)
             failed_step_indices = np.where(detect_arr > 0)[0]
@@ -251,12 +233,11 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
 
         def get_pushoff_stats(accel_path, start_end_times=[(-1, -1)], axis=None, quiet=True):
             """
-            Calculate push-off  for step detection - uses default if many steps are not found. (20 minimum)
-
             This function creates a pushoff_df when there is no pushoff_df defined. Essentially it will use
             the current pushoff_df to find steps, then create a new pushoff_df from those steps that were found.
 
-            TODO: Postponed -- Create a new function that can find pushoffs from raw data without calling acc_step_detect
+            Calculate push-off  for step detection - uses default if many steps are not found. (20 minimum)
+                    TODO: Postponed -- Create a new function that can find pushoffs from raw data without calling detect_steps_ssc; something look search for potential push-offs - manuall selection?
             ---
             Parameters
             ---
@@ -350,7 +331,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
 
         def push_off_detection(data=None, pushoff_df=None, push_off_threshold=None, freq=None):
             """
-            Detects the steps based on the pushoff_df
+            Detects the steps based on the pushoff_df, uses window correlate and cc threshold  to accept/reject pushoffs
             """
             pushoff_avg = pushoff_df['avg']
             print("before window_correlate")
@@ -383,7 +364,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
         def swing_detect(self, pushoff_ind, mid_swing_ind):
             """
             Detects swings (either up or down) given a starting index (window_ind).
-            Swing duration is preset.
+            Swing duration is preset - currently unused and mid_swing_peak_detect is used in place of this function
             """
             # swinging down
             detect_window = self.data[pushoff_ind:mid_swing_ind]
@@ -404,7 +385,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
 
         def heel_strike_detect(data=None, heel_strike_detect_time=None, window_ind=None, freq=None):
             """
-            Detects a heel strike based on the change in acceleration over time.
+            Detects a heel strike based on the change in acceleration over time (first derivative).
             """
             type(freq)
             type(heel_strike_detect_time)
@@ -472,14 +453,13 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
         states = {1: 'stance', 2: 'push-off',
                   3: 'swing-up', 4: 'swing-down', 5: 'footdown'}
         state = states[1]
+
         #defining step pushoff thresholds
-        #this says if pushoff_df is None then run "get_push_off_stats" if pushoff_df is defined then pushoff_df=pushoff_df
-        if pushoff_df == True:
+        if pushoff_df == True: #importing static pushoff_df
             dir_path = os.path.dirname(os.path.realpath(__file__))
             pushoff_df = pd.read_csv(os.path.join(dir_path, 'data', 'pushoff_OND07_left.csv'))
-        else:
+        else: #run custom pushoff -> needs known walking time to find know push-off values (that occur in steps) to develop new threshold for window_correlate
             pushoff_df = get_pushoff_stats(data, start_end_times=[(start_dp, end_dp)], axis=axis)
-            # pushoff_df = get_pushoff_stats(start_end_times=[(-1, -1)])
         swing_peaks = []
 
         if {'swing_down_mean', 'swing_down_std', 'swing_up_mean', 'swing_up_std', 'heel_strike_mean',
@@ -500,10 +480,12 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
         detects = {'push_offs': len(end_pushoff_ind), 'mid_swing_peak': [], 'swing_up': [], 'swing_down': [
         ], 'heel_strike': [], 'next_i': [], 'pushoff_mean': []}
         detect_arr = np.zeros(data.size)
+
         #initialize
         end_i = None
         step_indices = []
         step_lengths = []
+
         #run
         for count, i in tqdm(enumerate(end_pushoff_ind), total=len(end_pushoff_ind),
                              leave=False,
@@ -573,39 +555,31 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
         return steps_df
 
     def detect_steps_gyro(device=None, start_dp=None, end_dp=None):
-
-        #define functions for gyroscope step detection
+        '''
+        Detects the steps within the gyroscope data. Based on this paper:
+        Fraccaro, P., Coyle, L., Doyle, J., & O'Sullivan, D. (2014). Real-world gyroscope-based gait event detection and gait feature extraction.
+        '''
+        #define functions
         def bw_filter(data, fs, fc,  order):
-            # #dev
-            # data = gyro_data[indexes[0]:indexes[1]]
-            # plt.plot(data)
-            #
-            # order = 5
-            # fs = sample_rate
-            # fc = 5
-
-            # scipy.signal.filtfilt(b, a, x, axis=- 1, padtype='odd', padlen=None, method='pad', irlen=None)
+            """
+            Filter (filtfilt) data with dual pass lowpass butterworth filter
+            """
             b, a = butter(N=order, Wn=fc, btype='low', output='ba', fs=fs)
             filtered_data = filtfilt(b, a, data)
-            # plt.plot(filtered_data)
 
             return filtered_data
 
-        def find_adaptive_thresh(data):
-            # this function find the adaptive threshold (on pre-processed data) according to steps found in
-            # Fraccaro, P., Coyle, L., Doyle, J., & O'Sullivan, D. (2014). Real-world gyroscope-based gait event detection
-            # and gait feature extraction.
+        def find_adaptive_thresh(data, fs):
+            '''
+            Finds adaptive threshold on preprocessed data  with minimum 40 threshold
 
-            # 2a: Calculate derivative of signal
-            data_2d = np.diff(data)/0.02
-            # another differential method
-            # diff = np.zeros(len(data_f) - 1)
-            # for idx, value in enumerate(diff):
-            #         diff[idx] = (data_f[(idx + 1)] - data_f[(idx)]) /(1/sampl_freqs[axis])
+            B.R. Greene, et al., ”Adaptive estimation of temporal gait parameters using body-worn gyroscopes,”
+            Proc. IEEE Eng. Med. Bio. Soc. (EMBC 2011), pp. 1296-1299, 2010 and outlined in Fraccaro, P., Coyle, L., Doyle, J., & O'Sullivan, D. (2014)
+            '''
+            # calculate derivative of signal
+            data_2d = np.diff(data)/ (1 / fs)
 
-            # 2b: Calculate adaptive threshold from 10 max peaks in signal derivative
-            # note this threshold is applied to pre-procesed data for peak detection
-
+            # adaptive threshold from 10 max peaks in signal derivative
             thresh = np.mean(data[np.argpartition(data_2d, 10)[:10]])*0.2
             if thresh > 40:
                 pass
@@ -615,6 +589,9 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             return thresh
 
         def remove_single_step_bouts(df, steps_length=2):
+            '''
+            Step events are imported and bouts that have less than"steps_length" amount are removed from bouts_df
+            '''
             sum_df = df.groupby(['Bout_number']).count()
             sum_df.columns = ['Step_number', 'Step_index', 'Peak_times']
 
@@ -624,10 +601,13 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             df= df[df.Bout_number.isin(bout_index)]
             df.reset_index(inplace=True, drop=True)
             df = renumber_bouts(df)
-            #df.iloc[:, 0] = np.arange(1, len(df) + 1)
+
             return df
 
         def renumber_bouts(df):
+            '''
+            Renumbering the gait bouts for bouts_df after single step bouts are removed
+            '''
             orig_bouts = df.Bout_number
             num = 1
             for i in range(len(orig_bouts)):
@@ -645,7 +625,9 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             return df
 
         def get_bouts_data(df):
-
+            '''
+            imported steps
+            '''
             bout_list = df['Bout_number'].unique()
             bout_df = pd.DataFrame(columns=['Bout_number', 'Step_count', 'Start_time', 'End_time', 'Start_idx', 'End_idx'])
             for count, val in enumerate(bout_list):
@@ -679,9 +661,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             # data=bw_filter(data=data, fs=sample_freq, fc=5, order=5)
             # plt.plot(data)
             # 2: Adaptive threshold as per:
-            # B.R. Greene, et al., ”Adaptive estimation of temporal gait parameters using body-worn gyroscopes,”
-            # Proc. IEEE Eng. Med. Bio. Soc. (EMBC 2011), pp. 1296-1299, 2010
-            # and outlined in Fraccaro, P., Coyle, L., Doyle, J., & O'Sullivan, D. (2014)
+
             # ic = []
             # tc = []
             # frequency = []
@@ -797,7 +777,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             lf_data = bw_filter(data=data, fs=sample_freq, fc=3, order=5)
 
             # 2: Calculate adaptive threshold
-            th1 = find_adaptive_thresh(data=lf_data)
+            th1 = find_adaptive_thresh(data=lf_data, fs=sample_freq)
 
             # 3: Group MS peaks to identify gait events
             # how far should peaks be apart?
@@ -850,13 +830,11 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             # 4: Ensure left and right occurrence of gait events
             # single IMU only - no need for this step atm
 
-            # 5a: Get timestamps for all steps for output with dataframe
+            #get step timestamps
             step_events_df['Step_timestamp'] = timestamps[step_events_df['Step_index']]
 
-            # 5b: Remove gait events that were one or less steps
             gait_bouts_df = remove_single_step_bouts(df=step_events_df, steps_length=bout_steps)
 
-            # 5c: output bouts_df of bout data (step counts, start/end times, start/end ind)"
             gait_bouts_df = get_bouts_data(df=gait_bouts_df)
 
             # renumber the bouts in steps_df
@@ -1260,29 +1238,29 @@ if __name__ == '__main__':
     #setup subject and filepath
     ankle = nimbalwear.Device()
 
-    # #AXV6
-    # subj = "OND09_0011_01"
-    # ankle_path = fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf'
-    # if os.path.exists(ankle_path):
-    #      ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf')
-    # else:
-    #      ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_RAnkle.edf')
-    #GNAC
-    subj = "OND06_1027_01"
-    ankle_path = fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf'
+    #AXV6
+    subj = "OND09_0011_01"
+    ankle_path = fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf'
     if os.path.exists(ankle_path):
-        ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf')
+         ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf')
     else:
-        ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_GNAC_RAnkle.edf')
+         ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_RAnkle.edf')
+    # #GNAC
+    # subj = "OND06_1027_01"
+    # ankle_path = fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf'
+    # if os.path.exists(ankle_path):
+    #     ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf')
+    # else:
+    #     ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_GNAC_RAnkle.edf')
 
 
     #Input for detect steps is "Device" obj
     steps_df = detect_steps(device = ankle, bilateral_wear = False, start=100000, end=200000)
-    steps_df.to_csv(r'W:\dev\gait\acc_steps_df.csv')
+    steps_df.to_csv(r'W:\dev\gait\gyro_steps_df.csv')
 
     #def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None, left_device=None, duration_sec=15, bout_num_df=None, legacy_alg=False, left_kwargs={}, right_kwargs={}):
     bouts_steps_df, bouts_num_df, bouts_stats = get_walking_bouts(left_steps_df=steps_df, left_device=ankle)
-    bouts_steps_df.to_csv(r'W:\dev\gait\acc_sample_bouts_steps_df.csv')
-    bouts_num_df.to_csv(r'W:\dev\gait\acc_sample_bouts_num_df.csv')
-    bouts_stats.to_csv(r'W:\dev\gait\acc_sample_bouts_stats.csv')
+    bouts_steps_df.to_csv(r'W:\dev\gait\gyro_sample_bouts_steps_df.csv')
+    bouts_num_df.to_csv(r'W:\dev\gait\gyro_sample_bouts_num_df.csv')
+    bouts_stats.to_csv(r'W:\dev\gait\gyro_sample_bouts_stats.csv')
     # TODO: Run walking bouts through spatiotemporal characteristics that are available for that person
