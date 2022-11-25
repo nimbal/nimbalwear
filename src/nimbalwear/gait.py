@@ -645,14 +645,10 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
 
             return bout_df
 
-        def gyro_step_indexes(data, gait_bouts_df=None, sample_freq=None, min_swing_t=0.250, max_swing_t=0.800):
-            # # dev
-            # data = gyro_data[indexes[0]:indexes[1]]
-            # gait_bouts_df = gait_bouts_df
-            # sample_freq = sample_rate
-            # min_swing_ms = 250
-            # max_swing_ms = 800
-
+        def gyro_bout_analysis(data, gait_bouts_df=None, sample_freq=None, min_swing_t=0.250, max_swing_t=0.800):
+            '''
+            Iterate through gait bouts to find the footfall data
+            '''
             # create index values for min and maximum swing time
             min_swing_idx = sample_freq * min_swing_t
             max_swing_idx = sample_freq * max_swing_t
@@ -833,31 +829,19 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
             #get step timestamps
             step_events_df['Step_timestamp'] = timestamps[step_events_df['Step_index']]
 
-            gait_bouts_df = remove_single_step_bouts(df=step_events_df, steps_length=bout_steps)
-
-            gait_bouts_df = get_bouts_data(df=gait_bouts_df)
+            bouted_steps_df = remove_single_step_bouts(df=step_events_df, steps_length=bout_steps)
 
             # renumber the bouts in steps_df
             step_events_df['Bout_number'] = 0
-            for i in range(len(gait_bouts_df)):
-                bool = (step_events_df.Step_index >= gait_bouts_df.Start_idx[i]) & (
-                            step_events_df.Step_index <= gait_bouts_df.End_idx[i])
+            for i in range(len(bouted_steps_df)):
+                bool = (step_events_df.Step_index >= bouted_steps_df.Start_idx[i]) & (
+                            step_events_df.Step_index <= bouted_steps_df.End_idx[i])
                 idx = step_events_df.index[bool]
-                step_events_df.Bout_number.iloc[idx] = gait_bouts_df.Bout_number[i]
-            # step_events_df.Bout_number.replace(0, np.nan, inplace=True) #if you want non-bouts to show up at NaN
+                step_events_df.Bout_number.iloc[idx] = bouted_steps_df.Bout_number[i]
 
-            # 6a: iterate through gait bouts to find gait bout tabular data: mean cycle time, stance and swing times,
-            # frequency analysis
-            # gait_bouts_df = gyro_step_indexes(data=data, gait_bouts_df=gait_bouts_df, sample_freq=sample_freq)
+            step_events_df.columns = ['step_number', 'step_index','bout_number', 'step_timestamp']
 
-            # 6b: adjust start_idx to equal first ic and vv for terminal
-
-            # 6c: need to look at th3 th4 to determine whether we should keep or reject step
-
-            # 7: add a plotting function
-            step_events_df.columns = ['step_number', 'step_index','bout_number', 'step_timestamp'] #TODO: need step duration for bout function
-
-            return step_events_df, peak_heights #gait_bouts_df,
+            return step_events_df, peak_heights
 
         #define parameters
         all_data = np.array(device.signals)
