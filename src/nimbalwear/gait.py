@@ -9,8 +9,6 @@ from scipy.signal import butter, filtfilt, sosfilt, find_peaks, peak_widths, wel
 import matplotlib.pyplot as plt
 import nimbalwear
 
-
-# Stepdetector declassed
 def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
     '''
     Parameters
@@ -844,7 +842,7 @@ def detect_steps(device=None, bilateral_wear=False, start=0, end=-1):
         if bilateral_wear is False:
             steps_df = detect_steps_gyro(device=device)
         else:
-
+            #   TODO: Need to figure out if there is a way to get the device location of the obj (to then read in the other object OR import
 
     else:
         print("Device not defined. State space step detector not run.")
