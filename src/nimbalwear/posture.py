@@ -109,7 +109,7 @@ def _filter_acc_data(x, y, z):
 
 
 def _get_angles(x, y, z):
-    """Get angles between each axis using accelerometer data
+    """Get angles between each axis using accelerometer data TODO: explain in external documentation
 
     Args:
         x: time array of the x-axis acceleration values
@@ -199,7 +199,7 @@ def create_posture_df_template(data_df, gait_mask, tran_type='jerk', tran_thresh
 
 
 def classify_ankle_posture(posture_df):
-    """Determine posture based on ankle angles from each axis.
+    """Determine posture based on ankle angles from each axis. TODO: Add classification details to external documentation
 
     Posture can be: sitstand, sit, horizontal, or other.
     Angle interpretations for posture classification:
@@ -228,7 +228,7 @@ def classify_ankle_posture(posture_df):
 
 
 def classify_chest_posture(posture_df):
-    """Determine posture based on chest angles from each axis.
+    """Determine posture based on chest angles from each axis. TODO: Add classification details to external documentation
 
     Posture can be: sitstand, reclined, prone, supine, leftside, rightside, or
     other. Angle interpretations for posture classification:
@@ -274,7 +274,7 @@ def classify_chest_posture(posture_df):
 
 
 def classify_thigh_posture(posture_df):
-    """Determine posture based on thigh angles from each axis.
+    """Determine posture based on thigh angles from each axis. TODO: Add classification details to external documentation
 
     Posture can be: stand, sitlay, or other.
     Angle interpretations for posture classification:
@@ -299,7 +299,7 @@ def classify_thigh_posture(posture_df):
 
 
 def classify_wrist_position(posture_df):
-    """Determine wrist position based on wrist angles from each axis.
+    """Determine posture based on wrist angles from each axis. TODO: Add classification details to external documentation
 
     Position can be: up, down, supine, prone, and side.
     Angle interpretations for position classification:
@@ -385,7 +385,10 @@ def _clean_transitions(transitions, gap_fill=5):
 
 
 def combine_posture_dfs(posture_df_dict, tran_combo=None, tran_gap_fill=5):
-    """Use available posture dataframes to create a summary posture dataframe
+    """Use available posture dataframes to create a combined posture dataframe. This DataFrame will default to the chest
+    posture and will use additional posture dataframes to improve the classification.
+
+    TODO: Add specific details about how posture is determined in external documentation
 
     Args:
         posture_df_dict: dictionary with keys of the wearable name and values of
@@ -402,6 +405,7 @@ def combine_posture_dfs(posture_df_dict, tran_combo=None, tran_gap_fill=5):
     Notes:
         - Must have a chest posture dataframe
         - Does not use wrist data
+        - Columns in the returned dataframe are ['timestamp', 'posture', 'transition', 'gait']
     """
     print("Combining posture dataframes...", end=" ")
     # Crop dfs to uniform length
@@ -455,6 +459,7 @@ def combine_posture_dfs(posture_df_dict, tran_combo=None, tran_gap_fill=5):
         thigh_post = new_posture_df_dict['thigh']
 
         # chest sit/stand + thigh stand = stand
+        # If chest is reclined or if chest
         posture_df.loc[(posture_df['posture'] != 'reclined') &
                     (chest_post['posture'] == 'sitstand') &
                     (thigh_post['posture'] == 'stand'), 'posture'] = "stand"
@@ -484,8 +489,8 @@ def combine_posture_dfs(posture_df_dict, tran_combo=None, tran_gap_fill=5):
     return posture_df
 
 def summarize_posture_df(posture_df):
-    """Compresses consecutive rows of the same posture (with/without labels
-       into one row of the posture dataframe.
+    """Compresses posture_df into just the distinct successive postures. The columns for this dataframe are
+    ['start_timestamp', 'end_timestamp', 'duration', 'posture']
     """
     print("Compressing dataframe...", end=" ")
     df = posture_df.copy()
