@@ -1,3 +1,23 @@
+"""Run wearable data through the nimbalwear pipeline.
+
+Classes
+-------
+Pipeline
+    A study on which the pipeline can be run.
+Collection
+    A single data collection.
+
+Exceptions
+----------
+NWException
+
+Functions
+---------
+message(msg, level, display, log, logger_name)
+    Displays or logs a message.
+
+"""
+
 import os
 import shutil
 import datetime as dt
@@ -8,6 +28,7 @@ from functools import wraps
 import json
 import operator
 
+import toml
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
@@ -18,13 +39,65 @@ from .nonwear import vert_nonwear, nonwear_stats
 from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
 from .gait import AccelReader, WalkingBouts, get_gait_bouts, create_timestamps, gait_stats
 from .activity import activity_wrist_avm, activity_stats
+from .utils import convert_json_to_toml
 
 from .__version__ import __version__
 
 
 class Pipeline:
+    """"Represents a study on which the pipeline can be run.
 
+    Attributes
+    ----------
+    quiet : bool
+        Suppress displayed messages.
+    log : bool
+        Log messages.
+    study_dir : Path or str
+        Directory where study is stored.
+    study_code : str
+        Unique study identifier.
+    settings_path : Path or str
+        Path to the file containing settings for the pipeline.
+    dirs : dict
+        Dictionary of directories within the study_dir used by the pipeline to store data.
+    stages : list
+        List of stages in the pipeline.
+    sensors : dict
+        Dictionary of sensor type and the signal labels they contain.
+    device_locations : dict
+        Dictionary of device locations and aliases for each.
+    module_settings
+        Dictionary of modules with settings for each.
+    device_info_path : Path or str
+        Path to file containing information about each device in each collection in the study.
+    collection_info_path : Path or str
+        Path to file containing information about each collection in the study.
+    status_path : Path or str
+        Path to file containing information about the pipeline status of each collection.
+    settings_str : str
+        String version of settings toml file, for use in logs.
+    data_dicts : dict
+        Dictionary of data dictionaries to be written to each data folder.
+    device_info : DataFrame
+        Information about each device in each collection in the study.
+    collection_info : DataFrame
+        Information about each collection in the study.
+
+
+    """
     def __init__(self, study_dir, settings_path=None):
+        """Read settings, devices, and collections file to construct Pipeline instance.
+
+        Parameters
+        ----------
+        study_dir : Path or str
+            Directory where study is stored.
+        settings_path : Path or str, optional
+            Path to the file containing settings for the pipeline, defaults to None in which default settings file
+            path relative to study_dir is used.
+
+        """
 
         self.quiet = False
         self.log = True
@@ -32,38 +105,48 @@ class Pipeline:
         # initialize folder structure
         self.study_dir = Path(study_dir)
 
-        self.settings_path = Path(settings_path) if settings_path is not None else settings_path
-
-        if (self.settings_path is None) or (not self.settings_path.is_file()):
-            self.settings_path = self.study_dir / 'pipeline/settings/settings.json'
-            self.settings_path.parent.mkdir(parents=True, exist_ok=True)
-
-        if not self.settings_path.is_file():
-            settings_src = Path(__file__).parent.absolute() / 'settings/settings.json'
-            shutil.copy(settings_src, self.settings_path)
-
         # get study code
         self.study_code = self.study_dir.name
 
-        # read json file
-        with open(self.settings_path, 'r') as f:
-            settings_json = json.load(f)
+        # convert settings_path to Path if not None
+        self.settings_path = Path(settings_path) if settings_path is not None else settings_path
 
-        self.dirs = settings_json['pipeline']['dirs']
+        # if settings path is None or doesn't exist than set settings_path to default settings file
+        if (self.settings_path is None) or (not self.settings_path.is_file()):
+            self.settings_path = self.study_dir / 'pipeline/settings/settings.toml'
+            self.settings_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # if default settings file doesn't exist in this study then add it
+            if not self.settings_path.is_file():
+                settings_src = Path(__file__).parent.absolute() / 'settings/settings.toml'
+                shutil.copy(settings_src, self.settings_path)
+
+        # if a json file is passed in read it as is but convert it to toml for next time
+        # - this provides and option for backward compatibility to run the pipeline with the existing json file
+        # the first time after upgrading to version 0.19 that uses toml
+        if self.settings_path.suffix == ".json":
+            settings_dict = convert_json_to_toml(settings_path, settings_path.with_suffix(".toml"))
+        else: # read toml file
+
+            with open(self.settings_path, 'r') as f:
+                settings_dict = toml.load(f)
+
+        # parse specific settings into Pipeline attributes
+        self.dirs = settings_dict['pipeline']['dirs']
         self.dirs = {key: self.study_dir / value for key, value in self.dirs.items()}
 
-        # pipeline data files
+        self.stages = settings_dict['pipeline']['stages']
+        self.sensors = settings_dict['pipeline']['sensors']
+        self.device_locations = settings_dict['pipeline']['device_locations']
+        self.module_settings = settings_dict['modules']
+
+        # pipeline data file paths
         self.device_info_path = self.dirs['pipeline'] / 'devices.csv'
-        self.subject_info_path = self.dirs['pipeline'] / 'subjects.csv'
-        # self.log_file_path = self.dirs['logs'] / 'processing.log'
+        self.collection_info_path = self.dirs['pipeline'] / 'collections.csv'
         self.status_path = self.dirs['pipeline'] / 'status.csv'
 
-        self.stages = settings_json['pipeline']['stages']
-        self.sensors = settings_json['pipeline']['sensors']
-        self.device_locations = settings_json['pipeline']['device_locations']
-        self.module_settings = settings_json['modules']
-
-        self.settings_str = json.dumps(settings_json, indent=4)
+        # dump settings to str that can be printed in log
+        self.settings_str = toml.dumps(settings_dict)
 
         with open(Path(__file__).parent.absolute() / 'settings/data_dicts.json', 'r') as f:
             self.data_dicts = json.load(f)
@@ -74,10 +157,10 @@ class Pipeline:
         self.device_info = pd.read_csv(self.device_info_path, dtype=str).fillna('')
 
         # read subject level info
-        if self.subject_info_path.exists():
-            self.subject_info = pd.read_csv(self.subject_info_path, dtype=str).fillna('')
+        if self.collection_info_path.exists():
+            self.collection_info = pd.read_csv(self.collection_info_path, dtype=str).fillna('')
         else:
-            self.subject_info = None
+            self.collection_info = None
 
         # TODO: Check devices.csv and subjects.csv integrity
         # - ensure study code same for all rows (required) and matches study_dir (warning)
@@ -189,8 +272,8 @@ class Pipeline:
             if single_stage is not None:
                 message(f"Single stage: {single_stage}", level='info', display=(not self.quiet), log=self.log,
                         logger_name=self.log_name)
-            if not isinstance(self.subject_info, pd.DataFrame):
-                message("Missing subjects info file in meta folder `subjects.csv`", level='warning',
+            if not isinstance(self.collection_info, pd.DataFrame):
+                message("Missing collection info file in meta folder `collections.csv`", level='warning',
                         display=(not self.quiet), log=self.log, logger_name=self.log_name)
             message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
             message(f"Settings: {self.settings_path}\n\n {self.settings_str}", level='info', display=(not self.quiet),
@@ -205,9 +288,10 @@ class Pipeline:
                 coll_device_list_df.reset_index(inplace=True, drop=True)
 
                 coll_subject_dict = {}
-                if isinstance(self.subject_info, pd.DataFrame):
-                    coll_subject_df = self.subject_info.loc[(self.subject_info['study_code'] == self.study_code) &
-                                                            (self.subject_info['subject_id'] == subject_id)]
+                if isinstance(self.collection_info, pd.DataFrame):
+                    coll_subject_df = self.collection_info.loc[(self.collection_info['study_code'] == self.study_code) &
+                                                               (self.collection_info['subject_id'] == subject_id) &
+                                                               (self.collection_info['coll_id'] == coll_id)]
                     coll_subject_df.reset_index(inplace=True, drop=True)
                     coll_subject_dict = coll_subject_df.iloc[0].to_dict() if coll_subject_df.shape[0] > 0 else {}
 
@@ -215,7 +299,7 @@ class Pipeline:
                 coll = Collection(study_code=self.study_code, subject_id=subject_id, coll_id=coll_id)
 
                 coll.device_info = coll_device_list_df
-                coll.subject_info = coll_subject_dict
+                coll.collection_info = coll_subject_dict
 
                 self.process_collection(coll=coll, single_stage=single_stage)
 
@@ -231,7 +315,6 @@ class Pipeline:
         return
 
     def process_collection(self, coll, single_stage=None):
-
         """Processes the collection
 
         Args:
@@ -305,7 +388,7 @@ class Pipeline:
         device_index = []
 
         if single_stage == 'activity':
-            activity_device_index, activity_dominant = self.select_activity_device(coll=coll)
+            activity_device_index = self.select_activity_device(coll=coll, quiet=quiet, log=log)
             device_index += activity_device_index
         elif single_stage == 'gait':
             r_gait_device_index, l_gait_device_index = self.select_gait_device(coll=coll)
@@ -560,7 +643,14 @@ class Pipeline:
 
         sync_type = self.module_settings['sync']['type']
         sync_at_config = self.module_settings['sync']['sync_at_config']
-        search_radius = self.module_settings['sync']['search_radius']
+        search_radius = self.module_settings['sync'].get('search_radius', None)
+        rest_min = self.module_settings['sync']['rest_min']
+        rest_max = self.module_settings['sync']['rest_max']
+        rest_sens = self.module_settings['sync']['rest_sens']
+        flip_max = self.module_settings['sync']['flip_max']
+        min_flips = self.module_settings['sync']['min_flips']
+        reject_above_ae = self.module_settings['sync']['reject_above_ae']
+        req_tgt_corr = self.module_settings['sync']['req_tgt_corr']
 
         if not coll.device_info.empty:
             ref_device_type = coll.device_info.iloc[0]['device_type']
@@ -574,7 +664,16 @@ class Pipeline:
             device_type = row['device_type']
             device_location = row['device_location']
 
-            if idx > 0:
+            if idx == 0:
+
+                # check if sync_at_config is true and give warning and set to false if config_date after start_date
+                if (sync_at_config) & (coll.devices[idx].header['config_datetime'] > coll.devices[idx].header['start_datetime']):
+                    sync_at_config = False
+                    message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: Invalid config time, could not add as sync time",
+                            level='warning', display=(not quiet), log=log, logger_name=self.log_name)
+                    message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+            else:
 
                 accel_idx = coll.devices[idx].get_signal_index(self.sensors['accelerometer']['signals'][0])
 
@@ -586,21 +685,13 @@ class Pipeline:
                     ds_index = freq - 5
                 signal_ds = round(freq / (5 + ds_index))
 
-                # check if synnc_at_config is true and give warning and set to false if config_ate after start_date
-                if sync_at_config:
-                    if coll.devices[0].header['config_datetime'] > coll.devices[0].header['start_datetime']:
-
-                        sync_at_config = False
-
-                        message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: Invalid config time, could not add as sync time",
-                                    level='warning', display=(not quiet), log=log, logger_name=self.log_name)
-
                 syncs, segments = coll.devices[idx].sync(ref=coll.devices[0],
                                                          sig_labels=tuple(self.sensors['accelerometer']['signals']),
-                                                         type=sync_type,
-                                                         sync_at_config=sync_at_config,
-                                                         search_radius=search_radius,
-                                                         signal_ds=signal_ds)
+                                                         sync_type=sync_type, sync_at_config=sync_at_config,
+                                                         search_radius=search_radius, signal_ds=signal_ds,
+                                                         rest_min=rest_min, rest_max=rest_max, rest_sens=rest_sens,
+                                                         flip_max=flip_max, min_flips=min_flips,
+                                                         reject_above_ae=reject_above_ae, req_tgt_corr=req_tgt_corr)
 
 
                 message(f"Synchronized {device_type} {device_location} to {ref_device_type} {ref_device_location} at {syncs.shape[0]} sync points",
@@ -693,16 +784,23 @@ class Pipeline:
 
     @coll_status
     def nonwear(self, coll, quiet=False, log=True):
+        """Detect wear and non-wear bouts for all devices in the collection.
+
+        Parameters
+        ----------
+        coll : Collection
+            Collection object containing attributes and methods related to the collection
+        quiet : bool, optional
+            Suppress displayed messages (default is False)
+        log : bool, optional
+            Log messages (default is True)
+
+        """
 
         # process nonwear for all devices
         message("Detecting non-wear...", level='info', display=(not quiet), log=log, logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        accel_std_thresh_mg = self.module_settings['nonwear']['accel_std_thresh_mg']
-        low_temperature_cutoff = self.module_settings['nonwear']['low_temperature_cutoff']
-        high_temperature_cutoff = self.module_settings['nonwear']['high_temperature_cutoff']
-        temp_dec_roc = self.module_settings['nonwear']['temp_dec_roc']
-        temp_inc_roc = self.module_settings['nonwear']['temp_inc_roc']
         save = self.module_settings['nonwear']['save']
 
         coll.nonwear_bouts = pd.DataFrame()
@@ -719,17 +817,30 @@ class Pipeline:
             device_type = r['device_type']
             device_location = r['device_location']
 
+            # find device body location type
+
+            # get location aliases from settings
+            wrist_locations = self.device_locations['rwrist']['aliases'] + self.device_locations['lwrist']['aliases']
+            ankle_locations = self.device_locations['rankle']['aliases'] + self.device_locations['lankle']['aliases']
+            chest_locations = self.device_locations['chest']['aliases']
+
+            # compare device location to location types
+            if device_location.upper() in wrist_locations:
+                location_type = "wrist"
+            elif device_location.upper() in ankle_locations:
+                location_type = "ankle"
+            elif device_location.upper() in chest_locations:
+                location_type = "chest"
+
+            # get location specific non-wear settings
+            accel_std_thresh_mg = self.module_settings['nonwear']['settings'][location_type]['accel_std_thresh_mg']
+            low_temperature_cutoff = self.module_settings['nonwear']['settings'][location_type]['low_temperature_cutoff']
+            high_temperature_cutoff = self.module_settings['nonwear']['settings'][location_type]['high_temperature_cutoff']
+            temp_dec_roc = self.module_settings['nonwear']['settings'][location_type]['temp_dec_roc']
+            temp_inc_roc = self.module_settings['nonwear']['settings'][location_type]['temp_inc_roc']
+
+            # current device
             device = coll.devices[i]
-
-            # TODO: Add nonwear detection for other devices
-            # TODO: add wear bouts
-            # TODO: rename from nonwear to wear
-
-            if device_type not in ['AXV6', 'GNOR']:
-                message(f"Cannot detect non-wear for {device_type}_{device_location}",
-                        level='info', display=(not quiet), log=log, logger_name=self.log_name)
-                message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
-                continue
 
             # check for data loaded
             if device is None:
@@ -738,14 +849,20 @@ class Pipeline:
                 message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
                 continue
 
+            # get signal indices
             accel_x_idx = device.get_signal_index('Accelerometer x')
             accel_y_idx = device.get_signal_index('Accelerometer y')
             accel_z_idx = device.get_signal_index('Accelerometer z')
             temperature_idx = device.get_signal_index('Temperature')
 
-            # TODO: call different algorithm based on device_type or signals available??
-            # TODO: log algorithm used
+            # check for all required signals
+            if None in [accel_x_idx, accel_y_idx, accel_z_idx, temperature_idx]:
+                message(f"{device_type}_{device_location} does not contain all signals required to edetect non-wear",
+                        level='info', display=(not quiet), log=log, logger_name=self.log_name)
+                message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+                continue
 
+            # get signals
             accel_x = device.signals[accel_x_idx]
             accel_y = device.signals[accel_y_idx]
             accel_z = device.signals[accel_z_idx]
@@ -753,10 +870,11 @@ class Pipeline:
 
             # TODO: index signals by label - make option to return datetimeindex
 
+            # get sample rates
             accel_fs = device.signal_headers[accel_x_idx]['sample_rate']
             temperature_fs = device.signal_headers[temperature_idx]['sample_rate']
 
-
+            # detect non-wear using DETACH algorithm
             nonwear_bouts, nonwear_array = vert_nonwear(x_values=accel_x, y_values=accel_y, z_values=accel_z,
                                                         temperature_values=temperature, accel_freq=accel_fs,
                                                         temperature_freq=temperature_fs,
@@ -765,20 +883,21 @@ class Pipeline:
                                                         high_temperature_cutoff=high_temperature_cutoff,
                                                         temp_dec_roc=temp_dec_roc, temp_inc_roc=temp_inc_roc,
                                                         quiet=quiet)
-
             algorithm_name = 'DETACH'
 
-
+            # label non-wear bouts as non-wear events
             nonwear_bouts['event'] = "nonwear"
+
             nonwear_bouts.rename(columns={'Start Datapoint': 'start_datapoint', 'End Datapoint': 'end_datapoint'},
                                  inplace=True)
 
+            # count bouts
             bout_count = nonwear_bouts.shape[0]
 
             message(f"Detected {bout_count} nonwear bouts for {device_type} {device_location} ({algorithm_name})",
                     level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-            # convert datapoints to times
+            # convert datapoints to times and insert into dataframe as start and end time for each event
             start_date = device.header['start_datetime']
             sample_rate = device.signal_headers[accel_x_idx]['sample_rate']
             samples = device.signals[accel_x_idx].shape[0]
@@ -794,7 +913,10 @@ class Pipeline:
             nonwear_bouts['start_time'] = nonwear_start_times
             nonwear_bouts['end_time'] = nonwear_end_times
 
+            # select columns
             nonwear_bouts = nonwear_bouts[['event', 'start_time', 'end_time']]
+
+            # calculate wear events and insert between non-wear events
 
             # nonwear end times are wear start times -- nonwear start times are wear end times
             wear_start_times = nonwear_end_times
@@ -806,7 +928,7 @@ class Pipeline:
             # collection end is last wear end
             wear_end_times.append(end_date)
 
-            # remove first wear bout if duration is 0 - started with non-wear
+            # remove first and last wear bout if duration is 0 - started or ended with non-wear with non-wear
             if wear_start_times[0] == wear_end_times[0]:
                 wear_start_times = wear_start_times[1:]
                 wear_end_times = wear_end_times[1:]
@@ -815,37 +937,48 @@ class Pipeline:
                 wear_start_times = wear_start_times[:-1]
                 wear_end_times = wear_end_times[:-1]
 
+            # create wear dataframe
             wear_bouts = pd.DataFrame({'start_time': wear_start_times, 'end_time': wear_end_times, })
             wear_bouts['event'] = 'wear'
 
+            # concatenate with nonwear and sort by start_time
             nonwear_bouts = pd.concat([nonwear_bouts, wear_bouts], ignore_index=True)
             nonwear_bouts = nonwear_bouts.sort_values('start_time')
 
+            # number bouts as id
             nonwear_bouts.insert(loc=0, column='id', value=range(1, nonwear_bouts.shape[0] + 1))
+
+            # calculate daily summary non-wear
             daily_nonwear = nonwear_stats(nonwear_bouts, quiet=quiet)
 
-            # add identifiers
+            # add identifiers and settings to bouts and daily summary
             nonwear_bouts.insert(loc=0, column='study_code', value=study_code)
             nonwear_bouts.insert(loc=1, column='subject_id', value=subject_id)
             nonwear_bouts.insert(loc=2, column='coll_id', value=coll_id)
             nonwear_bouts.insert(loc=3, column='device_type', value=device_type)
             nonwear_bouts.insert(loc=4, column='device_location', value=device_location)
+            nonwear_bouts.insert(loc=5, column='accel_std_thresh_mg', value=accel_std_thresh_mg)
+            nonwear_bouts.insert(loc=6, column='low_temperature_cutoff', value=low_temperature_cutoff)
+            nonwear_bouts.insert(loc=7, column='high_temperature_cutoff', value=high_temperature_cutoff)
+            nonwear_bouts.insert(loc=8, column='temp_dec_roc', value=temp_dec_roc)
+            nonwear_bouts.insert(loc=9, column='temp_inc_roc', value=temp_inc_roc)
 
             daily_nonwear.insert(loc=0, column='study_code', value=study_code)
             daily_nonwear.insert(loc=1, column='subject_id', value=subject_id)
             daily_nonwear.insert(loc=2, column='coll_id', value=coll_id)
             daily_nonwear.insert(loc=3, column='device_type', value=device_type)
             daily_nonwear.insert(loc=4, column='device_location', value=device_location)
-
-
-            # reorder columns
-            # nonwear_bouts = nonwear_bouts[['study_code', 'subject_id', 'coll_id', 'device_type', 'device_location',
-            #                               'id', 'event', 'start_time', 'end_time']]
+            daily_nonwear.insert(loc=5, column='accel_std_thresh_mg', value=accel_std_thresh_mg)
+            daily_nonwear.insert(loc=6, column='low_temperature_cutoff', value=low_temperature_cutoff)
+            daily_nonwear.insert(loc=7, column='high_temperature_cutoff', value=high_temperature_cutoff)
+            daily_nonwear.insert(loc=8, column='temp_dec_roc', value=temp_dec_roc)
+            daily_nonwear.insert(loc=9, column='temp_inc_roc', value=temp_inc_roc)
 
             # append to collection attribute
             coll.nonwear_bouts = pd.concat([coll.nonwear_bouts, nonwear_bouts], ignore_index=True)
             coll.daily_nonwear = pd.concat([coll.daily_nonwear, daily_nonwear], ignore_index=True)
 
+            # save output files
             if save:
 
                 # create all file path variables
@@ -859,17 +992,17 @@ class Pipeline:
                 nonwear_csv_path = self.dirs['nonwear_bouts_standard'] / nonwear_csv_name
                 nonwear_daily_csv_path = self.dirs['nonwear_daily_standard'] / daily_nonwear_csv_name
 
+                # create parent folders if they don't exist
                 nonwear_csv_path.parent.mkdir(parents=True, exist_ok=True)
                 nonwear_daily_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
+                # save files
                 message(f"Saving {nonwear_csv_path}", level='info', display=(not quiet), log=log,
                         logger_name=self.log_name)
-
                 nonwear_bouts.to_csv(nonwear_csv_path, index=False)
 
                 message(f"Saving {nonwear_daily_csv_path}", level='info', display=(not quiet), log=log,
                         logger_name=self.log_name)
-
                 daily_nonwear.to_csv(nonwear_daily_csv_path, index=False)
 
             message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
@@ -930,42 +1063,58 @@ class Pipeline:
 
     @coll_status
     def crop(self, coll, quiet=False, log=True):
+        """Crop non-wear from start and end of all devices in the collection.
+
+        Parameters
+        ----------
+        coll : Collection
+            Collection object containing attributes and methods related to the collection
+        quiet : bool, optional
+            Suppress displayed messages (default is False)
+        log : bool, optional
+            Log messages (default is True)
+
+        """
 
         message("Cropping initial and final non-wear...", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        # min_duration_start = self.module_settings['crop']['min_duration_start']
-        # min_duration_end = self.module_settings['crop']['min_duration_end']
-        # max_time_to_bof = self.module_settings['crop']['max_time_to_bof']
-        # max_time_to_eof = self.module_settings['crop']['max_time_to_eof']
+
+        # get crop settings
         min_wear_time = self.module_settings['crop']['min_wear_time']
         save = self.module_settings['crop']['save']
 
+        # make copy of nonwear bouts dataframe
         nonwear_bouts = coll.nonwear_bouts.copy()
         nonwear_bouts['duration'] = ((nonwear_bouts['end_time'] - nonwear_bouts['start_time']).dt.total_seconds() / 60).round()
 
+        # re-initialize collection daily_nonwear and nonwear_bouts dataframes
         coll.daily_nonwear = pd.DataFrame(columns=['study_code', 'subject_id', 'coll_id', 'device_type',
-                                                   'device_location', 'day_num', 'date', 'wear', 'nonwear'])
+                                                   'device_location', 'accel_std_thresh_mg', 'low_temperature_cutoff',
+                                                   'high_temperature_cutoff', 'temp_dec_roc', 'temp_inc_roc',
+                                                   'day_num', 'date', 'wear', 'nonwear'])
 
         coll.nonwear_bouts = pd.DataFrame(columns=['study_code', 'subject_id', 'coll_id', 'device_type',
-                                                   'device_location', 'id', 'event', 'start_time', 'end_time'])
+                                                   'device_location', 'accel_std_thresh_mg', 'low_temperature_cutoff',
+                                                   'high_temperature_cutoff', 'temp_dec_roc', 'temp_inc_roc', 'id',
+                                                   'event', 'start_time', 'end_time'])
 
-
-
-        # crop final nonwear from all device data
+        # loop through all devices in collection
         for i, r in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
                                desc='Cropping initial and final non-wear'):
 
-            # get info from device list
+            # get device info from device list
             study_code = r['study_code']
             subject_id = r['subject_id']
             coll_id = r['coll_id']
             device_type = r['device_type']
             device_location = r['device_location']
 
+            # get device data object
             device = coll.devices[i]
 
+            # if device data object doesn't exist display warning and go to next device
             if device is None:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No device data",
                         level='warning', display=(not quiet), log=log, logger_name=self.log_name)
@@ -974,6 +1123,7 @@ class Pipeline:
             # if there is nonwear data for any devices in this collection
             if not nonwear_bouts.empty:
 
+                # initialize daily nonwear dataframe
                 daily_nonwear = pd.DataFrame(columns=['day_num', 'date', 'wear', 'nonwear'])
 
                 # get nonwear bouts for current device
@@ -983,72 +1133,54 @@ class Pipeline:
                                                  (nonwear_bouts['device_type'] == device_type) &
                                                  (nonwear_bouts['device_location'] == device_location)].copy()
 
+                # if there are any detected non-wear bouts for this device
                 if not device_bouts.empty:
 
+                    # get bout indices of wear bouts that meet minimum duration
                     long_wear_idxs = device_bouts.index[(device_bouts['event'] == 'wear')
-                                                    & (device_bouts['duration'] > min_wear_time)]
+                                                    & (device_bouts['duration'] >= min_wear_time)]
 
+                    # if there is at least one wear bout of minimum duration
                     if not long_wear_idxs.empty:
 
+                        # select non-wear and wear bouts from first wear of minimum duration to last wear of minimum duration
+                        # - same as excluding all wear and non-wear bouts before first and after last wear of minimum duration
                         device_bouts = device_bouts.loc[long_wear_idxs[0]:long_wear_idxs[-1]]
 
+                        # if at least one wear or non-wear bout remains
                         if not device_bouts.empty:
 
-                        # nonwear_idx = nonwear_idx.tolist()
-                        #
-                        # # if there is nonwear data for current device
-                        # if len(nonwear_idx):
-                        #
-                        #     # get first nonwear period for current device
-                        #     first_nonwear_idx = nonwear_idx[0]
-                        #     first_nonwear = nonwear_bouts_keep.loc[first_nonwear_idx]
-                        #
-                        #     # get last nonwear period for current device
-                        #     last_nonwear_idx = nonwear_idx[-1]
-                        #     last_nonwear = nonwear_bouts_keep.loc[last_nonwear_idx]
-                        #
                             # get time info from device data
                             start_time = device.header['start_datetime']
+
+                            # calculate end time of device data
                             samples = len(device.signals[0])
                             sample_rate = device.signal_headers[0]['sample_rate']
                             duration = dt.timedelta(seconds=samples / sample_rate)
                             end_time = start_time + duration
-                        #
-                        #     # get duration and time to start of file of first nonwear
-                        #     first_nonwear_duration = first_nonwear['end_time'] - first_nonwear['start_time']
-                        #     first_nonwear_time_to_bof = first_nonwear['start_time'] - start_time
-                        #
-                        #     # get duration and time to end of file of last nonwear
-                        #     last_nonwear_duration = last_nonwear['end_time'] - last_nonwear['start_time']
-                        #     last_nonwear_time_to_eof = end_time - last_nonwear['end_time']
-                        #
-                        #     # only crop if first nonwear starts within 20 minutes of start of file
-                        #     crop_start = ((first_nonwear_duration >= dt.timedelta(minutes=min_duration_end)) &
-                        #                 (first_nonwear_time_to_bof <= dt.timedelta(minutes=max_time_to_bof)))
-                        #
-                        #     # only crop if last nonwear ends within 20 minutes of end of file
-                        #     crop_end = ((last_nonwear_duration >= dt.timedelta(minutes=min_duration_end)) &
-                        #                     (last_nonwear_time_to_eof <= dt.timedelta(minutes=max_time_to_eof)))
 
+                            # get new start and end time from remaining bouts
                             new_start_time = device_bouts.iloc[0]['start_time']
                             new_end_time = device_bouts.iloc[-1]['end_time']
 
+                            # display messages about duration cropped from start and end of file
                             start_crop_duration = new_start_time - start_time
-
                             message(f"Cropping {start_crop_duration} from begininng of collection for {device_type} {device_location}",
                                     level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
                             end_crop_duration = end_time - new_end_time
-
                             message(f"Cropping {end_crop_duration} from end of collection for {device_type} {device_location}",
                                     level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
+                            # crop device data
                             device.crop(new_start_time, new_end_time, inplace=True)
 
                             # recalculate nonwear summary
                             #nonwear_bouts =  nonwear_bouts_keep[nonwear_bouts_keep.index.isin(nonwear_idx)]
                             db = device_bouts.drop(columns=['study_code', 'subject_id', 'coll_id', 'device_type',
-                                                                     'device_location', 'duration'], )
+                                                            'device_location', 'accel_std_thresh_mg',
+                                                            'low_temperature_cutoff', 'high_temperature_cutoff',
+                                                            'temp_dec_roc', 'temp_inc_roc', 'duration'], )
                             daily_nonwear = nonwear_stats(db, quiet=quiet)
 
                     else:
@@ -1059,12 +1191,25 @@ class Pipeline:
                     message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for device",
                             level='warning', display=(not quiet), log=log, logger_name=self.log_name)
 
+                # save settings used to derive device bouts and add to nonwear dataframe
+                accel_std_thresh_mg = device_bouts.iloc[0]['accel_std_thresh_mg']
+                low_temperature_cutoff = device_bouts.iloc[0]['low_temperature_cutoff']
+                high_temperature_cutoff = device_bouts.iloc[0]['high_temperature_cutoff']
+                temp_dec_roc = device_bouts.iloc[0]['temp_dec_roc']
+                temp_inc_roc = device_bouts.iloc[0]['temp_inc_roc']
+
                 daily_nonwear.insert(loc=0, column='study_code', value=study_code)
                 daily_nonwear.insert(loc=1, column='subject_id', value=subject_id)
                 daily_nonwear.insert(loc=2, column='coll_id', value=coll_id)
                 daily_nonwear.insert(loc=3, column='device_type', value=device_type)
                 daily_nonwear.insert(loc=4, column='device_location', value=device_location)
+                daily_nonwear.insert(loc=5, column='accel_std_thresh_mg', value=accel_std_thresh_mg)
+                daily_nonwear.insert(loc=6, column='low_temperature_cutoff', value=low_temperature_cutoff)
+                daily_nonwear.insert(loc=7, column='high_temperature_cutoff', value=high_temperature_cutoff)
+                daily_nonwear.insert(loc=8, column='temp_dec_roc', value=temp_dec_roc)
+                daily_nonwear.insert(loc=9, column='temp_inc_roc', value=temp_inc_roc)
 
+                # update nonwear collection attribrutes
                 coll.daily_nonwear = pd.concat([coll.daily_nonwear, daily_nonwear], ignore_index=True)
                 device_bouts = device_bouts.drop(columns=['duration'])
                 coll.nonwear_bouts = pd.concat([coll.nonwear_bouts, device_bouts], ignore_index=True)
@@ -1074,6 +1219,7 @@ class Pipeline:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for collection",
                         level='warning', display=(not quiet), log=log, logger_name=self.log_name)
 
+            # save files
             if save:
 
                 # create all file path variables
@@ -1107,6 +1253,7 @@ class Pipeline:
                             logger_name=self.log_name)
                     device_bouts.to_csv(nonwear_csv_path, index=False)
 
+                    # write new daily non-wear summary
                     message(f"Saving {nonwear_daily_csv_path}", level='info', display=(not quiet), log=log,
                         logger_name=self.log_name)
 
@@ -1171,7 +1318,7 @@ class Pipeline:
         # TODO: axis needs to be set based on orientation of device
 
         step_detect_type = self.module_settings['gait']['step_detect_type']
-        axis = self.module_settings['gait']['axis']
+        axis = self.module_settings['gait'].get('axis', None)
         save = self.module_settings['gait']['save']
 
         message(f"Detecting steps and walking bouts using {step_detect_type} data...", level='info', display=(not quiet), log=log,
@@ -1586,96 +1733,125 @@ class Pipeline:
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
+        pref_cutpoint = self.module_settings['activity'].get('pref_cutpoint', None)
         save = self.module_settings['activity']['save']
         epoch_length = self.module_settings['activity']['epoch_length']
         sedentary_gait = self.module_settings['activity']['sedentary_gait']
 
-        coll.activity_epochs = pd.DataFrame()
+        dominant_hand = coll.collection_info['dominant_hand'].lower()
 
-        activity_device_index, dominant = self.select_activity_device(coll=coll)
+        # select all wrist devices
+        activity_device_index = self.select_activity_device(coll=coll, quiet=quiet, log=log)
 
         if len(activity_device_index) == 0:
-            raise NWException(f"{coll.subject_id}_{coll.coll_id}: Wrist device not found in device list")
+            raise NWException(f"{coll.subject_id}_{coll.coll_id}: No eligible wrist devices found in device list")
 
-        activity_device_index = activity_device_index[0]
 
-        # checks to see if files exist
-        if not coll.devices[activity_device_index]:
-            raise NWException(f'{coll.subject_id}_{coll.coll_id}: Wrist device data is missing')
+        for c, i in enumerate(activity_device_index):
 
-        accel_x_sig = coll.devices[activity_device_index].get_signal_index('Accelerometer x')
-        accel_y_sig = coll.devices[activity_device_index].get_signal_index('Accelerometer y')
-        accel_z_sig = coll.devices[activity_device_index].get_signal_index('Accelerometer z')
+            # checks to see if data exists
+            if not coll.devices[i]:
+                message(f'{coll.subject_id}_{coll.coll_id}: Wrist device data is missing', level='warning',
+                        display=(not quiet), log=log, logger_name=self.log_name)
+                message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+                continue
 
-        message(f"Calculating {epoch_length}-second epoch activity...", level='info', display=(not quiet), log=log,
-                logger_name=self.log_name)
+            device_type = coll.device_info.loc[i]['device_type']
+            device_location = coll.device_info.loc[i]['device_location']
 
-        cutpoint_ages = pd.DataFrame(self.module_settings['activity']['cutpoints'])
+            accel_x_sig = coll.devices[i].get_signal_index('Accelerometer x')
+            accel_y_sig = coll.devices[i].get_signal_index('Accelerometer y')
+            accel_z_sig = coll.devices[i].get_signal_index('Accelerometer z')
 
-        subject_age = int(coll.subject_info['age'])
-        lowpass = int(self.module_settings['activity']['lowpass'])
+            message(f"Calculating {epoch_length}-second epoch activity for {device_type}_{device_location}...",
+                    level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        cutpoint = cutpoint_ages['type'].loc[(cutpoint_ages['min_age'] <= subject_age)
-                                             & (cutpoint_ages['max_age'] >= subject_age)].item()
+            cutpoint_ages = pd.DataFrame(self.module_settings['activity']['cutpoints'])
 
-        # get nonwear for activity_device
-        device_nonwear = coll.nonwear_bouts.loc[(coll.nonwear_bouts['study_code'] == coll.study_code) &
-                                                (coll.nonwear_bouts['subject_id'] == coll.subject_id) &
-                                                (coll.nonwear_bouts['coll_id'] == coll.coll_id) &
-                                                (coll.nonwear_bouts['device_type'] ==
-                                                 coll.device_info.iloc[activity_device_index]['device_type']) &
-                                                (coll.nonwear_bouts['device_location'] ==
-                                                 coll.device_info.iloc[activity_device_index]['device_location']) &
-                                                (coll.nonwear_bouts['event'] == 'nonwear')]
+            subject_age = int(coll.collection_info['age'])
+            lowpass = int(self.module_settings['activity']['lowpass'])
 
-        sptw = coll.sptw
-        sleep_bouts =  coll.sleep_bouts.loc[coll.sleep_bouts['bout_detect'] == 't8a4']
+            cutpoint = cutpoint_ages['type'].loc[(cutpoint_ages['min_age'] <= subject_age)
+                                                 & (cutpoint_ages['max_age'] >= subject_age)].item()
 
-        e, b, avm, vm, avm_sec = activity_wrist_avm(x=coll.devices[activity_device_index].signals[accel_x_sig],
-                                                    y=coll.devices[activity_device_index].signals[accel_y_sig],
-                                                    z=coll.devices[activity_device_index].signals[accel_z_sig],
-                                                    sample_rate=coll.devices[activity_device_index].signal_headers[accel_x_sig]['sample_rate'],
-                                                    start_datetime=coll.devices[activity_device_index].header['start_datetime'],
-                                                    lowpass=lowpass, epoch_length=epoch_length, cutpoint=cutpoint,
-                                                    dominant=dominant, sedentary_gait=sedentary_gait,
-                                                    gait=coll.gait_bouts, nonwear=device_nonwear, sptw=sptw,
-                                                    sleep_bouts=sleep_bouts, quiet=quiet)
+            # select dominant or non-dominant cutpoint
+            if pref_cutpoint == "dominant":
+                dominant = True
+            elif pref_cutpoint == "non-dominant":
+                dominant = False
+            else:
+                if dominant_hand in ['right', 'left']:
+                    dominant_wrist = dominant_hand[0] + 'wrist'
+                    dominant = device_location.upper() in self.device_locations[dominant_wrist]['aliases']
+                else:
+                    dominant = True
 
-        coll.activity_epochs = e
-        coll.activity_bouts = b
 
-        # prepare avm dataframe
-        coll.avm_sec = pd.DataFrame()
-        coll.avm_sec['avm_num'] = np.arange(1, len(avm_sec) + 1)
-        coll.avm_sec['avm'] = avm_sec
-        coll.avm_sec.insert(loc=0, column='device_location',
-                            value=coll.devices[activity_device_index].header['device_location'])
-        coll.avm_sec = self.identify_df(coll, coll.avm_sec)
+            # get nonwear for activity_device
+            device_nonwear = coll.nonwear_bouts.loc[(coll.nonwear_bouts['study_code'] == coll.study_code) &
+                                                    (coll.nonwear_bouts['subject_id'] == coll.subject_id) &
+                                                    (coll.nonwear_bouts['coll_id'] == coll.coll_id) &
+                                                    (coll.nonwear_bouts['device_type'] == device_type) &
+                                                    (coll.nonwear_bouts['device_location'] == device_location) &
+                                                    (coll.nonwear_bouts['event'] == 'nonwear')]
 
-        message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log,
-                logger_name=self.log_name)
-        coll.activity_daily = activity_stats(coll.activity_bouts, quiet=quiet)
+            sptw = coll.sptw
+            sleep_bouts =  coll.sleep_bouts.loc[coll.sleep_bouts['bout_detect'] == 't8a4']
 
-        coll.activity_epochs.insert(loc=1, column='device_location',
-                                    value=coll.devices[activity_device_index].header['device_location'])
-        coll.activity_epochs.insert(loc=2, column='dominant_hand', value=dominant)
-        coll.activity_epochs.insert(loc=3, column='cutpoint_type', value=cutpoint)
+            e, b, avm, vm, avm_sec = activity_wrist_avm(x=coll.devices[i].signals[accel_x_sig],
+                                                        y=coll.devices[i].signals[accel_y_sig],
+                                                        z=coll.devices[i].signals[accel_z_sig],
+                                                        sample_rate=coll.devices[i].signal_headers[accel_x_sig]['sample_rate'],
+                                                        start_datetime=coll.devices[i].header['start_datetime'],
+                                                        lowpass=lowpass, epoch_length=epoch_length, cutpoint=cutpoint,
+                                                        dominant=dominant, sedentary_gait=sedentary_gait,
+                                                        gait=coll.gait_bouts, nonwear=device_nonwear, sptw=sptw,
+                                                        sleep_bouts=sleep_bouts, quiet=quiet)
 
-        coll.activity_bouts.insert(loc=1, column='device_location',
-                                   value=coll.devices[activity_device_index].header['device_location'])
-        coll.activity_bouts.insert(loc=2, column='dominant_hand', value=dominant)
-        coll.activity_bouts.insert(loc=3, column='cutpoint_type', value=cutpoint)
+            activity_epochs = e
+            activity_bouts = b
 
-        coll.activity_epochs = self.identify_df(coll, coll.activity_epochs)
-        coll.activity_bouts = self.identify_df(coll, coll.activity_bouts)
+            # prepare avm dataframe
+            avm_second = pd.DataFrame()
+            avm_second['avm_num'] = np.arange(1, len(avm_sec) + 1)
+            avm_second['avm'] = avm_sec
+            avm_second.insert(loc=0, column='device_location', value=device_location)
+            avm_second = self.identify_df(coll, avm_second)
 
-        coll.activity_daily.insert(loc=2, column='device_location',
-                                   value=coll.devices[activity_device_index].header['device_location'])
-        coll.activity_daily.insert(loc=3, column='dominant_hand', value=dominant)
-        coll.activity_daily.insert(loc=4, column='cutpoint_type', value=cutpoint)
-        coll.activity_daily.insert(loc=5, column='type', value='daily')
+            message("Summarizing daily activity volumes...", level='info', display=(not quiet), log=log,
+                    logger_name=self.log_name)
+            activity_daily = activity_stats(activity_bouts, quiet=quiet)
 
-        coll.activity_daily = self.identify_df(coll, coll.activity_daily)
+            activity_epochs.insert(loc=1, column='device_location',value=device_location)
+            activity_epochs.insert(loc=2, column='cutpoint_type', value=cutpoint)
+            activity_epochs.insert(loc=3, column='cutpoint_dominant', value=dominant)
+
+            activity_bouts.insert(loc=1, column='device_location', value=device_location)
+            activity_bouts.insert(loc=2, column='cutpoint_type', value=cutpoint)
+            activity_bouts.insert(loc=3, column='cutpoint_dominant', value=dominant)
+
+            activity_epochs = self.identify_df(coll, activity_epochs)
+            activity_bouts = self.identify_df(coll, activity_bouts)
+
+            activity_daily.insert(loc=2, column='device_location', value=device_location)
+            activity_daily.insert(loc=3, column='cutpoint_type', value=cutpoint)
+            activity_daily.insert(loc=4, column='cutpoint_dominant', value=dominant)
+            activity_daily.insert(loc=5, column='type', value='daily')
+
+            activity_daily = self.identify_df(coll, activity_daily)
+
+            if c == 0:
+                coll.activity_epochs = activity_epochs
+                coll.activity_bouts = activity_bouts
+                coll.activity_daily = activity_daily
+                coll.avm_second = avm_second
+            else:
+                coll.activity_epochs = pd.concat([coll.activity_epochs, activity_epochs])
+                coll.activity_bouts = pd.concat([coll.activity_bouts, activity_bouts])
+                coll.activity_daily = pd.concat([coll.activity_daily, activity_daily])
+                coll.avm_second = pd.concat([coll.avm_second, avm_second])
+
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         # TODO: more detailed log info about what was done, epochs, days, intensities?
         # TODO: info about algortihm and settings, device used, dominant vs non-dominant, in log, methods, or data table
@@ -1719,76 +1895,77 @@ class Pipeline:
 
             message(f"Saving {avm_csv_path}", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
-            coll.avm_sec.to_csv(avm_csv_path, index=False)
+            coll.avm_second.to_csv(avm_csv_path, index=False)
 
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
-    def select_activity_device(self, coll):
+    def select_activity_device(self, coll, quiet=False, log=True):
 
-        # select which device to use for activity level
-
-        dominant = self.module_settings['activity']['dominant']
-        dominant_hand = coll.subject_info['dominant_hand'].lower()
-
+        # select devices to use for activity level
         device_info_copy = coll.device_info.copy()
+
+        # convert device location to upper case
         device_info_copy['device_location'] = [x.upper() for x in device_info_copy['device_location']]
 
         # select eligible device types and locations
         activity_device_types = ['GNOR', 'AXV6']
         activity_locations = self.device_locations['rwrist']['aliases'] + self.device_locations['lwrist']['aliases']
 
-        # get index of all eligible devices
+        # get index of all eligible devices based on type and location
         activity_device_index = device_info_copy.loc[(device_info_copy['device_type'].isin(activity_device_types)) &
                                                      (device_info_copy['device_location'].isin(activity_locations))].index.values.tolist()
 
-        # if multiple eligible devices we will try to choose one
-        if len(activity_device_index) > 1:
+        # select device from list based on wrist preference
+        # if (pref_wrist != 'all') & (len(activity_device_index) > 1):
+        #
+        #     # select dominant or non-dominant based on argument
+        #     if (pref_wrist == 'dominant') & (dominant_hand in ['right', 'left']):
+        #             pref_wrist = dominant_hand
+        #     elif (pref_wrist == 'non-dominant') & (dominant_hand in ['right', 'left']):
+        #             pref_wrist = {'left': "right", 'right': "left"}[dominant_hand]
+        #
+        #     # if no dominant hand info display warning and take first device
+        #     if pref_wrist in ['dominant', 'non-dominant']:
+        #         message(f"Preferred wrist is {pref_wrist} but no dominant hand info found - selecting first eligible device...",
+        #                 level='warning', display=(not quiet), log=log, logger_name=self.log_name)
+        #         activity_device_index = [activity_device_index[0]]
+        #
+        #     else:
+        #
+        #         wrist = pref_wrist[0] + 'wrist'
+        #
+        #         # select devices at locations based on dominance
+        #         activity_locations = self.device_locations[wrist]['aliases']
+        #         activity_device_index = device_info_copy.loc[
+        #             (device_info_copy['device_type'].isin(activity_device_types)) &
+        #             (device_info_copy['device_location'].isin(activity_locations))].index.values.tolist()
+        #
+        #         # if still multiple eligible devices, take first one
+        #         if len(activity_device_index) > 1:
+        #             activity_device_index = [activity_device_index[0]]
+        #
+        #         # if no eligible devices, go back and take first one from list of all eligible
+        #         elif len(activity_device_index) < 1:
+        #             activity_locations = self.device_locations['rwrist']['aliases'] + self.device_locations['lwrist']['aliases']
+        #             activity_device_index = device_info_copy.loc[
+        #                 (device_info_copy['device_type'].isin(activity_device_types)) &
+        #                 (device_info_copy['device_location'].isin(activity_locations))].index.values.tolist()
+        #             activity_device_index = [activity_device_index[0]]
 
-            # if dominant hand is info is available we will choose based on dominant argument
-            if dominant_hand in ['right', 'left']:
-
-                # select dominant or non-dominant based on argument
-                if dominant:
-                    wrist = 'rwrist' if dominant_hand == 'right' else 'lwrist'
-                else:
-                    wrist = 'lwrist' if dominant_hand == 'right' else 'rwrist'
-
-                # select devices at locations based on dominance
-                activity_locations = self.device_locations[wrist]['aliases']
-                activity_device_index = device_info_copy.loc[
-                    (device_info_copy['device_type'].isin(activity_device_types)) &
-                    (device_info_copy['device_location'].isin(activity_locations))].index.values.tolist()
-
-                # if still multiple eligible devices, take first one
-                if len(activity_device_index) > 1:
-                    activity_device_index = [activity_device_index[0]]
-
-                # if no eligible devices, go back and take first one from list of all eligible
-                elif len(activity_device_index) < 1:
-                    activity_locations = self.device_locations['rwrist']['aliases'] + self.device_locations['lwrist']['aliases']
-                    activity_device_index = device_info_copy.loc[
-                        (device_info_copy['device_type'].isin(activity_device_types)) &
-                        (device_info_copy['device_location'].isin(activity_locations))].index.values.tolist()
-                    activity_device_index = [activity_device_index[0]]
-
-            # if no dominant hand info take first from list
-            else:
-                activity_device_index = [activity_device_index[0]]
-
-        # if only one device determine, if it is dominant
-        elif len(activity_device_index) == 1:
-
-            # if dominant hand info is available we will determine dominance
-            if dominant_hand in ['right', 'left']:
-                dominant_wrist = dominant_hand[0] + 'wrist'
-                dominant = device_info_copy.loc[activity_device_index]['device_location'].item() in \
-                           self.device_locations[dominant_wrist]['aliases']
+        # # if only one device determine, if it is dominant
+        # elif len(activity_device_index) == 1:
+        #
+        #     # if dominant hand info is available we will determine dominance
+        #     if dominant_hand in ['right', 'left']:
+        #         dominant_wrist = dominant_hand[0] + 'wrist'
+        #         dominant = device_info_copy.loc[activity_device_index]['device_location'].item() in \
+        #                    self.device_locations[dominant_wrist]['aliases']
 
             # if no dominant hand info available, assume dominant argument is correct
 
-        return activity_device_index, dominant
+        return activity_device_index
 
     def select_gait_device(self, coll):
 
@@ -1820,7 +1997,7 @@ class Pipeline:
         # select which device to use for activity level
 
         dominant = self.module_settings['sleep']['dominant']
-        dominant_hand = coll.subject_info['dominant_hand'].lower()
+        dominant_hand = coll.collection_info['dominant_hand'].lower()
 
         device_info_copy = coll.device_info.copy()
         device_info_copy['device_location'] = [x.upper() for x in device_info_copy['device_location']]
@@ -1877,6 +2054,99 @@ class Pipeline:
 
         return sleep_device_index, dominant
 
+    def add_custom_events(self, file_path, quiet=False):
+        """Import properly formatted csv of events.
+
+        Parameters
+        ----------
+        file_path : str or Path
+            Path to properly formatted csv of new events.
+        quiet : bool, optional
+            Suppress displayed messages (default is False)
+
+        """
+
+        file_path = Path(file_path)
+
+        # read new events from csv
+        index_cols = ['study_code', 'subject_id', 'coll_id', 'event', 'id', ]
+        dtype_cols = {'study_code': str, 'subject_id': str, 'coll_id': str, 'event': str, 'id': pd.Int64Dtype(),
+                      'details': str,
+                      'notes': str, }
+        date_cols = ['start_time', 'end_time', ]
+
+        if not file_path.is_file():
+            print(f"{file_path} does not exist.")
+            return False
+
+        if not quiet:
+            print(f"Reading new events file: {file_path}\n")
+
+        new_events = pd.read_csv(file_path, index_col=index_cols, dtype=dtype_cols, parse_dates=date_cols)
+
+        # ensure new events have unique index
+        if not new_events.index.is_unique:
+            print("Events could not be added because some events could not be uniquely identified by study_code, "
+                  "subject_id, coll_id, event, id columns.\n")
+            return False
+
+        # ensure start_time is not blank
+        if any(new_events['start_time'].isnull()):
+            print("Events could not be added because start_time is required and some were blank.\n")
+            return False
+
+        # ensure study code of all events matches
+        if any(new_events.index.get_level_values('study_code') != self.study_code):
+            print("Events could not be added because some study codes did not match current study.\n")
+            return False
+
+        custom_events_dir = self.dirs['events_custom']
+
+        unique_new_collections = new_events.reset_index().set_index(['study_code', 'subject_id', 'coll_id']).index.unique()
+
+        # loop through unique collections in new events file
+        for collection in unique_new_collections:
+
+            # get events for this collection only
+            new_collection_events = new_events.loc[([collection[0]], [collection[1]], [collection[2]])]
+
+            # generate custom events csv path
+            events_csv_name = f"{collection[0]}_{collection[1]}_{collection[2]}_EVENTS_CUSTOM.csv"
+            events_csv_path = custom_events_dir / events_csv_name
+
+            if events_csv_path.is_file():       # custom events csv already exists
+
+                # read csv
+                if not quiet:
+                    print(f"Reading custom events file: {events_csv_path}")
+                events = pd.read_csv(events_csv_path, index_col=index_cols, dtype=dtype_cols, parse_dates=date_cols)
+
+                # determine new event types being added and remove any events of those type that already exist
+                # - this is done to avoid confusion within a type of event - best to remove all of a type and re-add them
+                new_event_types = new_collection_events.index.unique('event').values
+
+                if not quiet:
+                    print(f"Replacing or adding events of following types: {', '.join(new_event_types)}.")
+
+                events = events[~events.index.get_level_values('event').isin(new_event_types)]
+
+                # add new events
+                events = pd.concat([events, new_collection_events])
+
+            else:       # custom events csv doesn't exist
+
+                events = new_collection_events
+
+            # save custom events csv
+            if not quiet:
+                print(f"Saving {events_csv_path}\n")
+
+            events = events.sort_values(by='start_time')
+            events_csv_path.parent.mkdir(parents=True, exist_ok=True)
+            events.to_csv(events_csv_path)
+
+        return True
+
     def identify_df(self, coll, df):
         df.insert(loc=0, column='study_code', value=self.study_code)
         df.insert(loc=1, column='subject_id', value=coll.subject_id)
@@ -1885,7 +2155,7 @@ class Pipeline:
 
     def get_collections(self):
 
-        collections = [(row['subject_id'], row['coll_id']) for i, row in self.device_info.iterrows()]
+        collections = [(row['subject_id'], row['coll_id']) for i, row in self.collection_info.iterrows()]
 
         collections = list(set(collections))
         collections.sort()

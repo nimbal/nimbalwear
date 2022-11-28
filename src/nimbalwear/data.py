@@ -256,16 +256,14 @@ class Device:
     def crop(self, new_start_time=None, new_end_time=None, inplace=False):
         """Crops data from start or end of all signals.
 
-        Args:
-            new_start_time (datetime, optional): New start time of cropped data,
-                defaults to None indicating no cropping from start of data.
-            new_end_time (datetime, optional): New end time of cropped data,
-                defaults to None indicating no cropping from end of data.
-            inplace (boolean, optional): Indicates whether current object is modified or a cropped copy is returned,
-                defaults to False indicating that a cropped copy of the object is returned.
-
-        Returns:
-            True if successful, False otherwise.
+        Parameters
+        ----------
+        new_start_time : datetime, optional
+            New start time of cropped data, None indicates no cropping from start of data (default is None)
+        new_end_time : datetime, optional
+            New end time of cropped dat, None indicates no cropping from end of data (default is None)
+        inplace : bool, optional
+            Modify current object in place, if False returns a cropped copy of the object (default is None)
         """
 
         # check to see if data exists
@@ -402,7 +400,9 @@ class Device:
         return pre_error, post_error, iterations
 
     def sync(self, ref, sig_labels=('Accelerometer x', 'Accelerometer y', 'Accelerometer z'), sync_type='flip',
-             sync_at_config=True, search_radius=None, **kwargs):
+             sync_at_config=True, search_radius=None, signal_ds=1, rest_min=2, rest_max=15, rest_sens=0.12, flip_max=2,
+             min_flips=4, reject_above_ae=0.2, req_tgt_corr=0.8, plot_detect_ref=False, plot_quality_ref=False,
+             plot_detect_tgt=False):
 
         syncs = None
         segments = None
@@ -416,7 +416,11 @@ class Device:
             # Add warning if config time > start_time
 
             syncs, segments = sync_devices(self, ref, sig_labels=sig_labels, last_sync=last_sync,
-                                           search_radius=search_radius, **kwargs)
+                                           search_radius=search_radius, signal_ds=signal_ds, rest_min=rest_min,
+                                           rest_max=rest_max, rest_sens=rest_sens, flip_max=flip_max,
+                                           min_flips=min_flips, reject_above_ae=reject_above_ae,
+                                           req_tgt_corr=req_tgt_corr, plot_detect_ref=plot_detect_ref,
+                                           plot_quality_ref=plot_quality_ref, plot_detect_tgt=plot_detect_tgt)
 
         else:
 

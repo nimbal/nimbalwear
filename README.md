@@ -16,10 +16,10 @@ console:
 
 `pip install git+https://github.com/nimbal/nimbalwear`
 
-To install a specific release, insert `@v#.#.#` after the repository name replacing with the tag associated with that 
-release. For example:
+To install a specific release, insert `M.m` after the repository name to install from the branch associated with that 
+minor release. For example:
 
-`pip install git+https://github.com/nimbal/nimbalwear@v1.0.0`
+`pip install git+https://github.com/nimbal/nimbalwear@0.18`
 
 # Package Dependency
 
@@ -28,9 +28,26 @@ To include the latest release of nimbalwear as a dependency in your Python packa
 
 `install_requires=['nimbalwear@git+https://github.com/nimbal/nimbalwear@[version]']`
 
-To include a specific release, replace `[version]` with the tag associated with that release.
+To include a specific release, replace `[version]` with the branch associated with that minor release.
 
 # Changes by version
+
+v0.19.1
+- add minimum correlation option for sync
+- bug fix: references to settings.json instead of settings.toml on install
+
+v0.19.0
+- subjects.csv renamed to collections.csv and coll_id column added
+- settings.toml replaces settings.json
+- moved config_time check to only occur on first device in sync and display appropriately in log
+- activity analysis now done for all wrist devices available with options to select cutpoints
+- Pipeline.add_custom_events() provides ability to add or replace custom events from csv 
+- can specify separate non-wear detection parameters for ankle, wrist, and trunk devices
+
+v0.18.3
+- change search radius to minutes
+- fix bug in plot if sync is near end of sync radius
+- fix assignment bug if search radius is not set
 
 v0.18.2
 - fix bug where pipeline tries to autocalibrate data from file that wasn't found
