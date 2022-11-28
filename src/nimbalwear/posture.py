@@ -156,7 +156,6 @@ def _get_transitions(x, y, z, gait_mask, th=0.04):
     return (x_threshed | y_threshed | z_threshed) & \
            np.array([not gait for gait in gait_mask])
 
-
 def create_posture_df_template(data_df, gait_mask, tran_type='jerk', tran_thresh=0.04):
     """Classify static movement time points as transition based on a threshold. This posture dataframe is then used for
      input into the wrist/ankle/chest/thigh posture classifiers.
@@ -520,9 +519,9 @@ def summarize_posture_df(posture_df):
                 (row.timestamp + td(seconds=1) - prev_start).total_seconds())
     df.reset_index(drop=True, inplace=True)
     df.insert(1, 'duration', durations)
-    end_timestamps = [row.timestamp + td(seconds=row.duration)
+    end_timestamps = [row.timestamp + td(seconds=row.duration - 1)
                       for row in df.itertuples()]
-    df.rename(columns={'timestamp': 'start_timestamp'})
+    df.rename(columns={'timestamp': 'start_timestamp'}, inplace = True)
     df.insert(1, 'end_timestamp', end_timestamps)
     df.drop(['transition', 'gait'], axis=1, inplace=True)
 
