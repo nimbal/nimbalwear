@@ -471,6 +471,16 @@ def combine_posture_dfs(posture_df_dict, tran_combo=None, tran_gap_fill=5):
     # overwrite postures within transition as transition
     posture_df.loc[(posture_df['transition']), 'posture'] = "transition"
 
+    # Remove transitions that have the same posture bordering it on both sides
+    summary_df = summarize_posture_df(posture_df)
+    for index, row in summary_df.loc[summary_df['posture'] == 'transition'].iterrows():
+        if index == 0 or index == len(summary_df):
+            continue
+
+        if summary_df.iloc[index - 1]['posture'] == summary_df.iloc[index + 1]['posture']:
+            actual_posture = summary_df.iloc[index - 1]['posture']
+            posture_df.loc[(posture_df['timestamp'] >= row['start_timestamp']) & (posture_df['timestamp'] <= row['end_timestamp']), 'posture'] = actual_posture
+
     print("Completed.")
     return posture_df
 
