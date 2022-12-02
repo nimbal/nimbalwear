@@ -614,21 +614,7 @@ def detect_steps(data = None, loc=None, ra_data=None, la_data = None, data_type=
 
             return step_events_df, peak_heights
 
-        #define parameters
-        all_data = np.array(device.signals)
-        ## get signal labels
-        index_dict = {"gyro_x": device.get_signal_index('Gyroscope x'),
-                      "gyro_y": device.get_signal_index('Gyroscope y'),
-                      "gyro_z": device.get_signal_index('Gyroscope z'),
-                      "accel_x": device.get_signal_index('Accelerometer x'),
-                      "accel_y": device.get_signal_index('Accelerometer y'),
-                      "accel_z": device.get_signal_index('Accelerometer z')}
-        ##get signal frequnecies needed for step detection
-        gyro_freq = device.signal_headers[index_dict['gyro_x']]['sample_rate']
 
-        gyro_data = device.signals[index_dict['gyro_z']]
-
-        data_start_time = device.header["start_datetime"] #if start is None else start
         data_len = len(gyro_data)
         file_duration = data_len / gyro_freq
         end_time = data_start_time + timedelta(0, file_duration)
@@ -926,8 +912,20 @@ if __name__ == '__main__':
     else:
         ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_GNAC_RAnkle.edf')
 
-    acc = ankle.signals()
+    all_data = np.array(device.signals)
+    ## get signal labels
+    index_dict = {"gyro_x": device.get_signal_index('Gyroscope x'),
+                  "gyro_y": device.get_signal_index('Gyroscope y'),
+                  "gyro_z": device.get_signal_index('Gyroscope z'),
+                  "accel_x": device.get_signal_index('Accelerometer x'),
+                  "accel_y": device.get_signal_index('Accelerometer y'),
+                  "accel_z": device.get_signal_index('Accelerometer z')}
+    ##get signal frequnecies needed for step detection
+    gyro_freq = device.signal_headers[index_dict['gyro_x']]['sample_rate']
 
+    gyro_data = device.signals[index_dict['gyro_z']]
+
+    data_start_time = device.header["start_datetime"]  # if start is None else start
 
     #
     # #Input for detect steps is "Device" obj
