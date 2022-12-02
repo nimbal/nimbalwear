@@ -23,7 +23,7 @@ def detect_steps(data = None, loc=None, ra_data=None, la_data = None, data_type=
     ---
     steps_df -> dataframe with detected steps
     '''
-    freq =
+
 
     #define functions
 
@@ -911,13 +911,13 @@ if __name__ == '__main__':
     #setup subject and filepath
     ankle = nimbalwear.Device()
 
-    #AXV6
-    subj = "OND09_0011_01"
-    ankle_path = fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf'
-    if os.path.exists(ankle_path):
-         ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf')
-    else:
-         ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_RAnkle.edf')
+    # #AXV6
+    # subj = "OND09_0011_01"
+    # ankle_path = fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf'
+    # if os.path.exists(ankle_path):
+    #      ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf')
+    # else:
+    #      ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_RAnkle.edf')
     #GNAC
     subj = "OND06_1027_01"
     ankle_path = fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf'
@@ -926,14 +926,16 @@ if __name__ == '__main__':
     else:
         ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_GNAC_RAnkle.edf')
 
+    acc = ankle.signals()
 
-    #Input for detect steps is "Device" obj
-    steps_df = detect_steps(device = ankle, bilateral_wear = False, start=100000, end=200000)
-    steps_df.to_csv(r'W:\dev\gait\acc_steps_df.csv')
 
-    #def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None, left_device=None, duration_sec=15, bout_num_df=None, legacy_alg=False, left_kwargs={}, right_kwargs={}):
-    bouts_steps_df, bouts_df, bouts_stats = get_walking_bouts(left_steps_df=steps_df, left_device=ankle)
-    bouts_steps_df.to_csv(r'W:\dev\gait\acc_sample_bouts_steps_df.csv')
-    bouts_df.to_csv(r'W:\dev\gait\acc_sample_bouts_num_df.csv')
-    bouts_stats.to_csv(r'W:\dev\gait\acc_sample_bouts_stats.csv')
-    # TODO: Run walking bouts through spatiotemporal characteristics that are available for that person
+    #
+    # #Input for detect steps is "Device" obj
+    # steps_df = detect_steps(device = ankle, bilateral_wear = False, start=100000, end=200000)
+    # steps_df.to_csv(r'W:\dev\gait\acc_steps_df.csv')
+    #
+    # #def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None, left_device=None, duration_sec=15, bout_num_df=None, legacy_alg=False, left_kwargs={}, right_kwargs={}):
+    # bouts_steps_df, bouts_df, bouts_stats = get_walking_bouts(left_steps_df=steps_df, left_device=ankle)
+    # bouts_steps_df.to_csv(r'W:\dev\gait\acc_sample_bouts_steps_df.csv')
+    # bouts_df.to_csv(r'W:\dev\gait\acc_sample_bouts_num_df.csv')
+    # bouts_stats.to_csv(r'W:\dev\gait\acc_sample_bouts_stats.csv')
