@@ -309,24 +309,11 @@ def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', data=Non
                 detects['pushoff_mean'].append(i - 1)
                 continue
 
-            # midswing peak detection -> mid_swing_peak_detect(data=None, pushoff_ind=None, swing_phase_time=None):
             mid_swing_i = mid_swing_peak_detect(data, i, swing_phase_time, freq)
             if mid_swing_i is None:
                 detects['mid_swing_peak'].append(i - 1)
                 continue
 
-            # # swing down, state = 2
-            # sdown_cc, sup_cc = self.swing_detect(i, mid_swing_i)
-            # if not max(sdown_cc) > self.swing_threshold:
-            #     detects['swing_down'].append(i - 1)
-            #     continue
-            #
-            # # swing up, state = 3
-            # if not max(sup_cc) > self.swing_threshold:
-            #     detects['swing_up'].append(i - 1)
-            #     continue
-
-            # heel-strike, state = 4 -> def heel_strike_detect(data=None, heel_strike_detect_time=None, window_ind=None, freq=None):
             accel_derivatives = heel_strike_detect(data, heel_strike_detect_time, mid_swing_i, freq)
             accel_threshold_list = np.where(
                 accel_derivatives < heel_strike_threshold)[0]
@@ -382,10 +369,8 @@ def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', data=Non
             B.R. Greene, et al., ”Adaptive estimation of temporal gait parameters using body-worn gyroscopes,”
             Proc. IEEE Eng. Med. Bio. Soc. (EMBC 2011), pp. 1296-1299, 2010 and outlined in Fraccaro, P., Coyle, L., Doyle, J., & O'Sullivan, D. (2014)
             '''
-            # calculate derivative of signal
             data_2d = np.diff(data)/ (1 / freq)
 
-            # adaptive threshold from 10 max peaks in signal derivative
             thresh = np.mean(data[np.argpartition(data_2d, 10)[:10]])*0.2
             if thresh > 40:
                 pass
@@ -442,42 +427,30 @@ def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', data=Non
                 end_time = np.max(temp['Peak_times'])
                 start_ind = np.min(temp['Step_index'])
                 end_ind = np.max(temp['Step_index'])
-                # cadence = step_count/((end_ind-start_ind)*(1/fs)/60)
                 data = pd.DataFrame([[count + 1,  step_count, start_time, end_time, start_ind, end_ind]], columns=bout_df.columns)    # , "Cadence":cadence}
                 bout_df = pd.concat([bout_df, data], ignore_index=True)
 
             return bout_df
 
         def find_steps_bouts_gyro(data, freq,  timestamps, break_sec, steps_length, start, end):
-            # crop data
             data = data[start:end]
-            # low pass filter at 3 hz
-            # 1: LP filter data at 3 Hz
+
             lf_data = bw_filter(data, freq, 3, 5)
 
-            # 2: Calculate adaptive threshold
             th1 = find_adaptive_thresh(lf_data, freq)
 
-            # 3: Group MS peaks to identify gait events
-            # how far should peaks be apart?
-
-            # identify peaks above calculated threshold
             idx_peaks, peak_hghts = find_peaks(x=data, height=th1, distance=40)  # at 50 samples/sec; 5 samples = 100 ms/0.1s; 10 samples = 200 ms/0.2s
             peak_heights = peak_hghts.get('peak_heights')
 
-            # create start of idx_peaks
-            # determine indices between peaks
-            peaks_diff = np.diff(idx_peaks)  # difference between index of peaks - so number datapoints between peaks
+            peaks_diff = np.diff(idx_peaks)
 
-            #bout counting
-            ge_break_ind = break_sec * freq  # threshold for indices between peaks that causes a new bout
-            bool_diff = peaks_diff > ge_break_ind  # creates boolean array of where differences are greater than break and indicated which gaps will be different bouts
-            ind_ge_diff = [i for i, x in enumerate(bool_diff) if x]  # return indices array True in boolean
+
+            ge_break_ind = break_sec * freq
+            bool_diff = peaks_diff > ge_break_ind
+            ind_ge_diff = [i for i, x in enumerate(bool_diff) if x]
             bouts = np.zeros(len(idx_peaks))
 
-            # for loop that counts the iterations of ind_ge_diff and counts
             for count, x in enumerate(ind_ge_diff):
-                # print(f'Count: {count}, Index_ge_diff:{idx_peaks[count]}, Value:{x}')
                 if count < len(ind_ge_diff) - 1:
                     if x == 0:
                         bouts[count] = 1
@@ -497,7 +470,7 @@ def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', data=Non
             step_count = range(1, len(idx_peaks) + 1)
             step_events_df = pd.DataFrame({'Step': step_count, 'Step_index': idx_peaks, 'Bout_number': bouts})
 
-            #get step timestamps
+            #timestamps
             step_events_df['Step_timestamp'] = timestamps[step_events_df['Step_index']]
             gait_bouts_df = remove_single_step_bouts(step_events_df, steps_length)
             gait_bouts_df = adjust_bout_number(gait_bouts_df)
@@ -518,7 +491,7 @@ def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', data=Non
 
         _, _, bout_steps = find_steps_bouts_gyro(data, freq, timestamps, break_sec, steps_length, start_dp, end_dp)
 
-        return bout_steps # steps_df, bouts_df
+        return bout_steps
 
     #run steps_detect here
     if data_type == 'accelerometer':
@@ -606,7 +579,6 @@ def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', data=Non
 
     return steps_df
 
-# Walkingbouts declassed
 def get_walking_bouts(steps_df=None, initiate_time=15, mrp=10, freq=None, stat_type='daily', single_leg=False):
     """
 
@@ -694,19 +666,17 @@ def get_walking_bouts(steps_df=None, initiate_time=15, mrp=10, freq=None, stat_t
 
         return gait_stats
 
-    #one df
     bouts = identify_bouts_one(steps_df, initiate_time, mrp, freq)
     bout_stats = gait_stats(bouts, stat_type, single_leg)
 
-    return bouts, bout_stats#bout_steps_df, bout_num_df, bouts_stats
+    return bouts, bout_stats
 
 
 ########################################################################################################################
 if __name__ == '__main__':
-    #setup subject and filepath
     ankle = nimbalwear.Device()
 
-    #GNAC
+    #GNAC testing
     subj = "OND06_1027_01"
     ankle_path = fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf'
     if os.path.exists(ankle_path):
@@ -731,7 +701,7 @@ if __name__ == '__main__':
     steps_df = detect_steps(ra_data=None, la_data=vertical_acc, data_type='accelerometer', left_right='left', loc='ankle', data=None, start_time=data_start_time, start=100000, end=200000, freq=fs)
 
 ###############################################################################
-   #  #AXV6
+   #  #AXV6 testing
    #  subj = "OND09_0011_01"
    #  ankle_path = fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf'
    #  if os.path.exists(ankle_path):
@@ -756,5 +726,8 @@ if __name__ == '__main__':
    #  data_start_time = ankle.header["start_datetime"]  # if start is None else start
 
     # steps_df = detect_steps(ra_data=sag_gyro, la_data=sag_gyro, data_type='gyroscope', left_right='bilateral', loc='ankle', data=None, start_time=data_start_time, start=0, end=-1, freq=fs)
-
+    #
+    #---
+    #
+    # get walking bouts should run on any detect_steps output (steps_df
     bouts, bout_stats = get_walking_bouts(steps_df=steps_df, initiate_time=15, mrp=10, freq=fs, stat_type='daily', single_leg=False)
