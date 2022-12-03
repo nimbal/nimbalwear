@@ -269,9 +269,6 @@ def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', data=Non
             pushoff_df = pd.read_csv(os.path.join(dir_path, 'src', 'nimbalwear', 'data', 'pushoff_OND07_left.csv'))
         elif pushoff_df == False:
             print('No pushoff_df available, to fix define pushoff_df')
-            #pushoff_df = get_pushoff_stats(data, start_end_times=[(start_dp, end_dp)], axis=axis)
-
-        swing_peaks = []
 
         if {'swing_down_mean', 'swing_down_std', 'swing_up_mean', 'swing_up_std', 'heel_strike_mean',
             'heel_strike_std'}.issubset(pushoff_df.columns):
@@ -675,7 +672,7 @@ def get_walking_bouts(steps_df=None, initiate_time=15, mrp=10, freq=None, stat_t
         # if only steps from one leg then double step counts
         bouts['step_count'] = bouts['step_count'] * 2 if single_leg else bouts['step_count']
 
-        if stat_type == 'daily':
+        if stat_type == 'daily': #hour #week #waking hours #sleep hours
 
             gait_stats = pd.DataFrame(columns=['day_num', 'date', 'type', 'longest_bout_time', 'longest_bout_steps',
                                                'bouts_over_3min', 'total_steps'])
@@ -683,7 +680,7 @@ def get_walking_bouts(steps_df=None, initiate_time=15, mrp=10, freq=None, stat_t
             day_num = 1
 
             for date, group_df in bouts.groupby('date'):
-                day_gait_stats = pd.DataFrame([[day_num, date, type, group_df['duration'].max(),
+                day_gait_stats = pd.DataFrame([[day_num, date, stat_type, group_df['duration'].max(),
                                                 round(group_df['step_count'].max()),
                                                 group_df.loc[group_df['duration'] > 180].shape[0],
                                                 round(group_df['step_count'].sum())]], columns=gait_stats.columns)
@@ -709,62 +706,55 @@ if __name__ == '__main__':
     #setup subject and filepath
     ankle = nimbalwear.Device()
 
-    # #GNAC
-    # subj = "OND06_1027_01"
-    # ankle_path = fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf'
-    # if os.path.exists(ankle_path):
-    #     ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf')
-    # else:
-    #     ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_GNAC_RAnkle.edf')
-    #
-    # ## get signal labels
-    # index_dict = {"accel_x": ankle.get_signal_index('Accelerometer x'),
-    #               "accel_y": ankle.get_signal_index('Accelerometer y'),
-    #               "accel_z": ankle.get_signal_index('Accelerometer z')}
-    # ##get signal frequencies needed for step detection
-    # fs = ankle.signal_headers[index_dict['accel_x']]['sample_rate']
-    #
-    # acc_data = np.array(ankle.signals[0:3])
-    # vertical_acc = np.array(ankle.signals[index_dict['accel_y']])
-    #
-    # data_start_time = ankle.header["start_datetime"]  # if start is None else start
-    #
-    # # #Input for detect steps is "Device" obj
-    # #def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', loc=None, data=None, start=0, end=-1, freq=None, orient_signal=True, low_pass=True):
-    # steps_df = detect_steps(ra_data=None, la_data=vertical_acc, data_type='accelerometer', loc='left', data=None, start_time=data_start_time, start=100000, end=200000, freq=fs)
-
-###############################################################################
-    #AXV6
-    subj = "OND09_0011_01"
-    ankle_path = fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf'
+    #GNAC
+    subj = "OND06_1027_01"
+    ankle_path = fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf'
     if os.path.exists(ankle_path):
-         ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf')
+        ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf')
     else:
-         ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_RAnkle.edf')
+        ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_GNAC_RAnkle.edf')
 
-   # get signal labels
+    ## get signal labels
     index_dict = {"accel_x": ankle.get_signal_index('Accelerometer x'),
                   "accel_y": ankle.get_signal_index('Accelerometer y'),
-                  "accel_z": ankle.get_signal_index('Accelerometer z'),
-                  "gyro_x": ankle.get_signal_index('Gyroscope x'),
-                  "gyro_y": ankle.get_signal_index('Gyroscope y'),
-                  "gyro_z": ankle.get_signal_index('Gyroscope z')}
+                  "accel_z": ankle.get_signal_index('Accelerometer z')}
     ##get signal frequencies needed for step detection
-    fs = ankle.signal_headers[index_dict['gyro_z']]['sample_rate']
+    fs = ankle.signal_headers[index_dict['accel_x']]['sample_rate']
 
-    gyro_data = np.array([ankle.signals[index_dict['gyro_x']], ankle.signals[index_dict['gyro_y']], ankle.signals[index_dict['gyro_z']]])
-    acc_data = np.array([ankle.signals[index_dict['accel_x']], ankle.signals[index_dict['accel_y']], ankle.signals[index_dict['accel_z']]])
-    sag_gyro = np.array(ankle.signals[index_dict['gyro_z']])
+    acc_data = np.array(ankle.signals[0:3])
+    vertical_acc = np.array(ankle.signals[index_dict['accel_y']])
 
     data_start_time = ankle.header["start_datetime"]  # if start is None else start
 
     # #Input for detect steps is "Device" obj
     #def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', loc=None, data=None, start=0, end=-1, freq=None, orient_signal=True, low_pass=True):
-    steps_df = detect_steps(ra_data=sag_gyro, la_data=sag_gyro, data_type='gyroscope', left_right='bilateral', loc='ankle', data=None, start_time=data_start_time, start=0, end=-1, freq=fs)
+    steps_df = detect_steps(ra_data=None, la_data=vertical_acc, data_type='accelerometer', left_right='left', loc='ankle', data=None, start_time=data_start_time, start=100000, end=200000, freq=fs)
 
-    #def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None, left_device=None, duration_sec=15, bout_num_df=None, legacy_alg=False, left_kwargs={}, right_kwargs={}):
+###############################################################################
+   #  #AXV6
+   #  subj = "OND09_0011_01"
+   #  ankle_path = fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf'
+   #  if os.path.exists(ankle_path):
+   #       ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf')
+   #  else:
+   #       ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_RAnkle.edf')
+   #
+   # # get signal labels
+   #  index_dict = {"accel_x": ankle.get_signal_index('Accelerometer x'),
+   #                "accel_y": ankle.get_signal_index('Accelerometer y'),
+   #                "accel_z": ankle.get_signal_index('Accelerometer z'),
+   #                "gyro_x": ankle.get_signal_index('Gyroscope x'),
+   #                "gyro_y": ankle.get_signal_index('Gyroscope y'),
+   #                "gyro_z": ankle.get_signal_index('Gyroscope z')}
+   #  ##get signal frequencies needed for step detection
+   #  fs = ankle.signal_headers[index_dict['gyro_z']]['sample_rate']
+   #
+   #  gyro_data = np.array([ankle.signals[index_dict['gyro_x']], ankle.signals[index_dict['gyro_y']], ankle.signals[index_dict['gyro_z']]])
+   #  acc_data = np.array([ankle.signals[index_dict['accel_x']], ankle.signals[index_dict['accel_y']], ankle.signals[index_dict['accel_z']]])
+   #  sag_gyro = np.array(ankle.signals[index_dict['gyro_z']])
+   #
+   #  data_start_time = ankle.header["start_datetime"]  # if start is None else start
+
+    # steps_df = detect_steps(ra_data=sag_gyro, la_data=sag_gyro, data_type='gyroscope', left_right='bilateral', loc='ankle', data=None, start_time=data_start_time, start=0, end=-1, freq=fs)
+
     bouts, bout_stats = get_walking_bouts(steps_df=steps_df, initiate_time=15, mrp=10, freq=fs, stat_type='daily', single_leg=False)
-
-    # bouts_steps_df.to_csv(r'W:\dev\gait\acc_sample_bouts_steps_df.csv')
-    # bouts_df.to_csv(r'W:\dev\gait\acc_sample_bouts_num_df.csv')
-    # bouts_stats.to_csv(r'W:\dev\gait\acc_sample_bouts_stats.csv')
