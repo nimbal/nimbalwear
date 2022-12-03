@@ -763,7 +763,7 @@ if __name__ == '__main__':
     steps_df = detect_steps(ra_data=sag_gyro, la_data=sag_gyro, data_type='gyroscope', left_right='bilateral', loc='ankle', data=None, start_time=data_start_time, start=0, end=-1, freq=fs)
 
     #def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None, left_device=None, duration_sec=15, bout_num_df=None, legacy_alg=False, left_kwargs={}, right_kwargs={}):
-    bouts, bout_stats = get_walking_bouts(steps_df=steps_df, duration_sec=15, bout_num_df=None, legacy_alg=None, freq=fs)
+    bouts, bout_stats = get_walking_bouts(steps_df=steps_df, initiate_time=15, mrp=10, freq=fs, stat_type='daily', single_leg=False)
 
     # bouts_steps_df.to_csv(r'W:\dev\gait\acc_sample_bouts_steps_df.csv')
     # bouts_df.to_csv(r'W:\dev\gait\acc_sample_bouts_num_df.csv')
