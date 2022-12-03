@@ -8,15 +8,16 @@ import pandas as pd
 from scipy.signal import butter, filtfilt, sosfilt, find_peaks, peak_widths, welch
 import nimbalwear
 
-def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', loc='bilateral', data = None, start=0, end=-1, start_time=None, freq=None, orient_signal=True, low_pass=True):
+def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', data=None, left_right=None, loc='ankle', start=0, end=-1, start_time=None, freq=None, orient_signal=True, low_pass=True):
     '''
     Parameters
     ---
-    ra_data -> right ankle data; default None
-    la_data -> left ankle data; default None
+    ra_data -> right side data; default None
+    la_data -> left side data; default None
     data_type -> specify data to use to detect steps (what data type is in ra_data/la_data/data?); default accelerometer
     data -> data is for data input that is not ra_data or la_data; if this is defined then 'loc' needs to be defined
-    loc -> define wear location; if ankle than data can be put in ra_data/la_data or data and list the wear location here
+    left_right -> define wear side; 'left' , 'right', 'bilateral' or None (if trunk is true)
+    loc -> define wear location; 'ankle', 'thigh','trunk'
     start -> where do you want to start your step detection; this can be a index value or datetime; default 0
     start_datetime -> if start is a datetime then this needs to be defined
     end -> where do you want step detection to end; this can be a index value or datetime; default 0
@@ -362,8 +363,7 @@ def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', loc='bil
 
         return steps_df
 
-    def fraccaro_gyro_steps(freq, timestamps, data = None, loc=None, start_dp=start, end_dp=start,
-                          steps_length=2, min_swing_t=0.250, max_swing_t=0.800,  break_sec=2, bout_steps=3):
+    def fraccaro_gyro_steps(freq, timestamps, data = None, loc=None, start_dp=start, end_dp=end, steps_length=2, break_sec=2, bout_steps=3):
         '''
         Detects the steps within the gyroscope data. Based on this paper:
         Fraccaro, P., Coyle, L., Doyle, J., & O'Sullivan, D. (2014). Real-world gyroscope-based gait event detection and gait feature extraction.
@@ -519,32 +519,35 @@ def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', loc='bil
 
             return step_events_df, gait_bouts_df, bout_steps  #peak_heights
 
-        _, _, bout_steps = find_steps_bouts_gyro(data, freq, timestamps, break_sec, bout_steps, start, end)
+        _, _, bout_steps = find_steps_bouts_gyro(data, freq, timestamps, break_sec, steps_length, start_dp, end_dp)
 
         return bout_steps # steps_df, bouts_df
 
     #run steps_detect here
     if data_type == 'accelerometer':
-        #run accelerometer step
+        #ankle
+        if (left_right == 'right') | (left_right=='bilateral') & (loc == 'ankle'):
+                print('Finding steps: Right ankle, acceleration, state space controller.')
 
-        if ra_data is not None:
-            print('Finding steps: Right ankle, acceleration, state space controller.')
-            ra_data = ra_data if len(ra_data.shape)<2 else detect_vert(ra_data)
+                ra_data = ra_data if ra_data is not None else data
+                ra_data = ra_data if len(ra_data.shape)<2 else detect_vert(ra_data)
 
-            if orient_signal:
-                ra_data = flip_signal(ra_data, freq)
+                if orient_signal:
+                    ra_data = flip_signal(ra_data, freq)
 
-            if low_pass:
-                ra_data, _ = lowpass_filter(ra_data, freq)
+                if low_pass:
+                    ra_data, _ = lowpass_filter(ra_data, freq)
 
-            file_duration = len(ra_data) / freq
-            end_time = start_time + timedelta(0, file_duration)
-            timestamps = np.asarray(pd.date_range(start=start_time, end=end_time, periods=len(ra_data)))
+                file_duration = len(ra_data) / freq
+                end_time = start_time + timedelta(0, file_duration)
+                timestamps = np.asarray(pd.date_range(start=start_time, end=end_time, periods=len(ra_data)))
 
-            right_steps_df = state_space_steps(freq, timestamps, data=ra_data, loc='right', start_dp=start, end_dp=end, pushoff_df=True)
+                right_steps_df = state_space_steps(freq, timestamps, data=ra_data, loc='right', start_dp=start, end_dp=end, pushoff_df=True)
 
-        if la_data is not None:
+        if (left_right == 'left') | (left_right=='bilateral') & (loc == 'ankle'):
             print('Finding steps: Left ankle, acceleration, state space controller.')
+
+            la_data = la_data if la_data is not None else data
             la_data = la_data if len(la_data.shape) < 2 else detect_vert(la_data)
 
             if orient_signal:
@@ -560,19 +563,24 @@ def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', loc='bil
             left_steps_df = state_space_steps(freq, timestamps, data=la_data, loc='left', start_dp=start, end_dp=end,
                                               pushoff_df=True)
 
+        if loc == 'trunk':
+            print('Trunk step detection unavailable.')
+
     elif data_type == 'gyroscope':
-        if ra_data is not None:
+        if (left_right == 'right') | (left_right== 'bilateral') & (loc == 'ankle'):
             print('Finding steps: Right ankle, gyroscope, Fraccaro algorithm.')
+
+            ra_data = ra_data if ra_data is not None else data
             file_duration = len(ra_data) / freq
             end_time = data_start_time + timedelta(0, file_duration)
 
             timestamps = np.asarray(pd.date_range(start=start_time, end=end_time, periods=len(ra_data)))
 
-            right_steps_df = fraccaro_gyro_steps(freq, timestamps, data=la_data, loc='right', start_dp=start, end_dp=end)
+            right_steps_df = fraccaro_gyro_steps(freq, timestamps, data=ra_data, loc='right', start_dp=start, end_dp=end)
 
-        if la_data is not None:
+        if (left_right == 'left') | (left_right== 'bilateral') & (loc == 'ankle'):
             print('Finding steps: Left ankle, gyroscope, Fraccaro algorithm.')
-
+            la_data = la_data if la_data is not None else data
             file_duration = len(la_data) / freq
             end_time = data_start_time + timedelta(0, file_duration)
 
@@ -580,16 +588,24 @@ def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', loc='bil
 
             left_steps_df= fraccaro_gyro_steps(freq, timestamps, data=la_data, loc='left', start_dp=start, end_dp=end)
 
+        if (left_right == 'right') | (left_right == 'bilateral') & (loc == 'thigh'):
+            print('Thigh step detetion unavailable')
+
+        if (left_right == 'left') | (left_right == 'bilateral') & (loc == 'thigh'):
+            print('Thigh step detetion unavailable')
+    else:
+        print('No data type defined')
+
     #create steps_df
-    if loc == 'bilateral':
+    if left_right == 'bilateral':
         steps_df = pd.concat([right_steps_df, left_steps_df]).sort_values(by=['step_timestamp'])
         steps_df['step_number'] = np.arange(1,steps_df.shape[0]+1)
-    elif loc == 'right':
+    elif left_right == 'right':
         steps_df = right_steps_df
-    elif loc == 'left':
+    elif left_right == 'left':
         steps_df = left_steps_df
     else:
-        print('No wear location specified. Specify loc as "right", "left", "bilateral"')
+        print('No wear location specified. Specify loc as "right", "left", "bilateral". If loc is"trunk" or "thigh" analysis unavailable.')
 
     return steps_df
 
@@ -687,96 +703,6 @@ def get_walking_bouts(steps_df=None, initiate_time=15, mrp=10, freq=None, stat_t
 
     return bouts, bout_stats#bout_steps_df, bout_num_df, bouts_stats
 
-def gyro_gait_events(data, gait_bouts_df, freq, min_swing_t, max_swing_t):
-    '''
-    Iterate through gait bouts to find the footfall data
-    '''
-    # create index values for min and maximum swing time
-    min_swing_idx = freq * min_swing_t
-    max_swing_idx = freq * max_swing_t
-
-    peaks = []
-    gyro_mean = []
-    thresholds = []
-    mnf = []
-    mdf = []
-
-    initial_contacts = []
-    terminal_contacts = []
-
-    for row in gait_bouts_df.itertuples():
-        gyro_z_mean = np.mean(data[int(row[5]):int(row[6])])
-        gyro_mean.append(gyro_z_mean)
-        th2 = 0.8 * (1 / (sum(data[int(row[5]):int(row[6])] > gyro_z_mean)))
-        if th2 > 40:
-            pass
-        else:
-            th2 = 40
-        thresholds.append(th2)
-
-        peak_idx, _ = find_peaks(x=np.concatenate((np.zeros(1), data[int(row[5]):int(row[6])], np.zeros(1))),
-                                 height=th2, distance=freq * 0.5)
-        # correct peak_idx
-        peak_idx = peak_idx - 1 + int(row[5])
-        peaks.append(peak_idx)
-
-        ics = []
-        tcs = []
-
-        for i in range(len(peak_idx)):
-            window_len = math.floor(0.4 * freq)
-
-            # adaptation to the Fraccaro, P., Coyle, L., Doyle, J., & O'Sullivan, D. (2014) description of this algorithm
-            # final contacts (toe-down or flat foot) doesn't always pick off the middle peak, specifically with spikes at initail contact
-            # fc, _ = sp.find_peaks(data[int(row[5]):int(row[6])][peak_idx[i]:peak_idx[i+1]], distance=len(data[int(row[5]):int(row[6])])*0.5)
-            # print(fc)
-            # as per modification above - window_len is described here as half the distance between the two peaks
-
-            tc = np.argmin(data[int(peak_idx[i] - window_len):peak_idx[i]]) + peak_idx[i] - window_len
-            ic = np.argmin(data[peak_idx[i]:int(peak_idx[i] + window_len)]) + peak_idx[i]
-
-            if max_swing_idx < ic - tc < min_swing_idx:
-                continue
-            else:
-                ics.insert(i, ic)
-                tcs.insert(i, tc)
-
-            # plt.plot(data[peak_idx[0]-100:peak_idx[-1]+100])
-            # plt.scatter(x=np.array(tcs)-row[5]+100, y=data[tcs], marker='o', color='green')
-            # plt.scatter(x=peak_idx-row[5]+100, y=data[peak_idx], marker='x', color='orange')
-            # plt.scatter(x=np.array(ics)-row[5]+100, y=data[ics], marker='o', color='red')
-
-        # initial_contacts[int(row[0])].insert(0,ics)
-        # terminal_contacts[int(row[0])].insert(0,tcs)
-        initial_contacts.insert(int(row[0]), ics)
-        terminal_contacts.insert(int(row[0]), tcs)
-
-        # frequency of bouts
-        freqs, psd = welch(data[int(row[5]):int(row[6])], fs=freq)
-        # plt.figure(figsize=(5, 4))
-        # plt.plot(freqs, psd)
-        # plt.title('PSD: power spectral density')
-        # plt.xlabel('Frequency')
-        # plt.ylabel('Power')
-        # plt.tight_layout()
-
-        temp_mnf = sum(freqs * psd) / sum(psd)
-        temp_mdf = freqs[np.argmin(np.abs(np.cumsum(psd) - (0.5 * sum(psd))))]
-        mnf.append(temp_mnf)
-        mdf.append(temp_mdf)
-
-    gait_bouts_df['Gryo_z_mean'] = gyro_mean
-    gait_bouts_df['Threshold'] = thresholds
-    gait_bouts_df['MS_peaks'] = peaks
-    gait_bouts_df['Initial_contacts'] = initial_contacts
-    gait_bouts_df['Terminal_contacts'] = terminal_contacts
-    gait_bouts_df['Mean power freq'] = mnf
-    gait_bouts_df['Median power freq'] = mdf
-
-    # need to correct start idx and end idx (plus timestamps)
-
-    return gait_bouts_df
-
 
 ########################################################################################################################
 if __name__ == '__main__':
@@ -834,7 +760,7 @@ if __name__ == '__main__':
 
     # #Input for detect steps is "Device" obj
     #def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', loc=None, data=None, start=0, end=-1, freq=None, orient_signal=True, low_pass=True):
-    steps_df = detect_steps(ra_data=sag_gyro, la_data=sag_gyro, data_type='gyroscope', loc='bilateral', data=None, start_time=data_start_time, start=0, end=-1, freq=fs)
+    steps_df = detect_steps(ra_data=sag_gyro, la_data=sag_gyro, data_type='gyroscope', left_right='bilateral', loc='ankle', data=None, start_time=data_start_time, start=0, end=-1, freq=fs)
 
     #def get_walking_bouts(left_steps_df=None, right_steps_df=None, right_device=None, left_device=None, duration_sec=15, bout_num_df=None, legacy_alg=False, left_kwargs={}, right_kwargs={}):
     bouts, bout_stats = get_walking_bouts(steps_df=steps_df, duration_sec=15, bout_num_df=None, legacy_alg=None, freq=fs)
