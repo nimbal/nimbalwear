@@ -581,7 +581,19 @@ def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', data=Non
 
 def get_walking_bouts(steps_df=None, initiate_time=15, mrp=10, freq=None, stat_type='daily', single_leg=False):
     """
-
+ Parameters
+    ---
+    steps_df -> detect_steps output
+    initiate_time -> amount of time (in seconds) steps need to be detected before bout is initiated
+    mrp -> maximum resting period; amount of time (in seconds) with no steps before bout is terminated
+    freq -> sampleing frequency
+    stat_type -> input for bout_stats; how do you want the bouts group? 'daily' is the only operating type at the moment
+    single leg -> does steps_df have one or two legs? should we double the step count to get total steps? True or False
+    ---
+    Returns
+    ---
+    bouts -> dataframe with detected steps organized into bouts
+    bout_stats -> summary of bout distribution for stats
     """
 
     def identify_bouts_one(steps_df, initiate_time, mrp, freq):
