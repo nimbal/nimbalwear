@@ -32,6 +32,9 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v0.19.2
+- bug fix: properly calculates sample indices to be removed - no longer attempts to remove sample beyond end of window
+
 v0.19.1
 - add minimum correlation option for sync
 - bug fix: references to settings.json instead of settings.toml on install
