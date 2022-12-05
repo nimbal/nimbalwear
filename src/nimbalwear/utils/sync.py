@@ -127,7 +127,7 @@ def sync_devices(tgt_device, ref_device, sig_labels=('Accelerometer x', 'Acceler
 
                     obj_del.extend(range(round(abs(seg_start_idx) / seg_adjust_rate)))
                     obj_del.extend(
-                        [round(seg_adjust_rate * (j + 1)) - 1 for j in range(round(seg_end_idx / seg_adjust_rate))])
+                        [round(seg_adjust_rate * (j + 1)) - 1 for j in range(int(seg_end_idx / seg_adjust_rate))])
 
                 else:
 
