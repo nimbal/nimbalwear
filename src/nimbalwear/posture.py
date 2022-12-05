@@ -139,9 +139,9 @@ def _get_transitions(x, y, z, gait_mask, th=0.04):
     z_jerk = np.diff(z, prepend=z[0])
 
     # apply threshold th to the jerks
-    x_threshed = np.array([True if x > th else False for x in abs(x_jerk)])
-    y_threshed = np.array([True if y > th else False for y in abs(y_jerk)])
-    z_threshed = np.array([True if z > th else False for z in abs(z_jerk)])
+    x_threshed = np.abs(x_jerk) > th
+    y_threshed = np.abs(y_jerk) > th
+    z_threshed = np.abs(z_jerk) > th
 
     # don't include a point as transition if there is gait activity
     return (x_threshed | y_threshed | z_threshed) & \
