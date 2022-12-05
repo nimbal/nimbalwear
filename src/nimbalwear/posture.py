@@ -72,9 +72,9 @@ def _filter_acc_data(x, y, z):
     """Filter accelerometer data to obtain gravity and body movement components
 
     Args:
-        x: time array of the x-axis acceleration values
-        y: time array of the y-axis acceleration values
-        z: time array of the z-axis acceleration values
+        x: time array of the single-axis acceleration values
+        y: time array of the single-axis acceleration values
+        z: time array of the single-axis acceleration values
 
     Returns:
         - list of gravity components of each axis of accelerometer data
@@ -99,23 +99,23 @@ def _filter_acc_data(x, y, z):
     return [grav_x, grav_y, grav_z], [bm_x, bm_y, bm_z]
 
 
-def _get_angles(x, y, z):
-    """Get angles between each axis using accelerometer data TODO: explain in external documentation
+def _get_angles(grav_x, grav_y, grav_z):
+    """Get angles between each axis using the gravity components of the accelerometer data created in _filter_acc_data
 
     Args:
-        x: time array of the x-axis acceleration values
-        y: time array of the y-axis acceleration values
-        z: time array of the z-axis acceleration values
+        grav_x: time array of the gravity component of a single-axis of an accelerometer
+        grav_y: time array of the gravity component of a single-axis of an accelerometer
+        grav_z: time array of the gravity component of a single-axis of an accelerometer
 
     Returns:
-        angle_x: time array of x-axis angles
-        angle_y: time array of y-axis angles
-        angle_z: time array of z-axis angles
+        angle_x: time array of angles for a single-axis
+        angle_y: time array of angles for a single-axis
+        angle_z: time array of angles for a single-axis
     """
-    magnitude = np.sqrt(np.square(np.array([x, y, z])).sum(axis=0))
-    angle_x = np.arccos(x / magnitude) * 180 / np.pi
-    angle_y = np.arccos(y / magnitude) * 180 / np.pi
-    angle_z = np.arccos(z / magnitude) * 180 / np.pi
+    magnitude = np.sqrt(np.square(np.array([grav_x, grav_y, grav_z])).sum(axis=0))
+    angle_x = np.arccos(grav_x / magnitude) * 180 / np.pi
+    angle_y = np.arccos(grav_y / magnitude) * 180 / np.pi
+    angle_z = np.arccos(grav_z / magnitude) * 180 / np.pi
 
     return angle_x, angle_y, angle_z
 
