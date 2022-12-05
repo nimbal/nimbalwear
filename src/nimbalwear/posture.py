@@ -3,7 +3,7 @@ import numpy as np
 from scipy import signal
 from datetime import timedelta as td
 
-def prep_accelerometer_df(x, y, z, sample_rate, body_location, start_datetime):
+def prep_accelerometer_df(x, y, z, sample_rate, body_location, start_time):
     """
     Creates the proper dataframe format for an individual accelerometer for the remainder of the posture analysis
     """
@@ -13,25 +13,25 @@ def prep_accelerometer_df(x, y, z, sample_rate, body_location, start_datetime):
             "Anterior": [-i for i in z],
             "Up": x,
             "Left": y,
-            "start_stamp": start_datetime,
+            "start_time": start_time,
             "sample_rate": sample_rate}
     elif body_location in ['ankle', 'thigh']:
         data_dict = {
             "Anterior": y,
             "Up": x,
             "Left": z,
-            "start_stamp": start_datetime,
+            "start_time": start_time,
             "sample_rate": sample_rate}
     elif body_location == 'wrist':
         data_dict = {
             "Anterior": [-i for i in x],
             "Up": y,
             "Left": z,
-            "start_stamp": start_datetime,
+            "start_time": start_time,
             "sample_rate": sample_rate}
 
     # Epoch data
-    ts = pd.date_range(data_dict['start_stamp'], periods=len(data_dict['Anterior']),
+    ts = pd.date_range(data_dict['start_time'], periods=len(data_dict['Anterior']),
                        freq=(str(1 / data_dict['sample_rate']) + 'S'))
     df = pd.DataFrame({'timestamp': ts, 'ant_acc': data_dict['Anterior'],
                        'up_acc': data_dict['Up'], 'left_acc': data_dict['Left']})
@@ -39,40 +39,31 @@ def prep_accelerometer_df(x, y, z, sample_rate, body_location, start_datetime):
         f'{1}S', on='timestamp').mean().reset_index(col_fill='timestamp')  # Resample to 1s intervals using mean
 
 
-def get_gait_mask(gait_df, start, end):
+def get_gait_mask(gait_df, start_time, end_time):
     """
     creates a list of 0's (no gait) and 1's (gait) with each value representing 1 second.
     """
     # Read in gait_object
 
-    gait_df['start_timestamp'] = pd.DatetimeIndex(gait_df['start_timestamp']).floor('S')
-    gait_df['end_timestamp'] = pd.DatetimeIndex(gait_df['end_timestamp']).ceil('S')
+    gait_df['start_time'] = pd.DatetimeIndex(gait_df['start_time']).floor('S')
+    gait_df['end_time'] = pd.DatetimeIndex(gait_df['end_time']).ceil('S')
 
     # Crop gait df to start and end times
-    if gait_df.loc[gait_df.index[0], 'start_timestamp'] < start:
-        gait_df.loc[gait_df.index[0], 'start_timestamp'] = start
-    if gait_df.loc[gait_df.index[-1], 'end_timestamp'] > end:
-        gait_df.loc[gait_df.index[-1], 'end_timestamp'] = end
+    if gait_df.loc[gait_df.index[0], 'start_time'] < start_time:
+        gait_df.loc[gait_df.index[0], 'start_time'] = start_time
+    if gait_df.loc[gait_df.index[-1], 'end_time'] > end_time:
+        gait_df.loc[gait_df.index[-1], 'end_time'] = end_time
 
     # Create gait mask
-    epoch_ts = list(pd.date_range(start, end, freq='1S', inclusive='both'))
-
+    epoch_ts = list(pd.date_range(start_time, end_time, freq='1S', inclusive='both'))
     gait_mask = np.zeros(len(epoch_ts), dtype=int)
-    start_stamp = epoch_ts[0]
+    start_timestamp = epoch_ts[0] # Change start_time to pandas timestamp format
 
-    # Use nimbalwear/gait.py for the correct format
-    try:
-        for row in gait_df.itertuples():
-            start = np.ceil((row.start_timestamp - start_stamp).total_seconds())
-            stop = np.floor((row.end_timestamp - start_stamp).total_seconds())
-            gait_mask[int(start):int(stop)] = 1
+    for row in gait_df.itertuples():
+        start = np.ceil((row.start_time - start_timestamp).total_seconds())
+        stop = np.floor((row.end_time - start_timestamp).total_seconds())
+        gait_mask[int(start):int(stop)] = 1
 
-    # Posture GS format
-    except (KeyError, AttributeError):
-        for row in gait_df.itertuples():
-            start = (row.Start - start_stamp).total_seconds()
-            stop = (row.Stop - start_stamp).total_seconds()
-            gait_mask[int(start):int(stop)] = 1
 
     return gait_mask
 
@@ -477,20 +468,20 @@ def combine_posture_dfs(posture_df_dict, tran_combo=None, tran_gap_fill=5):
 
     # Remove transitions that have the same posture bordering it on both sides
     summary_df = summarize_posture_df(posture_df)
-    for index, row in summary_df.loc[summary_df['posture'] == 'transition'].iterrows():
-        if index == 0 or index == len(summary_df):
+    for row in summary_df.loc[summary_df['posture'] == 'transition'].itertuples():
+        if row.Index == 0 or row.Index == len(summary_df):
             continue
 
-        if summary_df.iloc[index - 1]['posture'] == summary_df.iloc[index + 1]['posture']:
-            actual_posture = summary_df.iloc[index - 1]['posture']
-            posture_df.loc[(posture_df['timestamp'] >= row['start_timestamp']) & (posture_df['timestamp'] <= row['end_timestamp']), 'posture'] = actual_posture
+        if summary_df.iloc[row.Index - 1]['posture'] == summary_df.iloc[row.Index + 1]['posture']:
+            actual_posture = summary_df.iloc[row.Index - 1]['posture']
+            posture_df.loc[(posture_df['timestamp'] >= row.start_time) & (posture_df['timestamp'] <= row.end_time), 'posture'] = actual_posture
 
     print("Completed.")
     return posture_df
 
 def summarize_posture_df(posture_df):
     """Compresses posture_df into just the distinct successive postures. The columns for this dataframe are
-    ['start_timestamp', 'end_timestamp', 'duration', 'posture']
+    ['start_time', 'end_time', 'duration', 'posture']
     """
     print("Compressing dataframe...", end=" ")
     df = posture_df.copy()
@@ -526,8 +517,8 @@ def summarize_posture_df(posture_df):
     df.insert(1, 'duration', durations)
     end_timestamps = [row.timestamp + td(seconds=row.duration - 1)
                       for row in df.itertuples()]
-    df.rename(columns={'timestamp': 'start_timestamp'}, inplace = True)
-    df.insert(1, 'end_timestamp', end_timestamps)
+    df.rename(columns={'timestamp': 'start_time'}, inplace = True)
+    df.insert(1, 'end_time', end_timestamps)
     df.drop(['transition', 'gait'], axis=1, inplace=True)
 
     print("Completed.")
@@ -543,7 +534,7 @@ def posture(gait_df, wrist_x = None,wrist_y = None,wrist_z = None, wrist_freq = 
 
     Args:
         gait_df: This is a summary dataframe that is created in nimbalwear.gait. It should have the following
-                 columns ['start', 'end', 'number_steps', 'start_timestamp', 'end_timestamp']
+                 columns ['start', 'end', 'number_steps', 'start_time', 'end_time']
         tran_combo: list of booleans indicating what wearable transitions
                     should be combined for the overall transition mask
         tran_gap_fill: maximum gap between transition periods to fill as
@@ -577,7 +568,7 @@ def posture(gait_df, wrist_x = None,wrist_y = None,wrist_z = None, wrist_freq = 
         freq = vals[3]
         start = vals[4]
 
-        prepped_df = prep_accelerometer_df(x, y, z, sample_rate=freq, body_location=bodypart, start_datetime=start)
+        prepped_df = prep_accelerometer_df(x, y, z, sample_rate=freq, body_location=bodypart, start_time=start)
         end = prepped_df['timestamp'].values[-1]
 
         gait_mask = get_gait_mask(gait_df, start, end)
