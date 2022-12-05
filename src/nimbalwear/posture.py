@@ -329,14 +329,54 @@ def classify_wrist_position(posture_df):
     return posture_df
 
 
-def _crop_posture_dfs(posture_df_dict):
+def _crop_posture_dfs(posture_df_dict, ignore_wrist = True):
     """
     crops all dfs in the posture_df_dict to the same size by cropping to the latest start and
     earliest end within all posture dataframes
-    """
-    new_start = max([df['timestamp'].values[0] for df in posture_df_dict.values()])  # Latest start time of any df
-    new_end = min([df['timestamp'].values[-1] for df in posture_df_dict.values()])  # Earliest end time of any df
 
+    Args:
+        posture_df_dict: dictionary with keys of the wearable name and values of dataframes of timestamps, postures,
+                         and transitions
+        ignore_wrist: Boolean for determining whether or note to ignore wrist end times when determining where to crop
+                      file. If True, will ignore the wrist data when determining the optimal start and stop times and, if
+                      necessary, will pad the wrist posture_df with None values for any timestamps it doesn't have data for.
+                      This defaults as True since wrist data is not used for the combined posture, if would shorten the
+                      combined posture data unnecessarily if a wrist device stopped collecting early.
+    """
+    # Get start and stop times
+    if 'wrist' in posture_df_dict.keys():
+        posture_df_dict_wrist = posture_df_dict.copy()
+        if ignore_wrist:
+            posture_df_dict_wrist.pop('wrist')
+        new_start = max([df['timestamp'].values[0] for df in posture_df_dict_wrist.values()])  # Latest start time
+        new_end = min([df['timestamp'].values[-1] for df in posture_df_dict_wrist.values()]) # Earliest end time
+    else:
+        new_start = max([df['timestamp'].values[0] for df in posture_df_dict.values()])  # Latest start time of any df
+        new_end = min([df['timestamp'].values[-1] for df in posture_df_dict.values()])  # Earliest end time of any df
+
+    # if ignore_wrist, pad the wrist dataframe
+    if 'wrist' in posture_df_dict.keys():
+        if ignore_wrist == True:
+            df = posture_df_dict['wrist']
+            df = df.iloc[100:-100].reset_index(drop=True)
+            # Pad Start
+            if df['timestamp'].iloc[0] > new_start:
+                new_times = pd.date_range(new_start, df['timestamp'].iloc[0], freq='1S', inclusive='left', name='timestamp')
+                new_rows = {col: [None] * len(new_times) for col in df.columns if col != 'timestamp'}
+                new_rows['timestamp'] = new_times
+                new_start_df = pd.DataFrame(new_rows, columns=df.columns)
+                df = pd.concat([new_start_df, df]).reset_index(drop=True)
+
+            # Pad End
+            if df['timestamp'].iloc[-1] < new_end:
+                new_times = pd.date_range(df['timestamp'].iloc[-1], new_end, freq='1S', inclusive='right', name='timestamp')
+                new_rows = {col: [None] * len(new_times) for col in df.columns if col != 'timestamp'}
+                new_rows['timestamp'] = new_times
+                new_end_df = pd.DataFrame(new_rows, columns=df.columns)
+                df = pd.concat([df, new_end_df]).reset_index(drop=True)
+            posture_df_dict['wrist'] = df
+
+    # Crop Dfs
     for k in posture_df_dict.keys():
         df = posture_df_dict[k]
         posture_df_dict[k] = df.loc[(df['timestamp'] >= new_start) & (df['timestamp'] <= new_end)]
