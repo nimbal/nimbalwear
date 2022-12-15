@@ -54,7 +54,7 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
             print("Applying lowpass filter to data...")
 
         # low-pass filter
-        order = 5
+        order = 2
         sos = butter(N=order, Wn=lowpass, btype='lowpass', analog=False, output='sos', fs=sample_rate)
         accel = sosfilt(sos, accel)
 
