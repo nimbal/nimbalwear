@@ -6,7 +6,7 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 from scipy.signal import butter, filtfilt, sosfilt, find_peaks, peak_widths, welch
-import nimbalwear
+
 
 def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', data=None, left_right=None, loc='ankle', start=0, end=-1, start_time=None, freq=None, orient_signal=True, low_pass=True):
     '''
@@ -686,7 +686,10 @@ def get_walking_bouts(steps_df=None, initiate_time=15, mrp=10, freq=None, stat_t
 
 ########################################################################################################################
 if __name__ == '__main__':
-    ankle = nimbalwear.Device()
+
+    from src.nimbalwear import Device
+
+    ankle = Device()
 
     #GNAC testing
     subj = "OND06_1027_01"
