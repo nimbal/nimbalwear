@@ -32,6 +32,9 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v0.19.5
+- bug fix: properly detects sleep bouts when entire SPTW is sleep
+
 v0.19.4
 - added utility to read password protected excel files
 
