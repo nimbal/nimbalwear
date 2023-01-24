@@ -39,14 +39,13 @@ def detect_vert(axes, method='adg'):
 
     return vert_data  # , vert_idx, test_stats
 
-
+#TODO: could probably just specify a low pass freq, init?
 def lowpass_filter(acc_data, freq, order=2, cutoff_ratio=0.17):
     """
     Applies a lowpass filter on the accelerometer data
     """
     cutoff_freq = freq * cutoff_ratio
-    sos = butter(N=order, Wn=cutoff_freq,
-                 btype='low', fs=freq, output='sos')
+    sos = butter(N=order, Wn=cutoff_freq, btype='low', fs=freq, output='sos')
     acc_data = sosfilt(sos, acc_data)
 
     return acc_data, cutoff_freq
