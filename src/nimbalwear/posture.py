@@ -146,8 +146,11 @@ def _get_transitions(x, y, z, gait_mask, th=0.04):
     z_threshed = np.abs(z_jerk) > th
 
     # don't include a point as transition if there is gait activity
-    return (x_threshed | y_threshed | z_threshed) & \
+    if gait_mask is not None:
+        return (x_threshed | y_threshed | z_threshed) & \
            np.array([not gait for gait in gait_mask])
+    else:
+         return(x_threshed | y_threshed | z_threshed)
 
 
 def create_posture_df_template(data_df, gait_mask, tran_type='jerk', tran_thresh=0.04):
@@ -210,7 +213,10 @@ def classify_ankle_posture(anterior, proximal, lateral, gait_df, freq, start_tim
                                        freq=freq, body_location='ankle', start_time=start_time)
     end = prepped_df['timestamp'].values[-1]
 
-    gait_mask = get_gait_mask(gait_df, start_time, end)
+    if gait_df is not None:
+        gait_mask = get_gait_mask(gait_df, start_time, end)
+    else:
+        gait_mask = None
 
     posture_df = create_posture_df_template(prepped_df, gait_mask)
 
@@ -244,7 +250,10 @@ def classify_chest_posture(superior, left, anterior, gait_df, freq, start_time):
                                        body_location='chest', start_time=start_time)
     end = prepped_df['timestamp'].values[-1]
 
-    gait_mask = get_gait_mask(gait_df, start_time, end)
+    if gait_df is not None:
+        gait_mask = get_gait_mask(gait_df, start_time, end)
+    else:
+        gait_mask = None
 
     posture_df = create_posture_df_template(prepped_df, gait_mask)
 
@@ -293,7 +302,10 @@ def classify_thigh_posture(anterior, proximal, lateral, gait_df, freq, start_tim
                                        freq=freq, body_location='thigh', start_time=start_time)
     end = prepped_df['timestamp'].values[-1]
 
-    gait_mask = get_gait_mask(gait_df, start_time, end)
+    if gait_df is not None:
+        gait_mask = get_gait_mask(gait_df, start_time, end)
+    else:
+        gait_mask = None
 
     posture_df = create_posture_df_template(prepped_df, gait_mask)
 
@@ -321,7 +333,10 @@ def classify_wrist_position(palmar, proximal, thumb, gait_df, freq, start_time):
                                        body_location='wrist', start_time=start_time)
     end = prepped_df['timestamp'].values[-1]
 
-    gait_mask = get_gait_mask(gait_df, start_time, end)
+    if gait_df is not None:
+        gait_mask = get_gait_mask(gait_df, start_time, end)
+    else:
+        gait_mask = None
 
     posture_df = create_posture_df_template(prepped_df, gait_mask)
 
@@ -556,7 +571,7 @@ def summarize_posture_df(posture_df):
     return df
 
 
-def posture(gait_df, wrist_palmar=None, wrist_proximal=None, wrist_thumb=None, wrist_freq=None, wrist_start=None,
+def posture(gait_df = None, wrist_palmar=None, wrist_proximal=None, wrist_thumb=None, wrist_freq=None, wrist_start=None,
             ankle_anterior=None, ankle_proximal=None, ankle_lateral=None, ankle_freq=None, ankle_start=None,
             chest_superior=None, chest_left=None, chest_anterior=None, chest_freq=None, chest_start=None,
             thigh_anterior=None, thigh_proximal=None, thigh_lateral=None, thigh_freq=None, thigh_start=None,
