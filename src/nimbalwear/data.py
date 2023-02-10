@@ -176,7 +176,8 @@ class Device:
 
         for i, s_h in enumerate(self.signals):
             self.signal_headers[i]['physical_max'] = max(self.signal_headers[i]['physical_max'], max(self.signals[i]))
-            self.signal_headers[i]['physical_min'] = min(self.signal_headers[i]['physical_min'], min(self.signals[i]))
+            self.signal_headers[i]['physical_min'] = min([self.signal_headers[i]['physical_min'], min(self.signals[i]),
+                                                         self.signal_headers[i]['physical_max'] - 1])
             self.signal_headers[i]['digital_max'] = 32767
             self.signal_headers[i]['digital_min'] = -32768
             self.signal_headers[i]['prefilter'] = ''

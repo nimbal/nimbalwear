@@ -1796,7 +1796,10 @@ class Pipeline:
                                                     (coll.nonwear_bouts['event'] == 'nonwear')]
 
             sptw = coll.sptw
-            sleep_bouts =  coll.sleep_bouts.loc[coll.sleep_bouts['bout_detect'] == 't8a4']
+            if coll.sleep_bouts.empty:
+                sleep_bouts = pd.DataFrame()
+            else:
+                sleep_bouts =  coll.sleep_bouts.loc[coll.sleep_bouts['bout_detect'] == 't8a4']
 
             e, b, avm, vm, avm_sec = activity_wrist_avm(x=coll.devices[i].signals[accel_x_sig],
                                                         y=coll.devices[i].signals[accel_y_sig],

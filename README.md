@@ -32,6 +32,19 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v0.19.6
+- bug fix: ensure physical_min < physical_max when writing edf
+
+v0.19.5
+- bug fix: properly detects sleep bouts when entire SPTW is sleep
+
+v0.19.4
+- added utility to read password protected excel files
+
+v0.19.3
+- bug fix: adjust filter order in activity module
+- bug fix: fix error when trying to run activity module with no sleep detected
+
 v0.19.2
 - bug fix: properly calculates sample indices to be removed - no longer attempts to remove sample beyond end of window
 
