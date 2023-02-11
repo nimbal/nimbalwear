@@ -38,6 +38,7 @@ from .data import Device
 from .nonwear import vert_nonwear, nonwear_stats
 from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
 from .gait import AccelReader, WalkingBouts, get_gait_bouts, create_timestamps, gait_stats
+from .posture import posture_detect
 from .activity import activity_wrist_avm, activity_stats
 from .utils import convert_json_to_toml
 
@@ -347,7 +348,7 @@ class Pipeline:
         if single_stage in ['activity']:
             coll = self.read_sleep(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
-        if single_stage in ['activity']:
+        if single_stage in ['activity', 'posture']:
             coll = self.read_gait(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
         # crop final nonwear
@@ -404,7 +405,7 @@ class Pipeline:
 
         return coll
 
-    def read(self, coll, single_stage=None, quiet=False, log=True):
+    def read(self, coll, single_stage=None, quiet=False, log=True, orientation_dict = None):
 
         message("Reading device data from files...", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
@@ -523,6 +524,9 @@ class Pipeline:
                 device_data.header['device_type'] = device_type
                 device_data.header['device_id'] = device_id
                 device_data.header['device_location'] = device_location
+
+            if orientation_dict is not None:
+                device_data.add_orientation(orientation_dict) # TODO: Kit, let me know if this is compatible with the "mismatch" functionality above
 
             message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
