@@ -790,8 +790,7 @@ class Pipeline:
 
     @coll_status
     def posture(self, coll, quiet=False, log=True):
-        """TODO: Add decription
-
+        """ Determine posture based on wrist, ankle, thigh and chest accelerometers.
         Parameters
         ----------
         coll : Collection
@@ -800,6 +799,16 @@ class Pipeline:
             Suppress displayed messages (default is False)
         log : bool, optional
             Log messages (default is True)
+
+        Notes
+        -------
+        - For each device, posture is determined by first detecting bouts of gait.
+        - For wrist, the possible postures are: up, down, supine, prone, and side
+        - For ankle, the possible postures are: sitstand, sit, horizontal, or other.
+        - For chest, the possible postures are: sitstand, reclined, prone, supine, leftside, rightside, or
+    other.
+        - For thigh, the possible postures are: stand, sitlay, or other.
+
 
         """
         message("Detecting posture...", level='info', display=(not quiet), log=log, logger_name=self.log_name)
