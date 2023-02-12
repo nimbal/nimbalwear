@@ -69,6 +69,23 @@ aliases = [ "RA", "RIGHTANKLE", "RANKLE",]
 [pipeline.device_locations.chest]
 aliases = [ "CHEST",]
 
+[pipeline.orientation]
+LWrist_palmar = "Accelerometer z"
+LWrist_proximal = "-Accelerometer y"
+LWrist_thumb = "-Accelerometer x"
+RWrist_palmar = "-Accelerometer z"
+RWrist_proximal = "-Accelerometer y"
+RWrist_thumb = "-Accelerometer x"
+LAnkle_anterior = "Accelerometer x"
+LAnkle_proximal = "-Accelerometer y"
+LAnkle_lateral = "-Accelerometer z"
+RAnkle_anterior = "-Accelerometer y"
+RAnkle_proximal = "Accelerometer x"
+RAnkle_lateral = "Accelerometer z"
+Chest_superior = "Accelerometer x"
+Chest_left = "Accelerometer y"
+Chest_anterior = "-Accelerometer z"
+
 [modules]
 
 [modules.read]
@@ -152,3 +169,8 @@ step_detect_type = "gyro"
 #axis
 save = true
 
+[modules.posture]
+save = true
+ankle = "RAnkle"
+wrist = "RWrist"
+chest = "Chest"
