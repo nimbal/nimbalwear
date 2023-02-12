@@ -140,7 +140,7 @@ class Pipeline:
         self.sensors = settings_dict['pipeline']['sensors']
         self.device_locations = settings_dict['pipeline']['device_locations']
         self.module_settings = settings_dict['modules']
-
+        self.orientation_dict = settings_dict['pipeline']['orientation']
         # pipeline data file paths
         self.device_info_path = self.dirs['pipeline'] / 'devices.csv'
         self.collection_info_path = self.dirs['pipeline'] / 'collections.csv'
@@ -330,7 +330,7 @@ class Pipeline:
             coll = self.required_devices(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
         # read data from all devices in collection
-        coll = self.read(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
+        coll = self.read(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log, orientation_dict= self.orientation_dict)
 
         # convert to edf
         if single_stage in [None, 'convert']:
@@ -359,11 +359,13 @@ class Pipeline:
         if single_stage in [None, 'save_sensors']:
             coll = self.save_sensors(coll=coll, quiet=self.quiet, log=self.log)
 
-        # process posture
-
         # process gait
         if single_stage in [None, 'gait']:
             coll = self.gait(coll=coll, quiet=self.quiet, log=self.log, )
+
+        # process posture
+        if single_stage in [None, 'posture']:
+            coll = self.posture(coll=coll, quiet=self.quiet, log=self.log)
 
         # process sleep
         if single_stage in [None, 'sleep']:
@@ -783,6 +785,119 @@ class Pipeline:
                     level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
             message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        return coll
+
+    @coll_status
+    def posture(self, coll, quiet=False, log=True):
+        """TODO: Add decription
+
+        Parameters
+        ----------
+        coll : Collection
+            Collection object containing attributes and methods related to the collection
+        quiet : bool, optional
+            Suppress displayed messages (default is False)
+        log : bool, optional
+            Log messages (default is True)
+
+        """
+        message("Detecting posture...", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        save = self.module_settings['posture']['save']
+
+
+        # detect nonwear for each device
+        posture_args = {'gait_df':coll.gait_bouts,
+                        'wrist_palmar':None, 'wrist_proximal':None, 'wrist_thumb':None, 'wrist_freq':None,
+                        'wrist_start':None,
+                        'ankle_anterior':None, 'ankle_proximal':None, 'ankle_lateral':None, 'ankle_freq':None,
+                        'ankle_start':None,
+                        'chest_superior':None, 'chest_left':None, 'chest_anterior':None, 'chest_freq':None,
+                        'chest_start':None,
+                        'thigh_anterior':None, 'thigh_proximal':None, 'thigh_lateral':None, 'thigh_freq':None,
+                        'thigh_start':None,
+                        'tran_combo':None, 'tran_gap_fill':5}
+
+        for i, r in coll.device_info.iterrows():
+            device_location = r['device_location']
+            device = coll.devices[i]
+
+            if 'wrist' in self.module_settings['posture'].keys():
+                if self.module_settings['posture']['wrist'].upper() in self.device_locations['rwrist'][
+                    'aliases']:
+                    wrist_locations = self.device_locations['rwrist']['aliases']
+                elif self.module_settings['posture']['wrist'].upper() in self.device_locations['lwrist']['aliases']:
+                    wrist_locations = self.device_locations['lwrist']['aliases']
+                if device_location.upper() in wrist_locations:
+                    posture_args['wrist_palmar'] = device.signals[device.get_signal_index('palmar')]
+                    posture_args['wrist_proximal'] = device.signals[device.get_signal_index('proximal')]
+                    posture_args['wrist_thumb'] = device.signals[device.get_signal_index('thumb')]
+                    posture_args['wrist_freq'] = device.signal_headers[device.get_signal_index('palmar')]['sample_rate']
+                    posture_args['wrist_start'] = device.header['start_datetime']
+
+            if 'ankle' in self.module_settings['posture'].keys():
+                if self.module_settings['posture']['ankle'].upper() in self.device_locations['rankle']['aliases']:
+                    ankle_locations = self.device_locations['rankle']['aliases']
+                elif self.module_settings['posture']['ankle'].upper() in self.device_locations['lankle']['aliases']:
+                    ankle_locations = self.device_locations['lankle']['aliases']
+                if device_location.upper() in ankle_locations:
+                    posture_args['ankle_anterior'] = device.signals[device.get_signal_index('anterior')]
+                    posture_args['ankle_proximal'] = device.signals[device.get_signal_index('proximal')]
+                    posture_args['ankle_lateral'] = device.signals[device.get_signal_index('lateral')]
+                    posture_args['ankle_freq'] = device.signal_headers[device.get_signal_index('anterior')]['sample_rate']
+                    posture_args['ankle_start'] = device.header['start_datetime']
+
+            if 'chest' in self.module_settings['posture'].keys():
+                chest_locations = self.device_locations['chest']['aliases']
+                if device_location.upper() in chest_locations:
+                    posture_args['chest_superior'] = device.signals[device.get_signal_index('superior')]
+                    posture_args['chest_left'] = device.signals[device.get_signal_index('left')]
+                    posture_args['chest_anterior'] = device.signals[device.get_signal_index('anterior')]
+                    posture_args['chest_freq'] = device.signal_headers[device.get_signal_index('superior')]['sample_rate']
+                    posture_args['chest_start'] = device.header['start_datetime']
+
+            if 'thigh' in self.module_settings['posture'].keys():
+                if self.module_settings['posture']['wrist'].upper() in self.device_locations['rthigh'][
+                    'aliases']:
+                    thigh_locations = self.device_locations['rwrist']['aliases']
+                elif self.module_settings['posture']['thigh'].upper() in self.device_locations['lthigh']['aliases']:
+                    thigh_locations = self.device_locations['thigh']['aliases']
+                if device_location.upper() in thigh_locations:
+                    posture_args['thigh_anterior'] = device.signals[device.get_signal_index('anterior')]
+                    posture_args['thigh_proximal'] = device.signals[device.get_signal_index('proximal')]
+                    posture_args['thigh_lateral'] = device.signals[device.get_signal_index('lateral')]
+                    posture_args['thigh_freq'] = device.signal_headers[device.get_signal_index('anterior')]['sample_rate']
+                    posture_args['thigh_start'] = device.header['start_datetime']
+
+        posture_dfs_dict, summary_posture_dfs_dict, combined_posture_df, summary_combined_posture_df = posture_detect(**posture_args)
+        coll.posture_dfs_dict = posture_dfs_dict
+        coll.summary_posture_dfs_dict = summary_posture_dfs_dict
+        coll.combined_posture_df = combined_posture_df
+        coll.summary_combined_posture_df = summary_combined_posture_df
+
+        # save output files
+        if save:
+            # create all file path variables
+            for device_location, posture_df in summary_posture_dfs_dict.items():
+                posture_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, device_location,
+                                                       "POSTURE_DFS"]), "csv"])
+                posture_csv_path = self.dirs['posture_sensors'] / posture_csv_name
+                message(f"Saving {posture_csv_path}", level='info', display=(not quiet), log=log,
+                        logger_name=self.log_name)
+                posture_df.to_csv(posture_csv_path, index=False)
+
+            combined_posture_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "COMBINED_POSTURE_DFS"]), "csv"])
+            combined_posture_csv_path = self.dirs['posture_combined'] / combined_posture_csv_name
+            message(f"Saving {combined_posture_csv_path}", level='info', display=(not quiet), log=log,
+                    logger_name=self.log_name)
+            combined_posture_df.to_csv(combined_posture_csv_path, index=False)
+
+            message(f"Saving {combined_posture_csv_path}", level='info', display=(not quiet), log=log,
+                    logger_name=self.log_name)
+
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 

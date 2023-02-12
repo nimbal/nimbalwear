@@ -916,31 +916,36 @@ class Device:
         """
         for orientation_key, axis_name in orientation_dict.items():
             device_location = orientation_key.split("_")[0]
-            if device_location != self.header.device_location:
+            if device_location != self.header['device_location']: #TODO: currently not set up for location aliases
                 continue
 
-                orientation_name = orientation_key.split("_")[1]
-                if "-" in axis_name:
-                    axis_name = axis_name.replace("-", "")
-                    signal_idx = self.get_signal_index(axis_name)
-                    if signal_idx is None:
-                        print("ORIENTATION NOT AXIS NAME NOT SETUP CORRECTLY IN SETTINGS FILE") #TODO: make this the same as other error messages
-                    orientation_vals = -self.signals[signal_idx]
-                    orientation_header = self.signal_headers[signal_idx]
-                    orientation_header['label'] = orientation_name
+            orientation_name = orientation_key.split("_")[1]
+            if "-" in axis_name:
+                axis_name = axis_name.replace("-", "")
+                signal_idx = self.get_signal_index(axis_name)
+                orientation_vals = -self.signals[signal_idx].copy()
+                orientation_header = self.signal_headers[signal_idx].copy()
+                orientation_header['label'] = orientation_name
+                if self.get_signal_index(orientation_name) is not None: # Overwrite current orientation signal header/value
+                    orientation_idx = self.get_signal_index(orientation_name)
+                    self.signal_headers[orientation_idx] = orientation_header
+                    self.signals[orientation_idx] = orientation_vals
+                else:
                     self.signal_headers.append(orientation_header)
                     self.signals.append(orientation_vals)
 
+            else:
+                signal_idx = self.get_signal_index(axis_name)
+                orientation_vals = self.signals[signal_idx].copy()
+                orientation_header = self.signal_headers[signal_idx].copy()
+                orientation_header['label'] = orientation_name
+                if self.get_signal_index(orientation_name) is not None: # Overwrite current orientation signal header/value
+                    orientation_idx = self.get_signal_index(orientation_name)
+                    self.signal_headers[orientation_idx] = orientation_header
+                    self.signals[orientation_idx] = orientation_vals
                 else:
-                    axis_name = axis_name.replace("-", "")
-                    signal_idx = self.get_signal_index(axis_name)
-                    if signal_idx is None:
-                        print(
-                            "ORIENTATION NOT AXIS NAME NOT SETUP CORRECTLY IN SETTINGS FILE")  # TODO: make this the same as other error messages
-                    orientation_vals = self.signals[signal_idx]
-                    orientation_header = self.signal_headers[signal_idx]
-                    orientation_header['label'] = orientation_name
                     self.signal_headers.append(orientation_header)
                     self.signals.append(orientation_vals)
+
 
         return True

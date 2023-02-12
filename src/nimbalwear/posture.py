@@ -532,50 +532,26 @@ def summarize_posture_df(posture_df):
     """
     print("Compressing dataframe...", end=" ")
     df = posture_df.copy()
-    durations = []
-    first_diff_idx = 0
-    last_idx = df.shape[0] - 1
-    prev_start = df.iloc[0]['timestamp']
-    prev_post = df.iloc[0]['posture']
+    vals_changed = df["posture"].shift(-1) != df["posture"]
+    summary_df = df.copy()[vals_changed]
+    durs = summary_df['timestamp'] - summary_df['timestamp'].shift(1)
+    durs.iloc[0] = summary_df['timestamp'].iloc[0] - df['timestamp'].iloc[0]
+    summary_df['duration'] = durs.dt.total_seconds().values
 
-    for row in df.itertuples():
-        compress_bool = (row.posture != prev_post)
-        if compress_bool:
-            if (first_diff_idx + 1) != row.Index:
-                df.drop([i for i in range(first_diff_idx + 1, row.Index)],
-                        inplace=True)
-
-            durations.append((row.timestamp - prev_start).total_seconds())
-
-            first_diff_idx = row.Index
-            prev_start = row.timestamp
-            prev_post = row.posture
-
-            if row.Index == last_idx:
-                durations.append(1)
-
-        elif row.Index == last_idx:
-            df.drop([i for i in range(first_diff_idx + 1, last_idx + 1)],
-                    inplace=True)
-            durations.append(
-                (row.timestamp + td(seconds=1) - prev_start).total_seconds())
-    df.reset_index(drop=True, inplace=True)
-    df.insert(1, 'duration', durations)
-    end_timestamps = [row.timestamp + td(seconds=row.duration - 1)
-                      for row in df.itertuples()]
-    df.rename(columns={'timestamp': 'start_time'}, inplace=True)
-    df.insert(1, 'end_time', end_timestamps)
-    df.drop(['transition', 'gait'], axis=1, inplace=True)
-
+    start_times = df.iloc[(summary_df['timestamp'].shift(1).index + 1)[:-1].insert(0, 0)]['timestamp']
+    summary_df['start_time'] = start_times.values
+    summary_df.rename(columns={'timestamp': 'end_time'}, inplace=True)
+    summary_df = summary_df[['start_time', 'end_time', 'duration', 'posture']]
+    summary_df.reset_index(drop=True, inplace=True)
     print("Completed.")
-    return df
+    return summary_df
 
 
-def posture(gait_df = None, wrist_palmar=None, wrist_proximal=None, wrist_thumb=None, wrist_freq=None, wrist_start=None,
-            ankle_anterior=None, ankle_proximal=None, ankle_lateral=None, ankle_freq=None, ankle_start=None,
-            chest_superior=None, chest_left=None, chest_anterior=None, chest_freq=None, chest_start=None,
-            thigh_anterior=None, thigh_proximal=None, thigh_lateral=None, thigh_freq=None, thigh_start=None,
-            tran_combo=None, tran_gap_fill=5):
+def posture_detect(gait_df = None, wrist_palmar=None, wrist_proximal=None, wrist_thumb=None, wrist_freq=None, wrist_start=None,
+                   ankle_anterior=None, ankle_proximal=None, ankle_lateral=None, ankle_freq=None, ankle_start=None,
+                   chest_superior=None, chest_left=None, chest_anterior=None, chest_freq=None, chest_start=None,
+                   thigh_anterior=None, thigh_proximal=None, thigh_lateral=None, thigh_freq=None, thigh_start=None,
+                   tran_combo=None, tran_gap_fill=5):
     """
     Wrapper function to get gait for an individual with multiple sensors
 
