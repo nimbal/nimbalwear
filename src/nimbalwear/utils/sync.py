@@ -443,6 +443,9 @@ def detect_sync_flips_ref_signal(signal, signal_freq, signal_ds=1, rest_min=2, r
                 axs[i][1].text(0.1, 1.6, f"AE = {w[3]}", size=15, color=rejected_color)
                 i += 1
 
+    if plot_detect_ref | plot_quality_ref:
+        plt.show()
+
     accepted_sync_flips = [(round(x[0] * signal_ds), round(x[1] * signal_ds), x[2], x[3]) for x in keep_sync_ind]
     rejected_sync_flips = [(round(x[0] * signal_ds), round(x[1] * signal_ds), x[2], x[3]) for x in rej_sync_ind]
 
@@ -536,6 +539,7 @@ def detect_sync_flips_tgt_signal(tgt_signal, ref_sync, tgt_signal_freq, ref_sign
             if max_corr < 0:
                 ref_sync = [-x for x in ref_sync]
             plt.plot(range(tgt_sync_start, tgt_sync_end), ref_sync, color='red')
+
             plt.show()
 
         sync_start = round(tgt_sync_start * tgt_ds)
