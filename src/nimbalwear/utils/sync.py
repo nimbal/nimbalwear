@@ -231,8 +231,8 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
                         syncs = new_sync
                     else:
                         syncs = pd.concat([syncs, new_sync], ignore_index=True)
-    else:
 
+    if syncs is None:
         syncs = pd.DataFrame(columns=sync_cols)
 
     return syncs
