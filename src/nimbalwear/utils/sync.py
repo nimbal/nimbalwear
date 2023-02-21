@@ -444,7 +444,7 @@ def detect_sync_flips_ref_signal(signal, signal_freq, signal_ds=1, rest_min=2, r
                 i += 1
 
     if plot_detect_ref | plot_quality_ref:
-        plt.show()
+        plt.show(block=True)
 
     accepted_sync_flips = [(round(x[0] * signal_ds), round(x[1] * signal_ds), x[2], x[3]) for x in keep_sync_ind]
     rejected_sync_flips = [(round(x[0] * signal_ds), round(x[1] * signal_ds), x[2], x[3]) for x in rej_sync_ind]
@@ -540,7 +540,7 @@ def detect_sync_flips_tgt_signal(tgt_signal, ref_sync, tgt_signal_freq, ref_sign
                 ref_sync = [-x for x in ref_sync]
             plt.plot(range(tgt_sync_start, tgt_sync_end), ref_sync, color='red')
 
-            plt.show()
+            plt.show(block=True)
 
         sync_start = round(tgt_sync_start * tgt_ds)
         sync_end = round(tgt_sync_end * tgt_ds)
