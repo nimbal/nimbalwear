@@ -32,6 +32,13 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v0.19.8
+- bug fix: properly handles Axivity devices with no gyro collected
+
+v0.19.7
+- bug fix: instead of error, sync returns empty DataFrame when no syncs detected or matched
+- bug fix: fix bug where sync plots aren't displayed
+
 v0.19.6
 - bug fix: ensure physical_min < physical_max when writing edf
 

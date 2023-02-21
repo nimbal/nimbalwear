@@ -729,8 +729,8 @@ class Device:
                                      'transducer': "MEMS",
                                      'dimension': 'degree/s',
                                      'sample_rate': in_file.header['sample_rate'],
-                                     'physical_max': max(in_file.data['gx']),
-                                     'physical_min': min(in_file.data['gx']),
+                                     'physical_max': 1,
+                                     'physical_min': 0,
                                      'digital_max': 32767,
                                      'digital_min': -32768,
                                      'prefilter': ''},
@@ -738,8 +738,8 @@ class Device:
                                      'transducer': "MEMS",
                                      'dimension': 'degree/s',
                                      'sample_rate': in_file.header['sample_rate'],
-                                     'physical_max': max(in_file.data['gy']),
-                                     'physical_min': min(in_file.data['gy']),
+                                     'physical_max': 1,
+                                     'physical_min': 0,
                                      'digital_max': 32767,
                                      'digital_min': -32768,
                                      'prefilter': ''},
@@ -747,8 +747,8 @@ class Device:
                                      'transducer': "MEMS",
                                      'dimension': 'degree/s',
                                      'sample_rate': in_file.header['sample_rate'],
-                                     'physical_max': max(in_file.data['gz']),
-                                     'physical_min': min(in_file.data['gz']),
+                                     'physical_max': 1,
+                                     'physical_min': 0,
                                      'digital_max': 32767,
                                      'digital_min': -32768,
                                      'prefilter': ''},
@@ -756,8 +756,8 @@ class Device:
                                      'transducer': "MEMS",
                                      'dimension': 'g',
                                      'sample_rate': in_file.header['sample_rate'],
-                                     'physical_max': max(in_file.data['ax']),
-                                     'physical_min': min(in_file.data['ax']),
+                                     'physical_max': 1,
+                                     'physical_min': 0,
                                      'digital_max': 32767,
                                      'digital_min': -32768,
                                      'prefilter': ''},
@@ -765,8 +765,8 @@ class Device:
                                      'transducer': "MEMS",
                                      'dimension': 'g',
                                      'sample_rate': in_file.header['sample_rate'],
-                                     'physical_max': max(in_file.data['ay']),
-                                     'physical_min': min(in_file.data['ay']),
+                                     'physical_max': 1,
+                                     'physical_min': 0,
                                      'digital_max': 32767,
                                      'digital_min': -32768,
                                      'prefilter': ''},
@@ -774,8 +774,8 @@ class Device:
                                      'transducer': "MEMS",
                                      'dimension': 'g',
                                      'sample_rate': in_file.header['sample_rate'],
-                                     'physical_max': max(in_file.data['az']),
-                                     'physical_min': min(in_file.data['az']),
+                                     'physical_max': 1,
+                                     'physical_min': 0,
                                      'digital_max': 32767,
                                      'digital_min': -32768,
                                      'prefilter': ''},
@@ -783,8 +783,8 @@ class Device:
                                         'transducer': "Logarithmic light sensor",
                                         'dimension': 'units',
                                         'sample_rate': in_file.header['packet_rate'],
-                                        'physical_max': max(in_file.data['light']),
-                                        'physical_min': min(in_file.data['light']),
+                                        'physical_max': 1,
+                                        'physical_min': 0,
                                         'digital_max': 32767,
                                         'digital_min': -32768,
                                         'prefilter': ''},
@@ -792,8 +792,8 @@ class Device:
                                               'transducer': "Linear thermistor",
                                               'dimension': 'C',
                                               'sample_rate': in_file.header['packet_rate'],
-                                              'physical_max': max(in_file.data['temperature']),
-                                              'physical_min': min(in_file.data['temperature']),
+                                              'physical_max': 1,
+                                              'physical_min': 0,
                                               'digital_max': 32767,
                                               'digital_min': -32768,
                                               'prefilter': ''}
@@ -811,6 +811,11 @@ class Device:
                     self.signals.append(in_file.data[key][trim_samples:])
                 elif key in ['light', 'temperature']:
                     self.signals.append(in_file.data[key][trim_packets:])
+
+        # set physical max/min
+        for i, s in enumerate(self.signals):
+            self.signal_headers[i]['physical_max'] = max(s)
+            self.signal_headers[i]['physical_min'] = min(s)
 
         return True
 
