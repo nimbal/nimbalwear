@@ -549,7 +549,7 @@ def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', data=Non
             print('Trunk step detection unavailable.')
 
     elif data_type == 'gyroscope':
-        if (left_right == 'right') | (left_right== 'bilateral') & (loc == 'ankle'):
+        if (left_right == 'right') | (left_right == 'bilateral') & (loc == 'ankle'):
             print('Finding steps: Right ankle, gyroscope, Fraccaro algorithm.')
 
             ra_data = ra_data if ra_data is not None else data
@@ -563,10 +563,10 @@ def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', data=Non
             left_steps_df= fraccaro_gyro_steps(la_data, freq, start_time, loc='left', start_dp=start, end_dp=end)
 
         if (left_right == 'right') | (left_right == 'bilateral') & (loc == 'thigh'):
-            print('Thigh step detetion unavailable')
+            print('Thigh step detection unavailable')
 
         if (left_right == 'left') | (left_right == 'bilateral') & (loc == 'thigh'):
-            print('Thigh step detetion unavailable')
+            print('Thigh step detection unavailable')
     else:
         print('No data type defined')
 
