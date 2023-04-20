@@ -685,6 +685,8 @@ class Pipeline:
                     ds_index = freq - 5
                 signal_ds = round(freq / (5 + ds_index))
 
+                accel_signal_labels = tuple(self.sensors['accelerometer']['signals'])
+
                 syncs, segments = coll.devices[idx].sync(ref=coll.devices[0],
                                                          sig_labels=tuple(self.sensors['accelerometer']['signals']),
                                                          sync_type=sync_type, sync_at_config=sync_at_config,
@@ -697,12 +699,42 @@ class Pipeline:
                 message(f"Synchronized {device_type} {device_location} to {ref_device_type} {ref_device_location} at {syncs.shape[0]} sync points",
                         level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
+                ref_start_datetime = coll.devices[0].header['start_datetime']
+                sync_start_time = []
+                sync_end_time = []
+
+                for i, r in syncs.iterrows():
+
+                    sig_idx = coll.devices[0].get_signal_index(accel_signal_labels[int(r['ref_sig_idx'])])
+                    sample_rate = coll.devices[0].signal_headers[sig_idx]['sample_rate']
+
+
+                    sync_start_time.append(ref_start_datetime + dt.timedelta(seconds=(r['ref_start_idx'] / sample_rate)))
+                    sync_end_time.append(ref_start_datetime + dt.timedelta(seconds=(r['ref_end_idx'] / sample_rate)))
+
+                sync_ref_sig_labels = [accel_signal_labels[int(r['ref_sig_idx'])] for i, r in syncs.iterrows()]
+                sync_tgt_sig_labels = [accel_signal_labels[int(r['tgt_sig_idx'])] for i, r in syncs.iterrows()]
+
                 syncs.insert(loc=0, column='study_code', value=study_code)
                 syncs.insert(loc=1, column='subject_id', value=subject_id)
                 syncs.insert(loc=2, column='coll_id', value=coll_id)
                 syncs.insert(loc=3, column='device_type', value=device_type)
                 syncs.insert(loc=4, column='device_location', value=device_location)
                 syncs.insert(loc=5, column='sync_id', value=range(1, syncs.shape[0] + 1))
+                syncs.insert(loc=6, column='start_time', value=sync_start_time)
+                syncs.insert(loc=7, column='end_time', value=sync_end_time)
+                syncs.insert(loc=9, column='ref_sig_label', value=sync_ref_sig_labels)
+                syncs.insert(loc=15, column='tgt_sig_label', value=sync_tgt_sig_labels)
+
+                seg_start_time = []
+                seg_end_time = []
+
+                for i, r in segments.iterrows():
+                    sig_idx = coll.devices[0].get_signal_index(accel_signal_labels[0])
+                    sample_rate = coll.devices[0].signal_headers[sig_idx]['sample_rate']
+
+                    seg_start_time.append(ref_start_datetime + dt.timedelta(seconds=(r['ref_start_idx'] / sample_rate)))
+                    seg_end_time.append(ref_start_datetime + dt.timedelta(seconds=(r['ref_end_idx'] / sample_rate)))
 
                 segments.insert(loc=0, column='study_code', value=study_code)
                 segments.insert(loc=1, column='subject_id', value=subject_id)
@@ -710,6 +742,8 @@ class Pipeline:
                 segments.insert(loc=3, column='device_type', value=device_type)
                 segments.insert(loc=4, column='device_location', value=device_location)
                 segments.insert(loc=5, column='segment_id', value=range(1, segments.shape[0] + 1))
+                segments.insert(loc=6, column='start_time', value=seg_start_time)
+                segments.insert(loc=7, column='end_time', value=seg_end_time)
 
                 if self.module_settings['sync']['save']:
 
