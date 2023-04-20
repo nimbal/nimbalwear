@@ -1,4 +1,4 @@
-from statistics import mean, StatisticsError
+from statistics import mean
 
 from matplotlib import pyplot as plt
 from matplotlib import style as mstyle
@@ -179,12 +179,10 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
                             req_tgt_corr=0.8, plot_detect_ref=False, plot_quality_ref=False, plot_detect_tgt=False):
 
     # detect reference syncs
-    iw = detect_sync_flips_ref_accel(ref_accel, ref_freq, signal_ds=signal_ds, rest_min=rest_min, rest_max=rest_max,
+    ref_sync_windows = detect_sync_flips_ref_accel(ref_accel, ref_freq, signal_ds=signal_ds, rest_min=rest_min, rest_max=rest_max,
                                      rest_sens=rest_sens, flip_max=flip_max, min_flips=min_flips,
                                      reject_above_ae=reject_above_ae, plot_detect_ref=plot_detect_ref,
                                      plot_quality_ref=plot_quality_ref)
-
-    ref_sync_sig_idx, ref_sync_windows = iw
 
     syncs = None
     sync_cols = ['ref_sig_idx', 'ref_start_idx', 'ref_end_idx', 'ref_flips', 'ref_ae', 'tgt_sig_idx', 'tgt_start_idx',
@@ -194,10 +192,10 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
 
         for s in tqdm(ref_sync_windows[0], desc="Searching target for detected sync flips...", leave=False):
 
-            ref_sync = ref_accel[ref_sync_sig_idx][s[0]:s[1]]
+            ref_sync = ref_accel[s[0]][s[1]:s[2]]
 
             if search_radius is not None:
-                mid_sync_ref = s[0] + ((s[1] - s[0]) / 2)
+                mid_sync_ref = s[1] + ((s[2] - s[1]) / 2)
                 sample_gain = tgt_freq / ref_freq
                 sample_offset = int(offset * tgt_freq)
                 mid_sync_tgt = int(mid_sync_ref * sample_gain - sample_offset)
@@ -223,7 +221,7 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
                                                                          plot_detect_tgt=plot_detect_tgt)
 
                 if tgt_sync_sig_idx is not None:
-                    new_sync = pd.DataFrame([[int(ref_sync_sig_idx), int(s[0]), int(s[1]), int(s[2]), round(s[3], 3),
+                    new_sync = pd.DataFrame([[int(s[0]), int(s[1]), int(s[2]), int(s[3]), round(s[4], 3),
                                               int(tgt_sync_sig_idx), int(tgt_sync[0] + start_i), int(tgt_sync[1] + start_i),
                                               round(tgt_sync[2], 2)]],
                                             columns=sync_cols)
@@ -241,11 +239,14 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
 def detect_sync_flips_ref_accel(accel, signal_freq, signal_ds=1, rest_min=2, rest_max=15, rest_sens=0.12, flip_max=2,
                                 min_flips=4, reject_above_ae=0.2, plot_detect_ref=False, plot_quality_ref=False):
 
-    ref_sync_sig_idx = None
-    ref_sync_windows = None
-    prev_axis_mean_ae = 1
-    r_i = 0
-    for ref_signal in tqdm(accel, desc="Searching reference axes for sync flips...", leave=False):
+    # ref_sync_sig_idx = None
+    # ref_sync_windows = None
+    # prev_axis_mean_ae = 1
+
+    accept = []
+    reject = []
+
+    for i, ref_signal in enumerate(tqdm(accel, desc="Searching reference axes for sync flips...", leave=False)):
 
         # detect reference sync
         axis_sync_windows = detect_sync_flips_ref_signal(ref_signal, signal_freq, signal_ds=signal_ds,
@@ -255,21 +256,51 @@ def detect_sync_flips_ref_accel(accel, signal_freq, signal_ds=1, rest_min=2, res
                                                          plot_detect_ref=plot_detect_ref,
                                                          plot_quality_ref=plot_quality_ref)
 
-        try:
-            axis_mean_ae = mean([asw[3] for asw in axis_sync_windows[0]])
-        except StatisticsError:
-            r_i += 1
-            continue
+        # add axis index
+        axis_accept = [(i,) + w for w in axis_sync_windows[0]]
+        axis_reject = [(i,) + w for w in axis_sync_windows[1]]
 
-        # only get sync windows from axis with best match
-        if axis_mean_ae < prev_axis_mean_ae:
-            prev_axis_mean_ae = axis_mean_ae
-            ref_sync_sig_idx = r_i
-            ref_sync_windows = axis_sync_windows
+        rej_a_a = []
+        rej_a = []
 
-        r_i += 1
+        # check for overlap and keep lower ae (move other to reject)
+        if accept:
 
-    return ref_sync_sig_idx, ref_sync_windows
+            for a_a_i, a_a in enumerate(axis_accept):
+
+                for a_i, a in enumerate(accept):
+
+                    # check for overlap
+                    if (a_a[1] < a[2]) and (a_a[2] > a[1]):
+                        if a_a[4] > a[4]:
+                            rej_a_a.append(a_a_i)
+                        else:
+                            rej_a.append(a_i)
+
+        # move overlapping windows with higher error to reject list
+        axis_reject = axis_reject + [a for i, a in enumerate(axis_accept) if i in rej_a_a]
+        reject = reject + [a for i, a in enumerate(accept) if i in rej_a]
+
+        axis_accept = [a for i, a in enumerate(axis_accept) if i not in rej_a_a]
+        accept = [a for i, a in enumerate(accept) if i not in rej_a]
+
+        # append master lists with axis lists
+        accept = accept + axis_accept
+        reject = reject + axis_reject
+
+        # try:
+        #     axis_mean_ae = mean([asw[3] for asw in axis_sync_windows[0]])
+        # except StatisticsError:
+        #     continue
+        #
+        # # only get sync windows from axis with best match
+        # if axis_mean_ae < prev_axis_mean_ae:
+        #     prev_axis_mean_ae = axis_mean_ae
+        #     ref_sync_sig_idx = r_i
+        #     ref_sync_windows = axis_sync_windows
+    sync_windows = [accept, reject]
+
+    return sync_windows
 
 
 def detect_sync_flips_ref_signal(signal, signal_freq, signal_ds=1, rest_min=2, rest_max=15, rest_sens=0.12, flip_max=2,

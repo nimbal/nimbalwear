@@ -32,6 +32,9 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+- syncs detected from any axis rather than choosing those from one axis
+
+
 v0.19.8
 - bug fix: properly handles Axivity devices with no gyro collected
 
