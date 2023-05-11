@@ -42,37 +42,31 @@ def sync_devices(tgt_device, ref_device, sig_labels=('Accelerometer x', 'Acceler
     tgt_start_time = tgt_device.header['start_datetime']
     offset = (tgt_start_time - ref_start_time).total_seconds()
 
-    # get accelerometer indices
+    # get reference accelerometer indices
     ref_sig_idx = []
     for sig_label in sig_labels:
         ref_sig_idx.append(ref_device.get_signal_index(sig_label))
 
+    # get target accelerometer indices
     tgt_sig_idx = []
     for sig_label in sig_labels:
         tgt_sig_idx.append(tgt_device.get_signal_index(sig_label))
 
+    # get accel signals
     ref_accel = [ref_device.signals[i] for i in ref_sig_idx]
     tgt_accel = [tgt_device.signals[i] for i in tgt_sig_idx]
 
+    # get accel sample frequencies
     ref_freq = round(ref_device.signal_headers[ref_sig_idx[0]]['sample_rate'])
     tgt_freq = round(tgt_device.signal_headers[tgt_sig_idx[0]]['sample_rate'])
 
+    # detect sync locations
     syncs = detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=offset,
                                     search_radius=search_radius, signal_ds=signal_ds, rest_min=rest_min,
                                     rest_max=rest_max, rest_sens=rest_sens, flip_max=flip_max, min_flips=min_flips,
                                     reject_above_ae=reject_above_ae, req_tgt_corr=req_tgt_corr,
                                     plot_detect_ref=plot_detect_ref, plot_quality_ref=plot_quality_ref,
                                     plot_detect_tgt=plot_detect_tgt)
-
-    # if not syncs.empty:
-    #     syncs['ref_start_time'] = [ref_start_time + timedelta(seconds=(x['ref_start_idx'] / ref_freq))
-    #                                for i, x in syncs.iterrows()]
-    #     syncs['ref_end_time'] = [ref_start_time + timedelta(seconds=(x['ref_end_idx'] / ref_freq))
-    #                              for i, x in syncs.iterrows()]
-    #     syncs['tgt_start_time'] = [tgt_start_time + timedelta(seconds=(x['tgt_start_idx'] / ref_freq))
-    #                                for i, x in syncs.iterrows()]
-    #     syncs['tgt_end_time'] = [tgt_start_time + timedelta(seconds=(x['tgt_end_idx'] / ref_freq))
-    #                              for i, x in syncs.iterrows()]
 
     # get sync pairs (start_times)
     ref_sync_idx = syncs['ref_start_idx'].astype(dtype=int).to_list()
@@ -229,6 +223,27 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
                         syncs = new_sync
                     else:
                         syncs = pd.concat([syncs, new_sync], ignore_index=True)
+
+        # check for overlapping sync windows on target and reject one with lower correlation
+        rej_i = []
+        if syncs is not None:
+
+            # loop through all syncs
+            for i, t in enumerate(syncs.itertuples()):
+
+                # loop through remaining syncs after current sync
+                for rem_i, rem_t in enumerate(syncs.iloc[i + 1:].itertuples()):
+
+                    # check for overlap
+                    if (t.tgt_start_idx < rem_t.tgt_end_idx) and (t.tgt_end_idx > rem_t.tgt_start_idx):
+                        # store index of row with lower correlation for rejection
+                        if t.tgt_corr < rem_t.tgt_corr:
+                            rej_i.append(t.Index)
+                        else:
+                            rej_i.append(rem_t.Index)
+
+    # reject (drop) all flagged syncs
+    syncs = syncs.drop(labels=rej_i)
 
     if syncs is None:
         syncs = pd.DataFrame(columns=sync_cols)
