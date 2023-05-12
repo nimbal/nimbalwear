@@ -303,16 +303,9 @@ def detect_sync_flips_ref_accel(accel, signal_freq, signal_ds=1, rest_min=2, res
         accept = accept + axis_accept
         reject = reject + axis_reject
 
-        # try:
-        #     axis_mean_ae = mean([asw[3] for asw in axis_sync_windows[0]])
-        # except StatisticsError:
-        #     continue
-        #
-        # # only get sync windows from axis with best match
-        # if axis_mean_ae < prev_axis_mean_ae:
-        #     prev_axis_mean_ae = axis_mean_ae
-        #     ref_sync_sig_idx = r_i
-        #     ref_sync_windows = axis_sync_windows
+    accept = sorted(accept, key=lambda x: x[1])
+    reject = sorted(reject, key=lambda x: x[1])
+
     sync_windows = [accept, reject]
 
     return sync_windows
