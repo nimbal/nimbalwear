@@ -725,8 +725,10 @@ class Pipeline:
                 syncs.insert(loc=5, column='sync_id', value=range(1, syncs.shape[0] + 1))
                 syncs.insert(loc=6, column='start_time', value=sync_start_time)
                 syncs.insert(loc=7, column='end_time', value=sync_end_time)
-                syncs.insert(loc=9, column='ref_sig_label', value=sync_ref_sig_labels)
-                syncs.insert(loc=15, column='tgt_sig_label', value=sync_tgt_sig_labels)
+                syncs.insert(loc=8, column='ref_device_type', value=ref_device_type)
+                syncs.insert(loc=9, column='ref_device_location', value=ref_device_location)
+                syncs.insert(loc=11, column='ref_sig_label', value=sync_ref_sig_labels)
+                syncs.insert(loc=17, column='tgt_sig_label', value=sync_tgt_sig_labels)
 
                 seg_start_time = []
                 seg_end_time = []
