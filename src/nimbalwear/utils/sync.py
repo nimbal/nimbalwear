@@ -68,6 +68,16 @@ def sync_devices(tgt_device, ref_device, sig_labels=('Accelerometer x', 'Acceler
                                     plot_detect_ref=plot_detect_ref, plot_quality_ref=plot_quality_ref,
                                     plot_detect_tgt=plot_detect_tgt)
 
+    if last_sync is not None:
+        last_sync_ref_start_idx = round((last_sync - ref_start_time).total_seconds() * ref_freq)
+        last_sync_tgt_start_idx = round((last_sync - tgt_start_time).total_seconds() * tgt_freq)
+
+        last_sync_row = pd.DataFrame([[0, last_sync_ref_start_idx, last_sync_ref_start_idx + ref_freq, 0, 0, 0,
+                                      last_sync_tgt_start_idx, last_sync_tgt_start_idx + tgt_freq, 1]],
+                                     columns=syncs.columns)
+
+        syncs = pd.concat([last_sync_row, syncs]).reset_index(drop=True)
+
     # get sync pairs (start_times)
     ref_sync_idx = syncs['ref_start_idx'].astype(dtype=int).to_list()
     tgt_sync_idx = syncs['tgt_start_idx'].astype(dtype=int).to_list()
@@ -77,9 +87,9 @@ def sync_devices(tgt_device, ref_device, sig_labels=('Accelerometer x', 'Acceler
 
     # add "last known" if config times are withhin a couple hours ??
     #       - will be negative index at tgt config time relative to
-    if last_sync is not None:
-        ref_sync_idx.insert(0, round((last_sync - ref_start_time).total_seconds() * ref_freq))
-        tgt_sync_idx.insert(0, round((last_sync - tgt_start_time).total_seconds() * tgt_freq))
+    # if last_sync is not None:
+    #     ref_sync_idx.insert(0, round((last_sync - ref_start_time).total_seconds() * ref_freq))
+    #     tgt_sync_idx.insert(0, round((last_sync - tgt_start_time).total_seconds() * tgt_freq))
 
     segments = [ref_sync_idx[:-1], ref_sync_idx[1:], tgt_sync_idx[:-1], tgt_sync_idx[1:]]
     segments = list(map(list, zip(*segments)))
