@@ -752,15 +752,14 @@ class Pipeline:
                 if self.module_settings['sync']['save']:
 
                     # create all file path variables
-                    syncs_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
-                                                         "SYNC_LOC"]),
-                                               "csv"])
-                    segments_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
-                                                            "SYNC_SEG"]),
-                                                  "csv"])
+                    syncs_csv_name = (f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}"
+                                      + "_SYNC_EVENTS.csv")
 
-                    syncs_csv_path = self.dirs['sync'] / syncs_csv_name
-                    segments_csv_path = self.dirs['sync'] / segments_csv_name
+                    segments_csv_name = (f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}"
+                                         + "_SYNC_SEGMENTS.csv")
+
+                    syncs_csv_path = self.dirs['sync_events'] / syncs_csv_name
+                    segments_csv_path = self.dirs['sync_segments'] / segments_csv_name
 
                     syncs_csv_path.parent.mkdir(parents=True, exist_ok=True)
                     segments_csv_path.parent.mkdir(parents=True, exist_ok=True)
