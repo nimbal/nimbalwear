@@ -34,6 +34,7 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 - syncs detected from any axis rather than choosing those from one axis
 - include config sync in sync list
+- add ref device type and location to sync output
 
 
 v0.19.8
