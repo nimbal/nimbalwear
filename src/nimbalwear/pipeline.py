@@ -685,7 +685,8 @@ class Pipeline:
                     ds_index = freq - 5
                 signal_ds = round(freq / (5 + ds_index))
 
-                accel_signal_labels = tuple(self.sensors['accelerometer']['signals'])
+                # get signal labels and add 'Config' to end for sig_idx -1
+                accel_signal_labels = tuple(self.sensors['accelerometer']['signals']) + ('Config', )
 
                 syncs, segments = coll.devices[idx].sync(ref=coll.devices[0],
                                                          sig_labels=tuple(self.sensors['accelerometer']['signals']),
@@ -705,9 +706,10 @@ class Pipeline:
 
                 for i, r in syncs.iterrows():
 
-                    sig_idx = coll.devices[0].get_signal_index(accel_signal_labels[int(r['ref_sig_idx'])])
-                    sample_rate = coll.devices[0].signal_headers[sig_idx]['sample_rate']
+                    ref_sig_idx = 0 if r['ref_sig_idx'] < 0 else int(r['ref_sig_idx'])
 
+                    sig_idx = coll.devices[0].get_signal_index(accel_signal_labels[ref_sig_idx])
+                    sample_rate = coll.devices[0].signal_headers[sig_idx]['sample_rate']
 
                     sync_start_time.append(ref_start_datetime + dt.timedelta(seconds=(r['ref_start_idx'] / sample_rate)))
                     sync_end_time.append(ref_start_datetime + dt.timedelta(seconds=(r['ref_end_idx'] / sample_rate)))

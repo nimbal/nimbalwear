@@ -33,6 +33,7 @@ To include a specific release, replace `[version]` with the branch associated wi
 # Changes by version
 
 - syncs detected from any axis rather than choosing those from one axis
+- include config sync in sync list
 
 
 v0.19.8

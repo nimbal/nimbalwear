@@ -72,7 +72,7 @@ def sync_devices(tgt_device, ref_device, sig_labels=('Accelerometer x', 'Acceler
         last_sync_ref_start_idx = round((last_sync - ref_start_time).total_seconds() * ref_freq)
         last_sync_tgt_start_idx = round((last_sync - tgt_start_time).total_seconds() * tgt_freq)
 
-        last_sync_row = pd.DataFrame([[0, last_sync_ref_start_idx, last_sync_ref_start_idx + ref_freq, 0, 0, 0,
+        last_sync_row = pd.DataFrame([[-1, last_sync_ref_start_idx, last_sync_ref_start_idx + ref_freq, 0, 0, -1,
                                       last_sync_tgt_start_idx, last_sync_tgt_start_idx + tgt_freq, 1]],
                                      columns=syncs.columns)
 
