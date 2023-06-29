@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
-from scipy.signal import butter, sosfilt
+from scipy.signal import butter, sosfiltfilt
 
 
 def avm_cutpoints(cutpoint_type='Powell', dominant=False):
@@ -56,7 +56,7 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
         # low-pass filter
         order = 2
         sos = butter(N=order, Wn=lowpass, btype='lowpass', analog=False, output='sos', fs=sample_rate)
-        accel = sosfilt(sos, accel)
+        accel = sosfiltfilt(sos, accel)
 
     # calculate vector magnitudes
     if not quiet:

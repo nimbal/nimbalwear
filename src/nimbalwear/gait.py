@@ -6,7 +6,7 @@ from pathlib import Path
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
-from scipy.signal import butter, filtfilt, sosfilt, find_peaks, peak_widths, welch
+from scipy.signal import butter, sosfiltfilt, find_peaks, peak_widths, welch
 import matplotlib.pyplot as plt
 import pyedflib
 
@@ -198,7 +198,7 @@ class AccelReader:
         cutoff_freq = self.freq * 0.005
         sos = butter(N=1, Wn=cutoff_freq,
                             btype='low', fs=self.freq, output='sos')
-        orientation = sosfilt(sos, self.data)
+        orientation = sosfiltfilt(sos, self.data)
         flip_ind = np.where(orientation < -0.25)
         self.orientation = orientation
         self.data[flip_ind] = -self.data[flip_ind]
@@ -209,9 +209,8 @@ class AccelReader:
         Applies a lowpass filter on the accelerometer data
         """
         cutoff_freq = self.freq * cutoff_ratio
-        sos = butter(N=order, Wn=cutoff_freq,
-                            btype='low', fs=self.freq, output='sos')
-        self.data = sosfilt(sos, self.data)
+        sos = butter(N=order, Wn=cutoff_freq, btype='low', fs=self.freq, output='sos')
+        self.data = sosfiltfilt(sos, self.data)
 
     def plot(self, return_plt=False):
         """
@@ -1137,8 +1136,8 @@ def bw_filter(data, fs, fc,  order):
     # fc = 5
 
     # scipy.signal.filtfilt(b, a, x, axis=- 1, padtype='odd', padlen=None, method='pad', irlen=None)
-    b, a = butter(N=order, Wn=fc, btype='low', output='ba', fs=fs)
-    filtered_data = filtfilt(b, a, data)
+    sos = butter(N=order, Wn=fc, btype='low', output='sos', fs=fs)
+    filtered_data = sosfiltfilt(sos, data)
     # plt.plot(filtered_data)
 
     return filtered_data
