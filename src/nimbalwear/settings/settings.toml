@@ -1,10 +1,8 @@
-[pipeline]
-stages = [ "convert", "nonwear", "crop", "save_sensors", "gait", "sleep", "activity",]
-
 [pipeline.dirs]
-pipeline = "pipeline"
-logs = "pipeline/logs"
+study = "study"
+logs = "study/logs"
 device_raw = "wearables/raw"
+device_edf_raw = "wearables/device_edf_raw"
 device_edf_standard = "wearables/device_edf_standard"
 device_edf_cropped = "wearables/device_edf_cropped"
 sensor_edf = "wearables/sensor_edf"
@@ -28,6 +26,9 @@ sleep_daily = "analytics/sleep/daily"
 events_custom = "analytics/events/custom"
 reports_collection = "reports/collection"
 reports_feedback = "reports/feedback"
+
+[pipeline]
+stages = [ "convert", "nonwear", "crop", "save_sensors", "gait", "sleep", "activity",]
 
 [pipeline.sensors]
 
@@ -74,10 +75,17 @@ aliases = [ "CHEST",]
 [modules.read]
 overwrite_header = true
 
-[modules.convert]
+[modules.prep]
 sync = true
 autocal = true
 adj_start = ""
+nonwear = true
+crop = true
+
+[modules.analytics]
+gait = true
+sleep = true
+activity = true
 
 [modules.autocal]
 save = true
