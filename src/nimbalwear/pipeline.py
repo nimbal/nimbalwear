@@ -209,9 +209,9 @@ class Pipeline:
                 return res
             except NWException as e:
                 coll_status[f.__name__] = f'Failed'
-                message(str(e), level='error', display=(not kwargs['quiet']), log=kwargs['log'],
-                        logger_name=self.study_code)
-                message('', level='info', display=(not kwargs['quiet']), log=kwargs['log'], logger_name=self.study_code)
+                message(str(e), level='warning', display=(not kwargs['quiet']), log=kwargs['log'], logger_name=self.log_name)
+                message('', level='info', display=(not kwargs['quiet']), log=kwargs['log'], logger_name=self.log_name)
+                return kwargs['coll']
             except Exception as e:
                 coll_status[f.__name__] = f'Failed'
                 raise e
@@ -1124,7 +1124,10 @@ class Pipeline:
 
         # make copy of nonwear bouts dataframe
         nonwear_bouts = coll.nonwear_bouts.copy()
-        nonwear_bouts['duration'] = ((nonwear_bouts['end_time'] - nonwear_bouts['start_time']).dt.total_seconds() / 60).round()
+
+        # if there is nonwear data for any devices in this collection
+        if not nonwear_bouts.empty:
+            nonwear_bouts['duration'] = ((nonwear_bouts['end_time'] - nonwear_bouts['start_time']).dt.total_seconds() / 60).round()
 
         # re-initialize collection daily_nonwear and nonwear_bouts dataframes
         coll.daily_nonwear = pd.DataFrame(columns=['study_code', 'subject_id', 'coll_id', 'device_type',
