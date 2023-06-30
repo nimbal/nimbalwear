@@ -29,6 +29,7 @@ import json
 import operator
 
 import toml
+from flatten_dict import flatten, unflatten
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
@@ -94,7 +95,7 @@ class Pipeline:
         study_dir : Path or str
             Directory where study is stored.
         settings_path : Path or str, optional
-            Path to the file containing settings for the pipeline, defaults to None in which default settings file
+            Path to the file containing the default settings for the study, defaults to None in which default settings file
             path relative to study_dir is used.
 
         """
@@ -108,28 +109,39 @@ class Pipeline:
         # get study code
         self.study_code = self.study_dir.name
 
+        # get settings paths
+        default_settings_path = Path(__file__).parent.absolute() / 'settings/settings.toml'
+
         # convert settings_path to Path if not None
-        self.settings_path = Path(settings_path) if settings_path is not None else settings_path
+        settings_path = Path(settings_path) if settings_path is not None else settings_path
 
         # if settings path is None or doesn't exist than set settings_path to default settings file
-        if (self.settings_path is None) or (not self.settings_path.is_file()):
-            self.settings_path = self.study_dir / 'pipeline/settings/settings.toml'
-            self.settings_path.parent.mkdir(parents=True, exist_ok=True)
+        if (settings_path is None) or (not settings_path.is_file()):
+            settings_path = self.study_dir / 'pipeline/settings/settings.toml'
+            settings_path.parent.mkdir(parents=True, exist_ok=True)
 
             # if default settings file doesn't exist in this study then add it
-            if not self.settings_path.is_file():
-                settings_src = Path(__file__).parent.absolute() / 'settings/settings.toml'
-                shutil.copy(settings_src, self.settings_path)
+            if not settings_path.is_file():
+                shutil.copy(default_settings_path, settings_path)
+
+        with open(default_settings_path, 'r') as f:
+            default_settings_dict = toml.load(f)
 
         # if a json file is passed in read it as is but convert it to toml for next time
         # - this provides and option for backward compatibility to run the pipeline with the existing json file
         # the first time after upgrading to version 0.19 that uses toml
-        if self.settings_path.suffix == ".json":
-            settings_dict = convert_json_to_toml(settings_path, settings_path.with_suffix(".toml"))
+        if settings_path.suffix == ".json":
+            study_settings_dict = convert_json_to_toml(settings_path, settings_path.with_suffix(".toml"))
         else: # read toml file
+            with open(settings_path, 'r') as f:
+                study_settings_dict = toml.load(f)
 
-            with open(self.settings_path, 'r') as f:
-                settings_dict = toml.load(f)
+        # flatten, update, unflatten settings dict
+        settings_dict = default_settings_dict.copy()
+        settings_dict = flatten(settings_dict, reducer='dot')
+        study_settings_dict = flatten(study_settings_dict, reducer='dot')
+        settings_dict.update(study_settings_dict)
+        settings_dict = unflatten(settings_dict, splitter='dot')
 
         # parse specific settings into Pipeline attributes
         self.dirs = settings_dict['pipeline']['dirs']
@@ -146,6 +158,7 @@ class Pipeline:
         self.status_path = self.dirs['pipeline'] / 'status.csv'
 
         # dump settings to str that can be printed in log
+        self.settings_path = settings_path
         self.settings_str = toml.dumps(settings_dict)
 
         with open(Path(__file__).parent.absolute() / 'settings/data_dicts.json', 'r') as f:
