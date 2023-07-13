@@ -1,4 +1,4 @@
-[pipeline.dirs]
+[study.dirs]
 study = "study"
 logs = "study/logs"
 device_raw = "wearables/raw"
@@ -28,7 +28,7 @@ reports_collection = "reports/collection"
 reports_feedback = "reports/feedback"
 
 [pipeline]
-stages = [ "convert", "nonwear", "crop", "save_sensors", "gait", "sleep", "activity",]
+stages = [ "convert", "prep", "analytics",]
 
 [pipeline.sensors]
 

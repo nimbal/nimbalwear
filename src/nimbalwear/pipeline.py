@@ -260,6 +260,7 @@ class Study:
 
             self.log_name = f'{subject_id}_{coll_id}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}'
             log_path = self.dirs['logs'] / (self.log_name + '.log')
+            settings_dump_path = self.dirs['logs'] / (self.log_name + '_settings.txt')
 
             fileh = logging.FileHandler(log_path, 'a')
             formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
@@ -326,18 +327,27 @@ class Study:
                     self.pipeline_settings = update_settings(self.pipeline_settings, coll_settings_dict)
                     self.settings_path_list.append(str(coll_settings_path))
 
-            self.pipeline_settings_str = toml.dumps(self.pipeline_settings)
+            if stages is None:
+                stages = self.pipeline_settings['pipeline']['stages']
+            else:
+                self.pipeline_settings['pipeline']['stages'] = stages
 
-            stages = self.pipeline_settings['pipeline']['stages'] if stages is None else stages
+            self.pipeline_settings_str = toml.dumps(self.pipeline_settings)
 
             message(f"Stages: {stages}", level='info', display=(not self.quiet), log=self.log,
                     logger_name=self.log_name)
+            message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
 
             #TODO: check for valid stages and order - up to user now
 
-            message(f"Settings: {self.settings_path_list}\n\n {self.pipeline_settings_str}", level='info', display=(not self.quiet),
-                    log=self.log, logger_name=self.log_name)
-            message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
+            # dump settings to file
+
+            with open(settings_dump_path, "w") as f:
+                f.write(self.pipeline_settings_str)
+
+            # message(f"Settings: {self.settings_path_list}\n\n {self.pipeline_settings_str}", level='info', display=(not self.quiet),
+            #         log=self.log, logger_name=self.log_name)
+            # message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
 
             try:
                 # get devices for this collection from device_list
@@ -607,6 +617,10 @@ class Study:
     @coll_status
     def convert(self, coll, quiet=False, log=True):
 
+        message("---- Convert stage --------", level='info', display=(not self.quiet), log=self.log,
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
         message("Converting device data to EDF...", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
@@ -639,6 +653,10 @@ class Study:
 
     @coll_status
     def prep(self, coll, quiet=False, log=True):
+
+        message("---- Data preparation stage --------", level='info', display=(not self.quiet), log=self.log,
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         if self.pipeline_settings['modules']['prep']['autocal']:
             coll = self.autocal(coll, quiet=quiet, log=log)
@@ -714,6 +732,10 @@ class Study:
 
     @coll_status
     def analytics(self, coll, quiet=False, log=True):
+
+        message("---- Analytics stage --------", level='info', display=(not self.quiet), log=self.log,
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         # process gait
         if self.pipeline_settings['modules']['analytics']['gait']:
