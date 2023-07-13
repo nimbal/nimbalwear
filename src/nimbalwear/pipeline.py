@@ -257,8 +257,8 @@ class Study:
             coll_id = collection[1]
 
             # set up logger
-
-            self.log_name = f'{subject_id}_{coll_id}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}'
+            start_time = dt.datetime.now()
+            self.log_name = f'{subject_id}_{coll_id}_{start_time.strftime("%Y%m%d%H%M%S")}'
             log_path = self.dirs['logs'] / (self.log_name + '.log')
             settings_dump_path = self.dirs['logs'] / (self.log_name + '_settings.txt')
 
@@ -343,6 +343,7 @@ class Study:
             # dump settings to file
 
             with open(settings_dump_path, "w") as f:
+                f.write(f"Study {self.study_code}, Subject {subject_id}, Collection {coll_id}, Time {start_time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
                 f.write(self.pipeline_settings_str)
 
             # message(f"Settings: {self.settings_path_list}\n\n {self.pipeline_settings_str}", level='info', display=(not self.quiet),
@@ -484,7 +485,7 @@ class Study:
 
     def read(self, coll, stages, quiet=False, log=True):
 
-        message("Reading device data from files...", level='info', display=(not quiet), log=log,
+        message("---- Reading device data --------", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
@@ -727,6 +728,9 @@ class Study:
             coll.devices[index].export_edf(file_path=cropped_device_path, quiet=quiet)
 
             message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        if self.pipeline_settings['modules']['prep']['save_sensors']:
+            coll = self.save_sensors(coll=coll, dir=self.dirs['sensor_edf'], quiet=self.quiet, log=self.log)
 
         return coll
 
@@ -1467,8 +1471,10 @@ class Study:
 
         return coll
 
-    @coll_status
-    def save_sensors(self, coll, quiet=False, log=True):
+    def save_devices(self, coll, dir, quiet=False, log=True):
+        pass
+
+    def save_sensors(self, coll, dir, quiet=False, log=True):
 
         message("Separating sensors from devices...", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
@@ -1504,7 +1510,7 @@ class Study:
                 if sig_nums:
 
                     sensor_edf_name = '.'.join(['_'.join([device_file_base, key.upper()]), 'edf'])
-                    sensor_path = self.dirs['sensor_edf'] / sensor_edf_name
+                    sensor_path = dir / sensor_edf_name
                     sensor_path.parent.mkdir(parents=True, exist_ok=True)
 
                     message(f"Saving {sensor_path}", level='info', display=(not quiet), log=log,
