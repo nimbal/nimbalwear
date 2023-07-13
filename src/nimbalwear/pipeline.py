@@ -622,33 +622,35 @@ class Study:
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        message("Converting device data to EDF...", level='info', display=(not quiet), log=log,
-                logger_name=self.log_name)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        coll = self.save_devices(coll=coll, dir=self.dirs['device_edf_raw'], quiet=self.quiet, log=self.log)
 
-        # save all device data to edf
-        for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
-                               desc='Converting device data to EDF'):
-
-            study_code = row['study_code']
-            subject_id = row['subject_id']
-            coll_id = row['coll_id']
-            device_type = row['device_type']
-            device_location = row['device_location']
-            device_edf_name = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}.edf"
-
-            # create all file path variables
-            device_edf_path = self.dirs['device_edf_raw'] / device_edf_name
-
-            # check that all folders exist for data output files
-            device_edf_path.parent.mkdir(parents=True, exist_ok=True)
-
-            message(f"Saving {device_edf_path}", level='info', display=(not quiet), log=log, logger_name=self.log_name)
-
-            # write device data as edf
-            coll.devices[index].export_edf(file_path=device_edf_path, quiet=quiet)
-
-            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        # message("Converting device data to EDF...", level='info', display=(not quiet), log=log,
+        #         logger_name=self.log_name)
+        # message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        #
+        # # save all device data to edf
+        # for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
+        #                        desc='Converting device data to EDF'):
+        #
+        #     study_code = row['study_code']
+        #     subject_id = row['subject_id']
+        #     coll_id = row['coll_id']
+        #     device_type = row['device_type']
+        #     device_location = row['device_location']
+        #     device_edf_name = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}.edf"
+        #
+        #     # create all file path variables
+        #     device_edf_path = self.dirs['device_edf_raw'] / device_edf_name
+        #
+        #     # check that all folders exist for data output files
+        #     device_edf_path.parent.mkdir(parents=True, exist_ok=True)
+        #
+        #     message(f"Saving {device_edf_path}", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        #
+        #     # write device data as edf
+        #     coll.devices[index].export_edf(file_path=device_edf_path, quiet=quiet)
+        #
+        #     message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
@@ -668,33 +670,35 @@ class Study:
         if self.pipeline_settings['modules']['prep']['adj_start']:
             coll = self.adj_start(coll, quiet=quiet, log=log)
 
-        message("Saving standardized device data to EDF...", level='info', display=(not quiet), log=log,
-                logger_name=self.log_name)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        coll = self.save_devices(coll=coll, dir=self.dirs['device_edf_standard'], quiet=self.quiet, log=self.log)
 
-        for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
-                               desc='Saving standardized device data to EDF'):
-
-            study_code = row['study_code']
-            subject_id = row['subject_id']
-            coll_id = row['coll_id']
-            device_type = row['device_type']
-            device_location = row['device_location']
-            device_edf_name = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}.edf"
-
-            # create all file path variables
-            standard_device_path = self.dirs['device_edf_standard'] / device_edf_name
-
-            # check that all folders exist for data output files
-            standard_device_path.parent.mkdir(parents=True, exist_ok=True)
-
-            message(f"Saving {standard_device_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.log_name)
-
-            # write device data as edf
-            coll.devices[index].export_edf(file_path=standard_device_path, quiet=quiet)
-
-            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        # message("Saving standardized device data to EDF...", level='info', display=(not quiet), log=log,
+        #         logger_name=self.log_name)
+        # message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        #
+        # for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
+        #                        desc='Saving standardized device data to EDF'):
+        #
+        #     study_code = row['study_code']
+        #     subject_id = row['subject_id']
+        #     coll_id = row['coll_id']
+        #     device_type = row['device_type']
+        #     device_location = row['device_location']
+        #     device_edf_name = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}.edf"
+        #
+        #     # create all file path variables
+        #     standard_device_path = self.dirs['device_edf_standard'] / device_edf_name
+        #
+        #     # check that all folders exist for data output files
+        #     standard_device_path.parent.mkdir(parents=True, exist_ok=True)
+        #
+        #     message(f"Saving {standard_device_path}", level='info', display=(not quiet), log=log,
+        #             logger_name=self.log_name)
+        #
+        #     # write device data as edf
+        #     coll.devices[index].export_edf(file_path=standard_device_path, quiet=quiet)
+        #
+        #     message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         if self.pipeline_settings['modules']['prep']['nonwear']:
             coll = self.nonwear(coll=coll, quiet=quiet, log=log)
@@ -702,32 +706,34 @@ class Study:
         if self.pipeline_settings['modules']['prep']['crop']:
             coll = self.crop(coll=coll, quiet=quiet, log=log)
 
-        message("Saving cropped device data to EDF...", level='info', display=(not quiet), log=log,
-                logger_name=self.log_name)
-        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
-
-        for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
-                               desc='Saving cropped device data to EDF'):
-            study_code = row['study_code']
-            subject_id = row['subject_id']
-            coll_id = row['coll_id']
-            device_type = row['device_type']
-            device_location = row['device_location']
-            device_edf_name = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}.edf"
-
-            # create all file path variables
-            cropped_device_path = self.dirs['device_edf_cropped'] / device_edf_name
-
-            # check that all folders exist for data output files
-            cropped_device_path.parent.mkdir(parents=True, exist_ok=True)
-
-            message(f"Saving {cropped_device_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.log_name)
-
-            # write device data as edf
-            coll.devices[index].export_edf(file_path=cropped_device_path, quiet=quiet)
-
-            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        coll = self.save_devices(coll=coll, dir=self.dirs['device_edf_cropped'], quiet=self.quiet, log=self.log)
+        #
+        # message("Saving cropped device data to EDF...", level='info', display=(not quiet), log=log,
+        #         logger_name=self.log_name)
+        # message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        #
+        # for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
+        #                        desc='Saving cropped device data to EDF'):
+        #     study_code = row['study_code']
+        #     subject_id = row['subject_id']
+        #     coll_id = row['coll_id']
+        #     device_type = row['device_type']
+        #     device_location = row['device_location']
+        #     device_edf_name = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}.edf"
+        #
+        #     # create all file path variables
+        #     cropped_device_path = self.dirs['device_edf_cropped'] / device_edf_name
+        #
+        #     # check that all folders exist for data output files
+        #     cropped_device_path.parent.mkdir(parents=True, exist_ok=True)
+        #
+        #     message(f"Saving {cropped_device_path}", level='info', display=(not quiet), log=log,
+        #             logger_name=self.log_name)
+        #
+        #     # write device data as edf
+        #     coll.devices[index].export_edf(file_path=cropped_device_path, quiet=quiet)
+        #
+        #     message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         if self.pipeline_settings['modules']['prep']['save_sensors']:
             coll = self.save_sensors(coll=coll, dir=self.dirs['sensor_edf'], quiet=self.quiet, log=self.log)
@@ -1472,7 +1478,35 @@ class Study:
         return coll
 
     def save_devices(self, coll, dir, quiet=False, log=True):
-        pass
+
+        message("Saving device data to EDF...", level='info', display=(not quiet), log=log,
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
+                               desc='Saving device data to EDF'):
+            study_code = row['study_code']
+            subject_id = row['subject_id']
+            coll_id = row['coll_id']
+            device_type = row['device_type']
+            device_location = row['device_location']
+            device_edf_name = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}.edf"
+
+            # create all file path variables
+            device_path = dir / device_edf_name
+
+            # check that all folders exist for data output files
+            device_path.parent.mkdir(parents=True, exist_ok=True)
+
+            message(f"Saving {device_path}", level='info', display=(not quiet), log=log,
+                    logger_name=self.log_name)
+
+            # write device data as edf
+            coll.devices[index].export_edf(file_path=device_path, quiet=quiet)
+
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        return coll
 
     def save_sensors(self, coll, dir, quiet=False, log=True):
 
@@ -1493,7 +1527,7 @@ class Study:
             device_type = row['device_type']
             device_location = row['device_location']
 
-            device_file_base = '_'.join([study_code, subject_id, coll_id, device_type, device_location])
+            device_file_base = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}"
 
             # loop through supported sensor types
             for key in tqdm(self.pipeline_settings['pipeline']['sensors'], leave=False, desc="Separating sensors"):
