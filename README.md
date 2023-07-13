@@ -32,6 +32,13 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+- option to save separate sensor EDF files after data prep
+- move settings dump from log into separate file
+- rename Pipeline class to Study
+- separate default, study, and custom pipeline settings
+- some missing data handled and reported as warning instead of raising exception
+- bug fix: all filters now dual pass
+- separate sync event and segments into separate folders
 - syncs detected from any axis rather than choosing those from one axis
 - include config sync in sync list
 - add ref device type and location to sync output
