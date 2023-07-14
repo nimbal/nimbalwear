@@ -1,12 +1,10 @@
 from datetime import timedelta
-import math
 import os
-from pathlib import Path
 
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
-from scipy.signal import butter, filtfilt, sosfiltfilt, find_peaks, peak_widths, welch
+from scipy.signal import butter, sosfiltfilt, find_peaks, peak_widths
 
 
 def detect_vert(axes, method='adg'):
@@ -47,7 +45,7 @@ def lowpass_filter(acc_data, freq, order=2, cutoff_ratio=0.17):
     """
     cutoff_freq = freq * cutoff_ratio
     sos = butter(N=order, Wn=cutoff_freq, btype='low', fs=freq, output='sos')
-    acc_data = sosfilt(sos, acc_data)
+    acc_data = sosfiltfilt(sos, acc_data)
 
     return acc_data, cutoff_freq
 
@@ -683,67 +681,3 @@ def gait_stats(bouts, stat_type='daily', single_leg=False):
         print('Invalid type selected.')
 
     return gait_stats
-
-########################################################################################################################
-if __name__ == '__main__':
-
-    from src.nimbalwear import Device
-
-    ankle = Device()
-
-    #GNAC testing
-    subj = "OND06_1027_01"
-    ankle_path = fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf'
-    if os.path.exists(ankle_path):
-        ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND06\processed\standard_device_edf\GNAC\{subj}_GNAC_LAnkle.edf')
-    else:
-        ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\sensor_edf\{subj}_GNAC_RAnkle.edf')
-
-    ## get signal labels
-    index_dict = {"accel_x": ankle.get_signal_index('Accelerometer x'),
-                  "accel_y": ankle.get_signal_index('Accelerometer y'),
-                  "accel_z": ankle.get_signal_index('Accelerometer z')}
-    ##get signal frequencies needed for step detection
-    fs = ankle.signal_headers[index_dict['accel_x']]['sample_rate']
-
-    acc_data = np.array(ankle.signals[0:3])
-    vertical_acc = np.array(ankle.signals[index_dict['accel_y']])
-
-    data_start_time = ankle.header["start_datetime"]  # if start is None else start
-
-    # #Input for detect steps is "Device" obj
-    #def detect_steps(ra_data=None, la_data=None, data_type='accelerometer', loc=None, data=None, start=0, end=-1, freq=None, orient_signal=True, low_pass=True):
-    steps_df = detect_steps(ra_data=None, la_data=vertical_acc, data_type='accelerometer', left_right='left', loc='ankle', data=None, start_time=data_start_time, start=100000, end=200000, freq=fs)
-
-###############################################################################
-   #  #AXV6 testing
-   #  subj = "OND09_0011_01"
-   #  ankle_path = fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf'
-   #  if os.path.exists(ankle_path):
-   #       ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_LAnkle.edf')
-   #  else:
-   #       ankle.import_edf(file_path=fr'W:\NiMBaLWEAR\OND09\wearables\device_edf_cropped\{subj}_AXV6_RAnkle.edf')
-   #
-   # # get signal labels
-   #  index_dict = {"accel_x": ankle.get_signal_index('Accelerometer x'),
-   #                "accel_y": ankle.get_signal_index('Accelerometer y'),
-   #                "accel_z": ankle.get_signal_index('Accelerometer z'),
-   #                "gyro_x": ankle.get_signal_index('Gyroscope x'),
-   #                "gyro_y": ankle.get_signal_index('Gyroscope y'),
-   #                "gyro_z": ankle.get_signal_index('Gyroscope z')}
-   #  ##get signal frequencies needed for step detection
-   #  fs = ankle.signal_headers[index_dict['gyro_z']]['sample_rate']
-   #
-   #  gyro_data = np.array([ankle.signals[index_dict['gyro_x']], ankle.signals[index_dict['gyro_y']], ankle.signals[index_dict['gyro_z']]])
-   #  acc_data = np.array([ankle.signals[index_dict['accel_x']], ankle.signals[index_dict['accel_y']], ankle.signals[index_dict['accel_z']]])
-   #  sag_gyro = np.array(ankle.signals[index_dict['gyro_z']])
-   #
-   #  data_start_time = ankle.header["start_datetime"]  # if start is None else start
-
-    # steps_df = detect_steps(ra_data=sag_gyro, la_data=sag_gyro, data_type='gyroscope', left_right='bilateral', loc='ankle', data=None, start_time=data_start_time, start=0, end=-1, freq=fs)
-    #
-    #---
-    #
-    # get walking bouts should run on any detect_steps output (steps_df
-    bouts = get_walking_bouts(steps_df=steps_df, initiate_time=15, mrp=10, freq=fs)
-    bout_stats = gait_stats(bouts, stat_type='daily', single_leg=False)
