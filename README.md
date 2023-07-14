@@ -32,6 +32,41 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+- option to save separate sensor EDF files after data prep
+- move settings dump from log into separate file
+- rename Pipeline class to Study
+- separate default, study, and custom pipeline settings
+- some missing data handled and reported as warning instead of raising exception
+- bug fix: all filters now dual pass
+- separate sync event and segments into separate folders
+- syncs detected from any axis rather than choosing those from one axis
+- include config sync in sync list
+- add ref device type and location to sync output
+
+
+v0.19.8
+- bug fix: properly handles Axivity devices with no gyro collected
+
+v0.19.7
+- bug fix: instead of error, sync returns empty DataFrame when no syncs detected or matched
+- bug fix: fix bug where sync plots aren't displayed
+
+v0.19.6
+- bug fix: ensure physical_min < physical_max when writing edf
+
+v0.19.5
+- bug fix: properly detects sleep bouts when entire SPTW is sleep
+
+v0.19.4
+- added utility to read password protected excel files
+
+v0.19.3
+- bug fix: adjust filter order in activity module
+- bug fix: fix error when trying to run activity module with no sleep detected
+
+v0.19.2
+- bug fix: properly calculates sample indices to be removed - no longer attempts to remove sample beyond end of window
+
 v0.19.1
 - add minimum correlation option for sync
 - bug fix: references to settings.json instead of settings.toml on install

@@ -2,10 +2,11 @@ from datetime import timedelta
 import math
 import os
 from pathlib import Path
+
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
-from scipy.signal import butter, filtfilt, sosfilt, find_peaks, peak_widths, welch
+from scipy.signal import butter, filtfilt, sosfiltfilt, find_peaks, peak_widths, welch
 
 
 def detect_vert(axes, method='adg'):
@@ -57,7 +58,7 @@ def flip_signal(acc_data, freq):
     """
     cutoff_freq = freq * 0.005
     sos = butter(N=1, Wn=cutoff_freq, btype='low', fs=freq, output='sos')
-    orientation = sosfilt(sos, acc_data)
+    orientation = sosfiltfilt(sos, acc_data)
     flip_ind = np.where(orientation < -0.25)
     acc_data[flip_ind] = -acc_data[flip_ind]
 
@@ -345,8 +346,8 @@ def fraccaro_gyro_steps(data, freq, start_time, loc=None, start_dp=0, end_dp=-1,
         """
         Filter (filtfilt) data with dual pass lowpass butterworth filter
         """
-        b, a = butter(N=order, Wn=fc, btype='low', output='ba', fs=freq)
-        filtered_data = filtfilt(b, a, data)
+        sos = butter(N=order, Wn=fc, btype='low', output='sos', fs=freq)
+        filtered_data = sosfiltfilt(sos, data)
 
         return filtered_data
 

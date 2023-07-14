@@ -300,8 +300,14 @@ def detect_sleep_bouts(z_angle_diff, sptw, z_sample_rate, start_datetime, raw_ep
 
         # Keep blocks > min_sleep_length
 
+
+
         z_angle_cross_threshold = [j for j in range(1, len(z_below_per_threshold))
                                    if z_below_per_threshold[j] != z_below_per_threshold[j - 1]]
+
+        # if all values below threshold then crossed threshold on first index
+        if all(z_below_per_threshold):
+            z_angle_cross_threshold.insert(0, 0)
 
         # only continue if sleep bout candidates detected (i.e., some values above and below threshold)
         if z_angle_cross_threshold:

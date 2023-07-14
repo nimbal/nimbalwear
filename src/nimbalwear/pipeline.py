@@ -39,12 +39,12 @@ from .nonwear import vert_nonwear, nonwear_stats
 from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
 from .gait import AccelReader, WalkingBouts, get_gait_bouts, create_timestamps, gait_stats
 from .activity import activity_wrist_avm, activity_stats
-from .utils import convert_json_to_toml
+from .utils import convert_json_to_toml, update_settings
 
 from .__version__ import __version__
 
 
-class Pipeline:
+class Study:
     """"Represents a study on which the pipeline can be run.
 
     Attributes
@@ -94,7 +94,7 @@ class Pipeline:
         study_dir : Path or str
             Directory where study is stored.
         settings_path : Path or str, optional
-            Path to the file containing settings for the pipeline, defaults to None in which default settings file
+            Path to the file containing the default settings for the study, defaults to None in which default settings file
             path relative to study_dir is used.
 
         """
@@ -108,48 +108,59 @@ class Pipeline:
         # get study code
         self.study_code = self.study_dir.name
 
-        # convert settings_path to Path if not None
-        self.settings_path = Path(settings_path) if settings_path is not None else settings_path
+        # get settings paths
+        default_settings_path = Path(__file__).parent.absolute() / 'settings/settings.toml'
 
-        # if settings path is None or doesn't exist than set settings_path to default settings file
-        if (self.settings_path is None) or (not self.settings_path.is_file()):
-            self.settings_path = self.study_dir / 'pipeline/settings/settings.toml'
-            self.settings_path.parent.mkdir(parents=True, exist_ok=True)
+        # convert settings_path to Path if not None
+        settings_path = Path(settings_path) if settings_path is not None else settings_path
+
+        # if settings path is None or doesn't exist then set settings_path to default settings file
+        if (settings_path is None) or (not settings_path.is_file()):
+            settings_path = self.study_dir / 'study/settings/settings.toml'
+            settings_path.parent.mkdir(parents=True, exist_ok=True)
 
             # if default settings file doesn't exist in this study then add it
-            if not self.settings_path.is_file():
-                settings_src = Path(__file__).parent.absolute() / 'settings/settings.toml'
-                shutil.copy(settings_src, self.settings_path)
+            if not settings_path.is_file():
+                shutil.copy(default_settings_path, settings_path)
+
+        with open(default_settings_path, 'r') as f:
+            default_settings_dict = toml.load(f)
+
+        self.study_settings = default_settings_dict.copy()
 
         # if a json file is passed in read it as is but convert it to toml for next time
         # - this provides and option for backward compatibility to run the pipeline with the existing json file
         # the first time after upgrading to version 0.19 that uses toml
-        if self.settings_path.suffix == ".json":
-            settings_dict = convert_json_to_toml(settings_path, settings_path.with_suffix(".toml"))
+        if settings_path.suffix == ".json":
+            study_settings_dict = convert_json_to_toml(settings_path, settings_path.with_suffix(".toml"))
         else: # read toml file
+            with open(settings_path, 'r') as f:
+                study_settings_dict = toml.load(f)
 
-            with open(self.settings_path, 'r') as f:
-                settings_dict = toml.load(f)
+        self.study_settings = update_settings(self.study_settings, study_settings_dict)
+        self.study_settings_str = toml.dumps(self.study_settings)
+        self.study_settings_path = settings_path
+        self.settings_path_list = [str(settings_path)]
 
         # parse specific settings into Pipeline attributes
-        self.dirs = settings_dict['pipeline']['dirs']
+        self.dirs = self.study_settings['study']['dirs']
         self.dirs = {key: self.study_dir / value for key, value in self.dirs.items()}
 
-        self.stages = settings_dict['pipeline']['stages']
-        self.sensors = settings_dict['pipeline']['sensors']
-        self.device_locations = settings_dict['pipeline']['device_locations']
-        self.module_settings = settings_dict['modules']
+        # self.stages = self.settings['pipeline']['stages']
+        # self.sensors = self.settings['pipeline']['sensors']
+        # self.device_locations = self.settings['pipeline']['device_locations']
+        # self.module_settings = self.settings['modules']
 
         # pipeline data file paths
-        self.device_info_path = self.dirs['pipeline'] / 'devices.csv'
-        self.collection_info_path = self.dirs['pipeline'] / 'collections.csv'
-        self.status_path = self.dirs['pipeline'] / 'status.csv'
+        self.device_info_path = self.dirs['study'] / 'devices.csv'
+        self.collection_info_path = self.dirs['study'] / 'collections.csv'
+        self.status_path = self.dirs['study'] / 'status.csv'
 
         # dump settings to str that can be printed in log
-        self.settings_str = toml.dumps(settings_dict)
 
-        with open(Path(__file__).parent.absolute() / 'settings/data_dicts.json', 'r') as f:
-            self.data_dicts = json.load(f)
+
+        # with open(Path(__file__).parent.absolute() / 'settings/data_dicts.json', 'r') as f:
+        #     self.data_dicts = json.load(f)
 
         # TODO: check for required files (raw data, device_list)
 
@@ -171,10 +182,10 @@ class Pipeline:
         for key, value in self.dirs.items():
             Path(value).mkdir(parents=True, exist_ok=True)
             # add data dictionary
-            if key in self.data_dicts:
-                df = pd.DataFrame(self.data_dicts[key])
-                p = value / f'{key}_dict.csv'
-                df.to_csv(p, index=False)
+            # if key in self.data_dicts:
+            #     df = pd.DataFrame(self.data_dicts[key])
+            #     p = value / f'{key}_dict.csv'
+            #     df.to_csv(p, index=False)
 
         return
 
@@ -184,21 +195,22 @@ class Pipeline:
 
             # the keys are the same as the function names
             coll_status = {
-                'nwcollection_id': f"{kwargs['coll'].subject_id}_{kwargs['coll'].coll_id}",
+                'subject_id': kwargs['coll'].subject_id,
+                'coll_id': kwargs['coll'].coll_id,
                 'convert': '',
-                'nonwear': '',
-                'crop': '',
-                'save_sensors': '',
-                'activity': '',
-                'gait': '',
-                'sleep': ''
+                'prep': '',
+                'analytics': '',
             }
 
-            status_df = pd.read_csv(self.status_path) if self.status_path.exists() \
+            status_df = pd.read_csv(self.status_path, dtype=str) if self.status_path.exists() \
                 else pd.DataFrame(columns=coll_status.keys())
 
-            if coll_status['nwcollection_id'] in status_df['nwcollection_id'].values:
-                index = status_df.loc[status_df['nwcollection_id'] == coll_status['nwcollection_id']].index[0]
+            current_collection = (coll_status['subject_id'], coll_status['coll_id'])
+            collections = zip(status_df['subject_id'], status_df['coll_id'])
+
+            if current_collection in collections:
+                index = status_df.loc[(status_df['subject_id'] == coll_status['subject_id'])
+                                      & (status_df['coll_id'] == coll_status['coll_id'])].index[0]
                 coll_status = status_df.to_dict(orient='records')[index]
             else:
                 index = (status_df.index.max() + 1)
@@ -209,9 +221,9 @@ class Pipeline:
                 return res
             except NWException as e:
                 coll_status[f.__name__] = f'Failed'
-                message(str(e), level='error', display=(not kwargs['quiet']), log=kwargs['log'],
-                        logger_name=self.study_code)
-                message('', level='info', display=(not kwargs['quiet']), log=kwargs['log'], logger_name=self.study_code)
+                message(str(e), level='warning', display=(not kwargs['quiet']), log=kwargs['log'], logger_name=self.log_name)
+                message('', level='info', display=(not kwargs['quiet']), log=kwargs['log'], logger_name=self.log_name)
+                return kwargs['coll']
             except Exception as e:
                 coll_status[f.__name__] = f'Failed'
                 raise e
@@ -221,7 +233,7 @@ class Pipeline:
 
         return coll_status_wrapper
 
-    def run(self, collections=None, single_stage=None, quiet=False, log=True, log_level=logging.INFO):
+    def run_pipeline(self, collections=None, stages=None, settings_path=None, quiet=False, log=True, log_level=logging.INFO):
         """
 
         :param collections: list of tuples (subject_id, coll_id), default is None which will run all collections
@@ -244,8 +256,11 @@ class Pipeline:
             subject_id = collection[0]
             coll_id = collection[1]
 
-            self.log_name = f'{subject_id}_{coll_id}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}'
+            # set up logger
+            start_time = dt.datetime.now()
+            self.log_name = f'{subject_id}_{coll_id}_{start_time.strftime("%Y%m%d%H%M%S")}'
             log_path = self.dirs['logs'] / (self.log_name + '.log')
+            settings_dump_path = self.dirs['logs'] / (self.log_name + '_settings.txt')
 
             fileh = logging.FileHandler(log_path, 'a')
             formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
@@ -258,6 +273,7 @@ class Pipeline:
             logger.setLevel(log_level)
             logger.addHandler(fileh)
 
+            # display header messages
             message("\n\n", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
             message(f"---- Processing collection ----------------------------------------------",
                     level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
@@ -269,16 +285,70 @@ class Pipeline:
             message(f"nimbalwear v{__version__}", level='info', display=(not self.quiet), log=self.log,
                     logger_name=self.log_name)
 
-            if single_stage is not None:
-                message(f"Single stage: {single_stage}", level='info', display=(not self.quiet), log=self.log,
-                        logger_name=self.log_name)
             if not isinstance(self.collection_info, pd.DataFrame):
                 message("Missing collection info file in meta folder `collections.csv`", level='warning',
                         display=(not self.quiet), log=self.log, logger_name=self.log_name)
             message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
-            message(f"Settings: {self.settings_path}\n\n {self.settings_str}", level='info', display=(not self.quiet),
-                    log=self.log, logger_name=self.log_name)
+
+
+            # set/reset default study settings for pipeline
+            self.pipeline_settings = self.study_settings.copy()
+
+            # update custom pipeline settings if file or 'auto' passed
+            if settings_path not in (None, 'auto'):
+
+                # convert settings_path to Path
+                settings_path = Path(settings_path)
+
+                # if settings file exists then update settings else display message
+                if settings_path.is_file():
+
+                    with open(settings_path, 'r') as f:
+                        pipeline_settings_dict = toml.load(f)
+                    self.pipeline_settings = update_settings(self.pipeline_settings, pipeline_settings_dict)
+                    self.settings_path_list.append(settings_path)
+
+                else:
+                    message(f"Custom settings file {settings_path} does not exist.", level='warning',
+                            display=(not self.quiet), log=self.log, logger_name=self.log_name)
+                    message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
+
+            elif settings_path == 'auto':
+                # look for custom settings file based on subject_id and coll_id
+                study_settings_dir = self.study_settings_path.parent
+                study_settings_name = self.study_settings_path.name
+                coll_settings_path = study_settings_dir / f"{self.study_code}_{subject_id}_{coll_id}_{study_settings_name}"
+
+                # if file exists update settings
+                if coll_settings_path.is_file():
+
+                    with open(coll_settings_path, 'r') as f:
+                        coll_settings_dict = toml.load(f)
+                    self.pipeline_settings = update_settings(self.pipeline_settings, coll_settings_dict)
+                    self.settings_path_list.append(str(coll_settings_path))
+
+            if stages is None:
+                stages = self.pipeline_settings['pipeline']['stages']
+            else:
+                self.pipeline_settings['pipeline']['stages'] = stages
+
+            self.pipeline_settings_str = toml.dumps(self.pipeline_settings)
+
+            message(f"Stages: {stages}", level='info', display=(not self.quiet), log=self.log,
+                    logger_name=self.log_name)
             message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
+
+            #TODO: check for valid stages and order - up to user now
+
+            # dump settings to file
+
+            with open(settings_dump_path, "w") as f:
+                f.write(f"Study {self.study_code}, Subject {subject_id}, Collection {coll_id}, Time {start_time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+                f.write(self.pipeline_settings_str)
+
+            # message(f"Settings: {self.settings_path_list}\n\n {self.pipeline_settings_str}", level='info', display=(not self.quiet),
+            #         log=self.log, logger_name=self.log_name)
+            # message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
 
             try:
                 # get devices for this collection from device_list
@@ -301,7 +371,7 @@ class Pipeline:
                 coll.device_info = coll_device_list_df
                 coll.collection_info = coll_subject_dict
 
-                self.process_collection(coll=coll, single_stage=single_stage)
+                self.process_collection(coll=coll, stages=stages)
 
             except:
                 tb = traceback.format_exc()
@@ -314,7 +384,7 @@ class Pipeline:
 
         return
 
-    def process_collection(self, coll, single_stage=None):
+    def process_collection(self, coll, stages):
         """Processes the collection
 
         Args:
@@ -325,17 +395,26 @@ class Pipeline:
             True if successful, False otherwise.
         """
 
-        if single_stage in ['activity', 'gait', 'sleep']:
-            coll = self.required_devices(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
+        stage_switch = {'convert': lambda: self.convert(coll=coll, quiet=self.quiet, log=self.log),
+                        'prep': lambda: self.prep(coll=coll, quiet=self.quiet, log=self.log),
+                        'analytics': lambda: self.analytics(coll=coll, quiet=self.quiet, log=self.log), }
+
+
+        # if single_stage in ['activity', 'gait', 'sleep']:
+        #     coll = self.required_devices(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
         # read data from all devices in collection
-        coll = self.read(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
+        coll = self.read(coll=coll, stages=stages, quiet=self.quiet, log=self.log)
+
+        for stage in stages:
+            coll = stage_switch.get(stage, lambda: 'Invalid')()
+
+        return True
 
         # convert to edf
         if single_stage in [None, 'convert']:
             coll = self.convert(coll=coll, quiet=self.quiet, log=self.log)
 
-        # data integrity ??
 
         # process nonwear for all devices
         if single_stage in [None, 'nonwear']:
@@ -404,13 +483,13 @@ class Pipeline:
 
         return coll
 
-    def read(self, coll, single_stage=None, quiet=False, log=True):
+    def read(self, coll, stages, quiet=False, log=True):
 
-        message("Reading device data from files...", level='info', display=(not quiet), log=log,
+        message("---- Reading device data --------", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        overwrite_header = self.module_settings['read']['overwrite_header']
+        overwrite_header = self.pipeline_settings['modules']['read']['overwrite_header']
 
         # TODO: move to json or make autodetect?
         import_switch = {'EDF': lambda: device_data.import_edf(device_file_path, quiet=quiet),
@@ -442,16 +521,16 @@ class Pipeline:
             device_edf_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location]),
                                         "edf"])
 
-            if single_stage in [None, 'convert']:
+            if stages[0] == 'convert':
 
                 device_file_path = self.dirs['device_raw'] / device_file_name
                 import_func = import_switch.get(device_type, lambda: 'Invalid')
 
                 #TODO: Rotate GENEActiv 90 deg if location is ankle
 
-            elif single_stage in ['nonwear', 'crop']:
+            elif stages[0] == 'prep':
 
-                device_file_path = self.dirs['device_edf_standard'] / device_edf_name
+                device_file_path = self.dirs['device_edf_raw'] / device_edf_name
                 import_func = import_switch.get('EDF', lambda: 'Invalid')
 
             else:
@@ -531,49 +610,154 @@ class Pipeline:
         #remove devices from device_info if file was not found
         coll.device_info = coll.device_info.drop(index=remove_idx).reset_index(drop=True)
 
+        if stages[0] == 'analytics':
+            coll = self.read_nonwear(coll=coll, quiet=self.quiet, log=self.log)
+
         return coll
 
     @coll_status
     def convert(self, coll, quiet=False, log=True):
 
-        if self.module_settings['convert']['autocal']:
-            coll = self.autocal(coll, quiet=quiet, log=log)
-
-        if self.module_settings['convert']['sync']:
-            coll = self.sync(coll, quiet=quiet, log=log)
-
-        if self.module_settings['convert']['adj_start']:
-            coll = self.adj_start(coll, quiet=quiet, log=log)
-
-        message("Converting device data to EDF...", level='info', display=(not quiet), log=log,
+        message("---- Convert stage --------", level='info', display=(not self.quiet), log=self.log,
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        # save all device data to edf
-        for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
-                               desc='Converting device data to EDF'):
+        coll = self.save_devices(coll=coll, dir=self.dirs['device_edf_raw'], quiet=self.quiet, log=self.log)
 
-            study_code = row['study_code']
-            subject_id = row['subject_id']
-            coll_id = row['coll_id']
-            device_type = row['device_type']
-            device_location = row['device_location']
-            device_edf_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location]),
-                                        "edf"])
+        # message("Converting device data to EDF...", level='info', display=(not quiet), log=log,
+        #         logger_name=self.log_name)
+        # message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        #
+        # # save all device data to edf
+        # for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
+        #                        desc='Converting device data to EDF'):
+        #
+        #     study_code = row['study_code']
+        #     subject_id = row['subject_id']
+        #     coll_id = row['coll_id']
+        #     device_type = row['device_type']
+        #     device_location = row['device_location']
+        #     device_edf_name = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}.edf"
+        #
+        #     # create all file path variables
+        #     device_edf_path = self.dirs['device_edf_raw'] / device_edf_name
+        #
+        #     # check that all folders exist for data output files
+        #     device_edf_path.parent.mkdir(parents=True, exist_ok=True)
+        #
+        #     message(f"Saving {device_edf_path}", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        #
+        #     # write device data as edf
+        #     coll.devices[index].export_edf(file_path=device_edf_path, quiet=quiet)
+        #
+        #     message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-            # create all file path variables
-            standard_device_path = self.dirs['device_edf_standard'] / device_edf_name
+        return coll
 
-            # check that all folders exist for data output files
-            standard_device_path.parent.mkdir(parents=True, exist_ok=True)
+    @coll_status
+    def prep(self, coll, quiet=False, log=True):
 
-            message(f"Saving {standard_device_path}", level='info', display=(not quiet), log=log,
-                    logger_name=self.log_name)
+        message("---- Data preparation stage --------", level='info', display=(not self.quiet), log=self.log,
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-            # write device data as edf
-            coll.devices[index].export_edf(file_path=standard_device_path, quiet=quiet)
+        if self.pipeline_settings['modules']['prep']['autocal']:
+            coll = self.autocal(coll, quiet=quiet, log=log)
 
-            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        if self.pipeline_settings['modules']['prep']['sync']:
+            coll = self.sync(coll, quiet=quiet, log=log)
+
+        if self.pipeline_settings['modules']['prep']['adj_start']:
+            coll = self.adj_start(coll, quiet=quiet, log=log)
+
+        coll = self.save_devices(coll=coll, dir=self.dirs['device_edf_standard'], quiet=self.quiet, log=self.log)
+
+        # message("Saving standardized device data to EDF...", level='info', display=(not quiet), log=log,
+        #         logger_name=self.log_name)
+        # message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        #
+        # for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
+        #                        desc='Saving standardized device data to EDF'):
+        #
+        #     study_code = row['study_code']
+        #     subject_id = row['subject_id']
+        #     coll_id = row['coll_id']
+        #     device_type = row['device_type']
+        #     device_location = row['device_location']
+        #     device_edf_name = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}.edf"
+        #
+        #     # create all file path variables
+        #     standard_device_path = self.dirs['device_edf_standard'] / device_edf_name
+        #
+        #     # check that all folders exist for data output files
+        #     standard_device_path.parent.mkdir(parents=True, exist_ok=True)
+        #
+        #     message(f"Saving {standard_device_path}", level='info', display=(not quiet), log=log,
+        #             logger_name=self.log_name)
+        #
+        #     # write device data as edf
+        #     coll.devices[index].export_edf(file_path=standard_device_path, quiet=quiet)
+        #
+        #     message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        if self.pipeline_settings['modules']['prep']['nonwear']:
+            coll = self.nonwear(coll=coll, quiet=quiet, log=log)
+
+        if self.pipeline_settings['modules']['prep']['crop']:
+            coll = self.crop(coll=coll, quiet=quiet, log=log)
+
+        coll = self.save_devices(coll=coll, dir=self.dirs['device_edf_cropped'], quiet=self.quiet, log=self.log)
+        #
+        # message("Saving cropped device data to EDF...", level='info', display=(not quiet), log=log,
+        #         logger_name=self.log_name)
+        # message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+        #
+        # for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
+        #                        desc='Saving cropped device data to EDF'):
+        #     study_code = row['study_code']
+        #     subject_id = row['subject_id']
+        #     coll_id = row['coll_id']
+        #     device_type = row['device_type']
+        #     device_location = row['device_location']
+        #     device_edf_name = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}.edf"
+        #
+        #     # create all file path variables
+        #     cropped_device_path = self.dirs['device_edf_cropped'] / device_edf_name
+        #
+        #     # check that all folders exist for data output files
+        #     cropped_device_path.parent.mkdir(parents=True, exist_ok=True)
+        #
+        #     message(f"Saving {cropped_device_path}", level='info', display=(not quiet), log=log,
+        #             logger_name=self.log_name)
+        #
+        #     # write device data as edf
+        #     coll.devices[index].export_edf(file_path=cropped_device_path, quiet=quiet)
+        #
+        #     message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        if self.pipeline_settings['modules']['prep']['save_sensors']:
+            coll = self.save_sensors(coll=coll, dir=self.dirs['sensor_edf'], quiet=self.quiet, log=self.log)
+
+        return coll
+
+    @coll_status
+    def analytics(self, coll, quiet=False, log=True):
+
+        message("---- Analytics stage --------", level='info', display=(not self.quiet), log=self.log,
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        # process gait
+        if self.pipeline_settings['modules']['analytics']['gait']:
+            coll = self.gait(coll=coll, quiet=self.quiet, log=self.log, )
+
+        # process sleep
+        if self.pipeline_settings['modules']['analytics']['sleep']:
+            coll = self.sleep(coll=coll, quiet=self.quiet, log=self.log)
+
+        # process activity levels
+        if self.pipeline_settings['modules']['analytics']['activity']:
+            coll = self.activity(coll=coll, quiet=self.quiet, log=self.log)
 
         return coll
 
@@ -615,7 +799,7 @@ class Pipeline:
             message(f"Autocalibrated {device_type} {device_location}: Calibration error reduced from {pre_err} to {post_err} after {iter} iterations.",
                     level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-            if self.module_settings['autocal']['save']:
+            if self.pipeline_settings['modules']['autocal']['save']:
 
                 # create all file path variables
                 calib_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
@@ -641,16 +825,16 @@ class Pipeline:
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        sync_type = self.module_settings['sync']['type']
-        sync_at_config = self.module_settings['sync']['sync_at_config']
-        search_radius = self.module_settings['sync'].get('search_radius', None)
-        rest_min = self.module_settings['sync']['rest_min']
-        rest_max = self.module_settings['sync']['rest_max']
-        rest_sens = self.module_settings['sync']['rest_sens']
-        flip_max = self.module_settings['sync']['flip_max']
-        min_flips = self.module_settings['sync']['min_flips']
-        reject_above_ae = self.module_settings['sync']['reject_above_ae']
-        req_tgt_corr = self.module_settings['sync']['req_tgt_corr']
+        sync_type = self.pipeline_settings['modules']['sync']['type']
+        sync_at_config = self.pipeline_settings['modules']['sync']['sync_at_config']
+        search_radius = self.pipeline_settings['modules']['sync'].get('search_radius', None)
+        rest_min = self.pipeline_settings['modules']['sync']['rest_min']
+        rest_max = self.pipeline_settings['modules']['sync']['rest_max']
+        rest_sens = self.pipeline_settings['modules']['sync']['rest_sens']
+        flip_max = self.pipeline_settings['modules']['sync']['flip_max']
+        min_flips = self.pipeline_settings['modules']['sync']['min_flips']
+        reject_above_ae = self.pipeline_settings['modules']['sync']['reject_above_ae']
+        req_tgt_corr = self.pipeline_settings['modules']['sync']['req_tgt_corr']
 
         if not coll.device_info.empty:
             ref_device_type = coll.device_info.iloc[0]['device_type']
@@ -675,7 +859,7 @@ class Pipeline:
 
             else:
 
-                accel_idx = coll.devices[idx].get_signal_index(self.sensors['accelerometer']['signals'][0])
+                accel_idx = coll.devices[idx].get_signal_index(self.pipeline_settings['pipeline']['sensors']['accelerometer']['signals'][0])
 
                 # set signal_ds to downsample to somewhere between 5-11 Hz for sync detection if possible
                 freq = coll.devices[idx].signal_headers[accel_idx]['sample_rate']
@@ -685,8 +869,11 @@ class Pipeline:
                     ds_index = freq - 5
                 signal_ds = round(freq / (5 + ds_index))
 
+                # get signal labels and add 'Config' to end for sig_idx -1
+                accel_signal_labels = tuple(self.pipeline_settings['pipeline']['sensors']['accelerometer']['signals']) + ('Config', )
+
                 syncs, segments = coll.devices[idx].sync(ref=coll.devices[0],
-                                                         sig_labels=tuple(self.sensors['accelerometer']['signals']),
+                                                         sig_labels=tuple(self.pipeline_settings['pipeline']['sensors']['accelerometer']['signals']),
                                                          sync_type=sync_type, sync_at_config=sync_at_config,
                                                          search_radius=search_radius, signal_ds=signal_ds,
                                                          rest_min=rest_min, rest_max=rest_max, rest_sens=rest_sens,
@@ -697,12 +884,45 @@ class Pipeline:
                 message(f"Synchronized {device_type} {device_location} to {ref_device_type} {ref_device_location} at {syncs.shape[0]} sync points",
                         level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
+                ref_start_datetime = coll.devices[0].header['start_datetime']
+                sync_start_time = []
+                sync_end_time = []
+
+                for i, r in syncs.iterrows():
+
+                    ref_sig_idx = 0 if r['ref_sig_idx'] < 0 else int(r['ref_sig_idx'])
+
+                    sig_idx = coll.devices[0].get_signal_index(accel_signal_labels[ref_sig_idx])
+                    sample_rate = coll.devices[0].signal_headers[sig_idx]['sample_rate']
+
+                    sync_start_time.append(ref_start_datetime + dt.timedelta(seconds=(r['ref_start_idx'] / sample_rate)))
+                    sync_end_time.append(ref_start_datetime + dt.timedelta(seconds=(r['ref_end_idx'] / sample_rate)))
+
+                sync_ref_sig_labels = [accel_signal_labels[int(r['ref_sig_idx'])] for i, r in syncs.iterrows()]
+                sync_tgt_sig_labels = [accel_signal_labels[int(r['tgt_sig_idx'])] for i, r in syncs.iterrows()]
+
                 syncs.insert(loc=0, column='study_code', value=study_code)
                 syncs.insert(loc=1, column='subject_id', value=subject_id)
                 syncs.insert(loc=2, column='coll_id', value=coll_id)
                 syncs.insert(loc=3, column='device_type', value=device_type)
                 syncs.insert(loc=4, column='device_location', value=device_location)
                 syncs.insert(loc=5, column='sync_id', value=range(1, syncs.shape[0] + 1))
+                syncs.insert(loc=6, column='start_time', value=sync_start_time)
+                syncs.insert(loc=7, column='end_time', value=sync_end_time)
+                syncs.insert(loc=8, column='ref_device_type', value=ref_device_type)
+                syncs.insert(loc=9, column='ref_device_location', value=ref_device_location)
+                syncs.insert(loc=11, column='ref_sig_label', value=sync_ref_sig_labels)
+                syncs.insert(loc=17, column='tgt_sig_label', value=sync_tgt_sig_labels)
+
+                seg_start_time = []
+                seg_end_time = []
+
+                for i, r in segments.iterrows():
+                    sig_idx = coll.devices[0].get_signal_index(accel_signal_labels[0])
+                    sample_rate = coll.devices[0].signal_headers[sig_idx]['sample_rate']
+
+                    seg_start_time.append(ref_start_datetime + dt.timedelta(seconds=(r['ref_start_idx'] / sample_rate)))
+                    seg_end_time.append(ref_start_datetime + dt.timedelta(seconds=(r['ref_end_idx'] / sample_rate)))
 
                 segments.insert(loc=0, column='study_code', value=study_code)
                 segments.insert(loc=1, column='subject_id', value=subject_id)
@@ -710,19 +930,20 @@ class Pipeline:
                 segments.insert(loc=3, column='device_type', value=device_type)
                 segments.insert(loc=4, column='device_location', value=device_location)
                 segments.insert(loc=5, column='segment_id', value=range(1, segments.shape[0] + 1))
+                segments.insert(loc=6, column='start_time', value=seg_start_time)
+                segments.insert(loc=7, column='end_time', value=seg_end_time)
 
-                if self.module_settings['sync']['save']:
+                if self.pipeline_settings['modules']['sync']['save']:
 
                     # create all file path variables
-                    syncs_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
-                                                         "SYNC_LOC"]),
-                                               "csv"])
-                    segments_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
-                                                            "SYNC_SEG"]),
-                                                  "csv"])
+                    syncs_csv_name = (f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}"
+                                      + "_SYNC_EVENTS.csv")
 
-                    syncs_csv_path = self.dirs['sync'] / syncs_csv_name
-                    segments_csv_path = self.dirs['sync'] / segments_csv_name
+                    segments_csv_name = (f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}"
+                                         + "_SYNC_SEGMENTS.csv")
+
+                    syncs_csv_path = self.dirs['sync_events'] / syncs_csv_name
+                    segments_csv_path = self.dirs['sync_segments'] / segments_csv_name
 
                     syncs_csv_path.parent.mkdir(parents=True, exist_ok=True)
                     segments_csv_path.parent.mkdir(parents=True, exist_ok=True)
@@ -748,7 +969,7 @@ class Pipeline:
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         # duration is stored in json in iso 8601 format
-        duration_iso = self.module_settings['convert']['adj_start']
+        duration_iso = self.pipeline_settings['modules']['convert']['adj_start']
 
         # default to add if no operator specified
         op = operator.add
@@ -801,7 +1022,7 @@ class Pipeline:
         message("Detecting non-wear...", level='info', display=(not quiet), log=log, logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        save = self.module_settings['nonwear']['save']
+        save = self.pipeline_settings['modules']['nonwear']['save']
 
         coll.nonwear_bouts = pd.DataFrame()
         coll.daily_nonwear = pd.DataFrame()
@@ -820,9 +1041,11 @@ class Pipeline:
             # find device body location type
 
             # get location aliases from settings
-            wrist_locations = self.device_locations['rwrist']['aliases'] + self.device_locations['lwrist']['aliases']
-            ankle_locations = self.device_locations['rankle']['aliases'] + self.device_locations['lankle']['aliases']
-            chest_locations = self.device_locations['chest']['aliases']
+            wrist_locations = (self.pipeline_settings['pipeline']['device_locations']['rwrist']['aliases']
+                               + self.pipeline_settings['pipeline']['device_locations']['lwrist']['aliases'])
+            ankle_locations = (self.pipeline_settings['pipeline']['device_locations']['rankle']['aliases']
+                               + self.pipeline_settings['pipeline']['device_locations']['lankle']['aliases'])
+            chest_locations = self.pipeline_settings['pipeline']['device_locations']['chest']['aliases']
 
             # compare device location to location types
             if device_location.upper() in wrist_locations:
@@ -833,11 +1056,11 @@ class Pipeline:
                 location_type = "chest"
 
             # get location specific non-wear settings
-            accel_std_thresh_mg = self.module_settings['nonwear']['settings'][location_type]['accel_std_thresh_mg']
-            low_temperature_cutoff = self.module_settings['nonwear']['settings'][location_type]['low_temperature_cutoff']
-            high_temperature_cutoff = self.module_settings['nonwear']['settings'][location_type]['high_temperature_cutoff']
-            temp_dec_roc = self.module_settings['nonwear']['settings'][location_type]['temp_dec_roc']
-            temp_inc_roc = self.module_settings['nonwear']['settings'][location_type]['temp_inc_roc']
+            accel_std_thresh_mg = self.pipeline_settings['modules']['nonwear']['settings'][location_type]['accel_std_thresh_mg']
+            low_temperature_cutoff = self.pipeline_settings['modules']['nonwear']['settings'][location_type]['low_temperature_cutoff']
+            high_temperature_cutoff = self.pipeline_settings['modules']['nonwear']['settings'][location_type]['high_temperature_cutoff']
+            temp_dec_roc = self.pipeline_settings['modules']['nonwear']['settings'][location_type]['temp_dec_roc']
+            temp_inc_roc = self.pipeline_settings['modules']['nonwear']['settings'][location_type]['temp_inc_roc']
 
             # current device
             device = coll.devices[i]
@@ -1009,18 +1232,19 @@ class Pipeline:
 
         return coll
 
-    def read_nonwear(self, coll, single_stage, quiet=False, log=True):
+    def read_nonwear(self, coll, quiet=False, log=True):
 
         # read nonwear data for all devices
         message("Reading non-wear data from files...", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        if single_stage == 'crop':
-            nonwear_csv_dir = self.dirs['nonwear_bouts_standard']
-        else:
-            nonwear_csv_dir = self.dirs['nonwear_bouts_cropped']
+        # if single_stage == 'crop':
+        #     nonwear_csv_dir = self.dirs['nonwear_bouts_standard']
+        # else:
+        #     nonwear_csv_dir = self.dirs['nonwear_bouts_cropped']
 
+        nonwear_csv_dir = self.dirs['nonwear_bouts_cropped']
         coll.nonwear_bouts = pd.DataFrame()
 
         # detect nonwear for each device
@@ -1082,12 +1306,15 @@ class Pipeline:
 
 
         # get crop settings
-        min_wear_time = self.module_settings['crop']['min_wear_time']
-        save = self.module_settings['crop']['save']
+        min_wear_time = self.pipeline_settings['modules']['crop']['min_wear_time']
+        save = self.pipeline_settings['modules']['crop']['save']
 
         # make copy of nonwear bouts dataframe
         nonwear_bouts = coll.nonwear_bouts.copy()
-        nonwear_bouts['duration'] = ((nonwear_bouts['end_time'] - nonwear_bouts['start_time']).dt.total_seconds() / 60).round()
+
+        # if there is nonwear data for any devices in this collection
+        if not nonwear_bouts.empty:
+            nonwear_bouts['duration'] = ((nonwear_bouts['end_time'] - nonwear_bouts['start_time']).dt.total_seconds() / 60).round()
 
         # re-initialize collection daily_nonwear and nonwear_bouts dataframes
         coll.daily_nonwear = pd.DataFrame(columns=['study_code', 'subject_id', 'coll_id', 'device_type',
@@ -1222,29 +1449,16 @@ class Pipeline:
             # save files
             if save:
 
-                # create all file path variables
-                device_edf_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location]),
-                                            "edf"])
-                nonwear_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
-                                                       "NONWEAR"]),
-                                             "csv"])
-                daily_nonwear_csv_name = '.'.join(['_'.join([study_code, subject_id, coll_id, device_type, device_location,
-                                                       "NONWEAR_DAILY"]),
-                                             "csv"])
+                nonwear_csv_name = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}_NONWEAR.csv"
+                daily_nonwear_csv_name = (f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}"
+                                          + "_NONWEAR_DAILY.csv")
 
-                cropped_device_path = self.dirs['device_edf_cropped'] / device_edf_name
                 nonwear_csv_path = self.dirs['nonwear_bouts_cropped'] / nonwear_csv_name
                 nonwear_daily_csv_path = self.dirs['nonwear_daily_cropped'] / daily_nonwear_csv_name
 
                 # check that all folders exist for data output files
-                cropped_device_path.parent.mkdir(parents=True, exist_ok=True)
                 nonwear_csv_path.parent.mkdir(parents=True, exist_ok=True)
                 nonwear_daily_csv_path.parent.mkdir(parents=True, exist_ok=True)
-
-                # write cropped device data as edf
-                message(f"Saving {cropped_device_path}", level='info', display=(not quiet), log=log,
-                        logger_name=self.log_name)
-                device.export_edf(file_path=cropped_device_path, quiet=quiet)
 
                 if not coll.nonwear_bouts.empty:
 
@@ -1263,8 +1477,38 @@ class Pipeline:
 
         return coll
 
-    @coll_status
-    def save_sensors(self, coll, quiet=False, log=True):
+    def save_devices(self, coll, dir, quiet=False, log=True):
+
+        message("Saving device data to EDF...", level='info', display=(not quiet), log=log,
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
+                               desc='Saving device data to EDF'):
+            study_code = row['study_code']
+            subject_id = row['subject_id']
+            coll_id = row['coll_id']
+            device_type = row['device_type']
+            device_location = row['device_location']
+            device_edf_name = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}.edf"
+
+            # create all file path variables
+            device_path = dir / device_edf_name
+
+            # check that all folders exist for data output files
+            device_path.parent.mkdir(parents=True, exist_ok=True)
+
+            message(f"Saving {device_path}", level='info', display=(not quiet), log=log,
+                    logger_name=self.log_name)
+
+            # write device data as edf
+            coll.devices[index].export_edf(file_path=device_path, quiet=quiet)
+
+            message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        return coll
+
+    def save_sensors(self, coll, dir, quiet=False, log=True):
 
         message("Separating sensors from devices...", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
@@ -1283,14 +1527,14 @@ class Pipeline:
             device_type = row['device_type']
             device_location = row['device_location']
 
-            device_file_base = '_'.join([study_code, subject_id, coll_id, device_type, device_location])
+            device_file_base = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}"
 
             # loop through supported sensor types
-            for key in tqdm(self.sensors, leave=False, desc="Separating sensors"):
+            for key in tqdm(self.pipeline_settings['pipeline']['sensors'], leave=False, desc="Separating sensors"):
 
                 # search for associated signals in current device
                 sig_nums = []
-                for sig_label in self.sensors[key]['signals']:
+                for sig_label in self.pipeline_settings['pipeline']['sensors'][key]['signals']:
                     sig_num = coll.devices[index].get_signal_index(sig_label)
 
                     if sig_num is not None:
@@ -1300,7 +1544,7 @@ class Pipeline:
                 if sig_nums:
 
                     sensor_edf_name = '.'.join(['_'.join([device_file_base, key.upper()]), 'edf'])
-                    sensor_path = self.dirs['sensor_edf'] / sensor_edf_name
+                    sensor_path = dir / sensor_edf_name
                     sensor_path.parent.mkdir(parents=True, exist_ok=True)
 
                     message(f"Saving {sensor_path}", level='info', display=(not quiet), log=log,
@@ -1317,9 +1561,9 @@ class Pipeline:
 
         # TODO: axis needs to be set based on orientation of device
 
-        step_detect_type = self.module_settings['gait']['step_detect_type']
-        axis = self.module_settings['gait'].get('axis', None)
-        save = self.module_settings['gait']['save']
+        step_detect_type = self.pipeline_settings['modules']['gait']['step_detect_type']
+        axis = self.pipeline_settings['modules']['gait'].get('axis', None)
+        save = self.pipeline_settings['modules']['gait']['save']
 
         message(f"Detecting steps and walking bouts using {step_detect_type} data...", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
@@ -1562,7 +1806,7 @@ class Pipeline:
         message("Analyzing sleep...", level='info', display=(not quiet), log=log, logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        save = self.module_settings['sleep']['save']
+        save = self.pipeline_settings['modules']['sleep']['save']
 
         coll.sptw = pd.DataFrame()
         coll.sleep_bouts = pd.DataFrame()
@@ -1733,10 +1977,10 @@ class Pipeline:
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        pref_cutpoint = self.module_settings['activity'].get('pref_cutpoint', None)
-        save = self.module_settings['activity']['save']
-        epoch_length = self.module_settings['activity']['epoch_length']
-        sedentary_gait = self.module_settings['activity']['sedentary_gait']
+        pref_cutpoint = self.pipeline_settings['modules']['activity'].get('pref_cutpoint', None)
+        save = self.pipeline_settings['modules']['activity']['save']
+        epoch_length = self.pipeline_settings['modules']['activity']['epoch_length']
+        sedentary_gait = self.pipeline_settings['modules']['activity']['sedentary_gait']
 
         dominant_hand = coll.collection_info['dominant_hand'].lower()
 
@@ -1766,10 +2010,10 @@ class Pipeline:
             message(f"Calculating {epoch_length}-second epoch activity for {device_type}_{device_location}...",
                     level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-            cutpoint_ages = pd.DataFrame(self.module_settings['activity']['cutpoints'])
+            cutpoint_ages = pd.DataFrame(self.pipeline_settings['modules']['activity']['cutpoints'])
 
             subject_age = int(coll.collection_info['age'])
-            lowpass = int(self.module_settings['activity']['lowpass'])
+            lowpass = int(self.pipeline_settings['modules']['activity']['lowpass'])
 
             cutpoint = cutpoint_ages['type'].loc[(cutpoint_ages['min_age'] <= subject_age)
                                                  & (cutpoint_ages['max_age'] >= subject_age)].item()
@@ -1782,7 +2026,7 @@ class Pipeline:
             else:
                 if dominant_hand in ['right', 'left']:
                     dominant_wrist = dominant_hand[0] + 'wrist'
-                    dominant = device_location.upper() in self.device_locations[dominant_wrist]['aliases']
+                    dominant = device_location.upper() in self.pipeline_settings['pipeline']['device_locations'][dominant_wrist]['aliases']
                 else:
                     dominant = True
 
@@ -1796,7 +2040,10 @@ class Pipeline:
                                                     (coll.nonwear_bouts['event'] == 'nonwear')]
 
             sptw = coll.sptw
-            sleep_bouts =  coll.sleep_bouts.loc[coll.sleep_bouts['bout_detect'] == 't8a4']
+            if coll.sleep_bouts.empty:
+                sleep_bouts = pd.DataFrame()
+            else:
+                sleep_bouts =  coll.sleep_bouts.loc[coll.sleep_bouts['bout_detect'] == 't8a4']
 
             e, b, avm, vm, avm_sec = activity_wrist_avm(x=coll.devices[i].signals[accel_x_sig],
                                                         y=coll.devices[i].signals[accel_y_sig],
@@ -1911,7 +2158,8 @@ class Pipeline:
 
         # select eligible device types and locations
         activity_device_types = ['GNOR', 'AXV6']
-        activity_locations = self.device_locations['rwrist']['aliases'] + self.device_locations['lwrist']['aliases']
+        activity_locations = (self.pipeline_settings['pipeline']['device_locations']['rwrist']['aliases']
+                              + self.pipeline_settings['pipeline']['device_locations']['lwrist']['aliases'])
 
         # get index of all eligible devices based on type and location
         activity_device_index = device_info_copy.loc[(device_info_copy['device_type'].isin(activity_device_types)) &
@@ -1974,8 +2222,8 @@ class Pipeline:
 
         # select eligible device types and locations
         gait_device_types = ['GNOR', 'AXV6']
-        r_gait_locations = self.device_locations['rankle']['aliases']
-        l_gait_locations = self.device_locations['lankle']['aliases']
+        r_gait_locations = self.pipeline_settings['pipeline']['device_locations']['rankle']['aliases']
+        l_gait_locations = self.pipeline_settings['pipeline']['device_locations']['lankle']['aliases']
 
         # get index of all eligible devices
         r_gait_device_index = device_info_copy.loc[(device_info_copy['device_type'].isin(gait_device_types)) &
@@ -1996,7 +2244,7 @@ class Pipeline:
 
         # select which device to use for activity level
 
-        dominant = self.module_settings['sleep']['dominant']
+        dominant = self.pipeline_settings['modules']['sleep']['dominant']
         dominant_hand = coll.collection_info['dominant_hand'].lower()
 
         device_info_copy = coll.device_info.copy()
@@ -2004,7 +2252,8 @@ class Pipeline:
 
         # select eligible device types and locations
         sleep_device_types = ['GNOR', 'AXV6']
-        sleep_locations = self.device_locations['rwrist']['aliases'] + self.device_locations['lwrist']['aliases']
+        sleep_locations = (self.pipeline_settings['pipeline']['device_locations']['rwrist']['aliases']
+                           + self.pipeline_settings['pipeline']['device_locations']['lwrist']['aliases'])
 
         # get index of all eligible devices
         sleep_device_index = device_info_copy.loc[(device_info_copy['device_type'].isin(sleep_device_types)) &
@@ -2023,7 +2272,7 @@ class Pipeline:
                     wrist = 'lwrist' if dominant_hand == 'right' else 'rwrist'
 
                 # select devices at locations based on dominance
-                sleep_locations = self.device_locations[wrist]['aliases']
+                sleep_locations = self.pipeline_settings['pipeline']['device_locations'][wrist]['aliases']
                 sleep_device_index = device_info_copy.loc[(device_info_copy['device_type'].isin(sleep_device_types)) &
                                                           (device_info_copy['device_location'].isin(sleep_locations))].index.values.tolist()
 
@@ -2033,7 +2282,8 @@ class Pipeline:
 
                 # if no eligible devices, go back and take first one from list of all eligible
                 elif len(sleep_device_index) < 1:
-                    sleep_locations = self.device_locations['rwrist']['aliases'] + self.device_locations['lwrist']['aliases']
+                    sleep_locations = (self.pipeline_settings['pipeline']['device_locations']['rwrist']['aliases']
+                                       + self.pipeline_settings['pipeline']['device_locations']['lwrist']['aliases'])
                     sleep_device_index = device_info_copy.loc[(device_info_copy['device_type'].isin(sleep_device_types)) &
                                                               (device_info_copy['device_location'].isin(sleep_locations))].index.values.tolist()
                     sleep_device_index = [sleep_device_index[0]]
@@ -2048,7 +2298,7 @@ class Pipeline:
             # if dominant hand info is available we will determine dominance
             if dominant_hand in ['right', 'left']:
                 dominant_wrist = dominant_hand[0] + 'wrist'
-                dominant = device_info_copy.loc[sleep_device_index]['device_location'].item() in self.device_locations[dominant_wrist]['aliases']
+                dominant = device_info_copy.loc[sleep_device_index]['device_location'].item() in self.pipeline_settings['pipeline']['device_locations'][dominant_wrist]['aliases']
 
             # if no dominant hand info available, assume dominant argument is correct
 
