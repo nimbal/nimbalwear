@@ -32,6 +32,7 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v0.20.0
 - add autocal offset and scale outputs
 - option to save separate sensor EDF files after data prep
 - move settings dump from log into separate file
