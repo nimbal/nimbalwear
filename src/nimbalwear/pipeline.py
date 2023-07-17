@@ -778,7 +778,7 @@ class Study:
             device_location = row['device_location']
             device_id = row['device_id']
 
-            pre_err, post_err, iter = coll.devices[idx].autocal(quiet=quiet)
+            pre_err, post_err, iter, offset, scale, tempoffset = coll.devices[idx].autocal(quiet=quiet)
 
             if pre_err is None:
                 message(f"Autocalibration for {device_type} {device_location} could not be performed.",
@@ -792,9 +792,11 @@ class Study:
                                   'device_type': device_type,
                                   'device_location': device_location,
                                   'device_id': device_id,
-                                  'pre_err': pre_err,
-                                  'post_err': post_err,
-                                  'iter': iter}, index=[0])
+                                  'pre_err': pre_err, 'post_err': post_err, 'iter': iter,
+                                  'offset_x': offset[0], 'offset_y': offset[1], 'offset_z': offset[2],
+                                  'scale_x': scale[0], 'scale_y': scale[1], 'scale_z': scale[2],
+                                  'tempoffset_x': tempoffset[0], 'tempoffset_y': tempoffset[1], 'tempoffset_z': tempoffset[2],
+                                  }, index=[0])
 
             message(f"Autocalibrated {device_type} {device_location}: Calibration error reduced from {pre_err} to {post_err} after {iter} iterations.",
                     level='info', display=(not quiet), log=log, logger_name=self.log_name)
