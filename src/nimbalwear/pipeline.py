@@ -37,7 +37,7 @@ from isodate import parse_duration
 from .data import Device
 from .nonwear import vert_nonwear, nonwear_stats
 from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
-from .gait import AccelReader, WalkingBouts, get_gait_bouts, create_timestamps, gait_stats
+#from .gait import AccelReader, WalkingBouts, get_gait_bouts, create_timestamps, gait_stats
 from .activity import activity_wrist_avm, activity_stats
 from .utils import convert_json_to_toml, update_settings
 
