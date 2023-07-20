@@ -322,7 +322,7 @@ def state_space_steps(data, freq, start_time, loc=None, start_dp=0, end_dp=-1, p
     # defining step pushoff thresholds
     if pushoff_df == True:  # importing static pushoff_df
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        pushoff_df = pd.read_csv(os.path.join(dir_path, 'data', 'pushoff_OND07_left.csv'))
+        pushoff_df = pd.read_csv(os.path.join(dir_path, 'data', 'pushoff_df.csv'))
     elif pushoff_df == False:
         print('No pushoff_df available, to fix define pushoff_df')
 
