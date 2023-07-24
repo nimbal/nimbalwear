@@ -112,7 +112,7 @@ def detect_steps(right_data=None, left_data=None, mid_data=None, loc='ankle', da
                 if low_pass is not None:
                     right_data, _ = lowpass_filter(right_data, low_pass)
 
-                right_steps_df = state_space_steps(right_data, freq, start_time, loc='right')
+                right_steps_df = state_space_accel_steps(right_data, freq, start_time, loc='right')
 
             if left_data is not None:
                 print('Finding steps: Left ankle, acceleration, state space controller.')
@@ -125,7 +125,7 @@ def detect_steps(right_data=None, left_data=None, mid_data=None, loc='ankle', da
                 if low_pass is not None:
                     left_data, _ = lowpass_filter(left_data, freq, low_pass)
 
-                left_steps_df = state_space_steps(left_data, freq, start_time, loc='left')
+                left_steps_df = state_space_accel_steps(left_data, freq, start_time, loc='left')
 
         elif loc == 'trunk':
             print('Trunk step detection unavailable.')
