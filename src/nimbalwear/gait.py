@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 from scipy.signal import butter, sosfiltfilt, find_peaks, peak_widths
 
-from .gait_accel import state_space_steps
+from .gait_accel import state_space_accel_steps
+from .gait_gyro import fraccaro_gyro_steps
 
 def lowpass_filter(acc_data, fs, cutoff_freq, order=2):
     """
@@ -16,6 +17,7 @@ def lowpass_filter(acc_data, fs, cutoff_freq, order=2):
     acc_data = sosfiltfilt(sos, acc_data)
 
     return acc_data
+
 
 def flip_signal(acc_data, freq):
     """
@@ -28,6 +30,7 @@ def flip_signal(acc_data, freq):
     acc_data[flip_ind] = -acc_data[flip_ind]
 
     return acc_data
+
 
 def detect_vert(axes, method='adg'):
     """
@@ -59,161 +62,6 @@ def detect_vert(axes, method='adg'):
         vert_data = axes[vert_idx]
 
     return vert_data  # , vert_idx, test_stats
-
-
-
-def fraccaro_gyro_steps(data, freq, start_time, loc=None, start_dp=0, end_dp=-1, steps_length=2, break_sec=2, ):
-    '''
-    Detects the steps within the gyroscope data. Based on this paper:
-    Fraccaro, P., Coyle, L., Doyle, J., & O'Sullivan, D. (2014). Real-world gyroscope-based gait event detection and gait feature extraction.
-    '''
-
-    # define functions
-    def bw_filter(data, freq, fc, order):
-        """
-        Filter (filtfilt) data with dual pass lowpass butterworth filter
-        """
-        sos = butter(N=order, Wn=fc, btype='low', output='sos', fs=freq)
-        filtered_data = sosfiltfilt(sos, data)
-
-        return filtered_data
-
-    def find_adaptive_thresh(data, freq):
-        '''
-        Finds adaptive threshold on preprocessed data  with minimum 40 threshold
-
-        B.R. Greene, et al., ”Adaptive estimation of temporal gait parameters using body-worn gyroscopes,”
-        Proc. IEEE Eng. Med. Bio. Soc. (EMBC 2011), pp. 1296-1299, 2010 and outlined in Fraccaro, P., Coyle, L., Doyle, J., & O'Sullivan, D. (2014)
-        '''
-        data_2d = np.diff(data) / (1 / freq)
-
-        thresh = np.mean(data[np.argpartition(data_2d, 10)[:10]]) * 0.2
-        if thresh > 40:
-            pass
-        else:
-            thresh = 40
-
-        return thresh
-
-    def remove_single_step_bouts(steps_df, steps_length):
-        '''
-        Step events are imported and bouts that have less than"steps_length" amount are removed from bouts_df
-        '''
-        sum_df = steps_df.groupby(['Bout_number']).count()
-        sum_df.columns = ['Step_number', 'Step_index', 'Peak_times']
-
-        sum_df.drop(sum_df[sum_df.Step_number < steps_length].index, inplace=True)
-        bout_index = sum_df.index
-
-        df = steps_df[steps_df.Bout_number.isin(bout_index)]
-        df.reset_index(inplace=True, drop=True)
-
-        return df
-
-    def adjust_bout_number(steps_df):
-        '''
-        Renumbering the gait bouts for bouts_df after single step bouts are removed
-        '''
-        orig_bouts = steps_df.Bout_number
-        num = 1
-        for i in range(len(orig_bouts)):
-            if i == 0:
-                steps_df.loc[i, 2] = num
-            else:
-                if orig_bouts[i] > orig_bouts[i - 1]:
-                    num = num + 1
-                    steps_df.loc[i, 2] = num
-                else:
-                    steps_df.loc[i, 2] = num
-        steps_df.drop('Bout_number', inplace=True, axis=1)
-        steps_df.columns = ['Step', 'Step_index', 'Peak_times', 'Bout_number']
-
-        return steps_df
-
-    def get_bouts_info(steps_df):
-        '''
-        import steps_df and out bout_df
-        '''
-        bout_list = steps_df['Bout_number'].unique()
-        bout_df = pd.DataFrame(columns=['Bout_number', 'Step_count', 'Start_time', 'End_time', 'Start_idx', 'End_idx'])
-        for count, val in enumerate(bout_list):
-            temp = steps_df[steps_df['Bout_number'] == bout_list[count]]
-            step_count = len(temp)
-            start_time = np.min(temp['Peak_times'])
-            end_time = np.max(temp['Peak_times'])
-            start_ind = np.min(temp['Step_index'])
-            end_ind = np.max(temp['Step_index'])
-            data = pd.DataFrame([[count + 1, step_count, start_time, end_time, start_ind, end_ind]],
-                                columns=bout_df.columns)  # , "Cadence":cadence}
-            bout_df = pd.concat([bout_df, data], ignore_index=True)
-
-        return bout_df
-
-    def find_steps_bouts_gyro(data, freq, timestamps, break_sec, steps_length, start, end):
-        data = data[start:end]
-
-        lf_data = bw_filter(data, freq, 3, 5)
-
-        th1 = find_adaptive_thresh(lf_data, freq)
-
-        idx_peaks, peak_hghts = find_peaks(x=data, height=th1,
-                                           distance=40)  # at 50 samples/sec; 5 samples = 100 ms/0.1s; 10 samples = 200 ms/0.2s
-        peak_heights = peak_hghts.get('peak_heights')
-
-        peaks_diff = np.diff(idx_peaks)
-
-        ge_break_ind = break_sec * freq
-        bool_diff = peaks_diff > ge_break_ind
-        ind_ge_diff = [i for i, x in enumerate(bool_diff) if x]
-        bouts = np.zeros(len(idx_peaks))
-
-        for count, x in enumerate(ind_ge_diff):
-            if count < len(ind_ge_diff) - 1:
-                if x == 0:
-                    bouts[count] = 1
-                    continue
-                elif ind_ge_diff[count] - ind_ge_diff[count + 1] == 1:
-                    bouts[count] = count + 1
-                    continue
-                else:
-                    if count == 0:
-                        bouts[:(ind_ge_diff[count + 1])] = count + 1
-                    else:
-                        bouts[(ind_ge_diff[count - 1] + 1):(ind_ge_diff[count + 1] + 1)] = count + 1
-            elif count == len(ind_ge_diff) - 1:
-                bouts[(ind_ge_diff[count - 1] + 1):ind_ge_diff[count] + 1] = count + 1
-                bouts[ind_ge_diff[count] + 1:] = count + 2
-
-        step_count = range(1, len(idx_peaks) + 1)
-        step_events_df = pd.DataFrame({'Step': step_count, 'Step_index': idx_peaks, 'Bout_number': bouts})
-
-        # timestamps
-        step_events_df['Step_timestamp'] = timestamps[step_events_df['Step_index']]
-        gait_bouts_df = remove_single_step_bouts(step_events_df, steps_length)
-        gait_bouts_df = adjust_bout_number(gait_bouts_df)
-        gait_bouts_df = get_bouts_info(gait_bouts_df)
-        step_events_df['Bout_number'] = 0
-        for i in range(len(gait_bouts_df)):
-            bool = (step_events_df.Step_index >= gait_bouts_df.Start_idx[i]) & (
-                    step_events_df.Step_index <= gait_bouts_df.End_idx[i])
-            idx = step_events_df.index[bool]
-            step_events_df.Bout_number.iloc[idx] = gait_bouts_df.Bout_number[i]
-
-        step_events_df.columns = ['step_number', 'step_index', 'bout_number', 'step_timestamp']
-        bout_steps = step_events_df[step_events_df['bout_number'] != 0]
-        bout_steps['foot'] = loc
-        bout_steps['alg'] = 'fraccaro_gyro'
-
-        return step_events_df, gait_bouts_df, bout_steps  # peak_heights
-
-    file_duration = len(data) / freq
-    end_time = start_time + timedelta(0, file_duration)
-    timestamps = np.asarray(pd.date_range(start=start_time, end=end_time, periods=len(data)))
-
-    _, _, bout_steps = find_steps_bouts_gyro(data, freq, timestamps, break_sec, steps_length, start_dp, end_dp)
-
-    return bout_steps
-
 
 
 def detect_steps(right_data=None, left_data=None, mid_data=None, loc='ankle', data_type='accel',
@@ -318,6 +166,7 @@ def detect_steps(right_data=None, left_data=None, mid_data=None, loc='ankle', da
 
     return steps_df
 
+
 def get_bouts(steps_df, min_bout_length=15, max_between_bouts=10, freq=None):
     """
  Parameters
@@ -385,6 +234,7 @@ def get_bouts(steps_df, min_bout_length=15, max_between_bouts=10, freq=None):
 
     return bouts
 
+
 def gait_stats(bouts, stat_type='daily', single_leg=False):
 
     bouts['date'] = pd.to_datetime(bouts['start_time']).dt.date
@@ -415,6 +265,7 @@ def gait_stats(bouts, stat_type='daily', single_leg=False):
         print('Invalid type selected.')
 
     return gait_stats
+
 
 if __name__ == "__main__":
 

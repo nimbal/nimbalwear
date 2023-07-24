@@ -306,7 +306,7 @@ def calc_detection_parameters(vert_accel, freq, step_indices, steps_df, pushoff_
     return pushoff_df, swing_phase_time, heel_strike_detect_time, heel_strike_threshold
 
 
-def state_space_steps(vert_accel, freq, start_time, loc=None, pushoff_df=None, pushoff_threshold=0.85, pushoff_time=0.4,
+def state_space_accel_steps(vert_accel, freq, start_time, loc=None, pushoff_df=None, pushoff_threshold=0.85, pushoff_time=0.4,
                       swing_down_detect_time=0.1, swing_up_detect_time=0.1, heel_strike_detect_time=0.5,
                       heel_strike_threshold=-5, foot_down_time=0.05, success=True, update_pars=True,
                       return_default=False):
