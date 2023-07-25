@@ -43,11 +43,11 @@ def mid_swing_peak_detect(data, pushoff_ind, freq, swing_phase_time=0.3):
     Detects a peak within the swing_detect window length - swing peak
     """
 
-    swing_detect = int(freq * swing_phase_time)  # length to check for swing
+    swing_detect_len = int(freq * swing_phase_time)  # length to check for swing
     detect_window = data[pushoff_ind:pushoff_ind + swing_detect]
     peaks, prop = find_peaks(-detect_window,
-                             distance=max(swing_detect * 0.25, 1),
-                             prominence=0.2, wlen=swing_detect,
+                             distance=max(swing_detect_len * 0.25, 1),
+                             prominence=0.2, wlen=swing_detect_len,
                              width=[0 * freq, swing_phase_time * freq], rel_height=0.75)
     if len(peaks) == 0:
         return None
@@ -172,7 +172,7 @@ def detect_steps(vert_accel, freq, pushoff_df, pushoff_threshold=0.85, pushoff_t
 
 
 def export_steps(vert_accel, detect_arr, state_arr, freq, start_time, step_indices, pushoff_time=0.4,
-                 foot_down_time=0.05,  loc='undefined', success=True):
+                 foot_down_time=0.05,  loc="undefined", success=True):
     """
     Export steps into a dataframe -  includes all potential push-offs and the state that they fail on
     """
@@ -306,10 +306,10 @@ def calc_detection_parameters(vert_accel, freq, step_indices, steps_df, pushoff_
     return pushoff_df, swing_phase_time, heel_strike_detect_time, heel_strike_threshold
 
 
-def state_space_accel_steps(vert_accel, freq, start_time, loc=None, pushoff_df=None, pushoff_threshold=0.85, pushoff_time=0.4,
-                      swing_down_detect_time=0.1, swing_up_detect_time=0.1, heel_strike_detect_time=0.5,
-                      heel_strike_threshold=-5, foot_down_time=0.05, success=True, update_pars=True,
-                      return_default=False):
+def state_space_accel_steps(vert_accel, freq, start_time, loc="undefined", pushoff_df=None, pushoff_threshold=0.85,
+                            pushoff_time=0.4, swing_down_detect_time=0.1, swing_up_detect_time=0.1,
+                            heel_strike_detect_time=0.5, heel_strike_threshold=-5, foot_down_time=0.05, success=True,
+                            update_pars=True, return_default=False):
 
     """
     Detects the steps within the accelerometer data. Based on this paper:
