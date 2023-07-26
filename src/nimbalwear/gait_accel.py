@@ -172,7 +172,7 @@ def detect_steps(vert_accel, freq, pushoff_df, pushoff_threshold=0.85, pushoff_t
 
 
 def export_steps(vert_accel, detect_arr, state_arr, freq, start_time, step_indices, pushoff_time=0.4,
-                 foot_down_time=0.05,  loc="undefined", success=True):
+                 foot_down_time=0.05,  success=True):
     """
     Export steps into a dataframe -  includes all potential push-offs and the state that they fail on
     """
@@ -217,8 +217,6 @@ def export_steps(vert_accel, detect_arr, state_arr, freq, start_time, step_indic
         'mid_swing_accel': vert_accel[mid_swing],
         'heel_strike_accel': vert_accel[heel_strike],
         'step_duration': step_durations,
-        'wear_loc': loc,
-        'alg': 'ssc'
         # 'avg_speed': avg_speed
     })
     failed_steps = pd.DataFrame({
@@ -345,7 +343,7 @@ def state_space_accel_steps(vert_accel, freq, start_time, loc="undefined", pusho
 
     # export steps
     default_steps_df = export_steps(vert_accel, detect_arr, state_arr, freq, start_time, step_indices,
-                                    pushoff_time=pushoff_time, foot_down_time=foot_down_time, loc=loc, success=success)
+                                    pushoff_time=pushoff_time, foot_down_time=foot_down_time, success=success)
 
     if update_pars:
 
@@ -368,7 +366,7 @@ def state_space_accel_steps(vert_accel, freq, start_time, loc="undefined", pusho
 
             # export steps
             steps_df = export_steps(vert_accel, detect_arr, state_arr, freq, start_time, step_indices,
-                                    pushoff_time=pushoff_time, foot_down_time=foot_down_time, loc=loc, success=success)
+                                    pushoff_time=pushoff_time, foot_down_time=foot_down_time, success=success)
 
         else:
 
@@ -382,3 +380,46 @@ def state_space_accel_steps(vert_accel, freq, start_time, loc="undefined", pusho
         return steps_df, default_steps_df
     else:
         return steps_df
+
+
+if __name__ == "__main__":
+
+    from pathlib import Path
+    import matplotlib.pyplot as plt
+
+    from . import Device
+
+    show_plots=True
+
+    # GNAC testing
+    ankle_path = Path("W:/NiMBaLWEAR/OND06/processed/standard_device_edf/GNAC/OND06_1027_01_GNAC_LAnkle.edf")
+    ankle = Device()
+    ankle.import_edf(ankle_path)
+
+    ## get signal idxs
+    y_idx = ankle.get_signal_index('Accelerometer y')
+
+    ##get signal frequencies needed for step detection
+    fs = ankle.signal_headers[y_idx]['sample_rate']
+
+    vertical_acc = ankle.signals[y_idx]
+
+    data_start_time = ankle.header['start_datetime']  # if start is None else start
+
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    pushoff_df = pd.read_csv(os.path.join(dir_path, 'data', 'pushoff_df.csv'))
+
+    # state_arr, detect_arr, step_indices, step_lengths = detect_steps(vert_accel=vertical_acc, freq=fs,
+    #                                                                  pushoff_df=pushoff_df, start_time=data_start_time)
+
+    steps_df, default_steps_df = state_space_accel_steps(vert_accel=vertical_acc, freq=fs, start_time=data_start_time,
+                                                         update_pars=True, return_default=True)
+
+    file_duration = len(vertical_acc) / fs
+    end_time = data_start_time + timedelta(0, file_duration)
+    timestamps = np.asarray(pd.date_range(start=data_start_time, end=end_time, periods=len(vertical_acc)))
+
+    if show_plots:
+        plt.plot(timestamps, vertical_acc)
+        plt.scatter(steps_df['step_timestamp'], [0] * steps_df.shape[0])
+        plt.scatter(default_steps_df['step_timestamp'], [0.1] * default_steps_df.shape[0])
