@@ -44,7 +44,7 @@ def mid_swing_peak_detect(data, pushoff_ind, freq, swing_phase_time=0.3):
     """
 
     swing_detect_len = int(freq * swing_phase_time)  # length to check for swing
-    detect_window = data[pushoff_ind:pushoff_ind + swing_detect]
+    detect_window = data[pushoff_ind:pushoff_ind + swing_detect_len]
     peaks, prop = find_peaks(-detect_window,
                              distance=max(swing_detect_len * 0.25, 1),
                              prominence=0.2, wlen=swing_detect_len,
@@ -172,13 +172,11 @@ def detect_steps(vert_accel, freq, pushoff_df, pushoff_threshold=0.85, pushoff_t
 
 
 def export_steps(vert_accel, detect_arr, state_arr, freq, start_time, step_indices, pushoff_time=0.4,
-                 foot_down_time=0.05,  success=True):
+                 foot_down_time=0.05, success=True):
     """
     Export steps into a dataframe -  includes all potential push-offs and the state that they fail on
     """
-    file_duration = len(vert_accel) / freq
-    end_time = start_time + timedelta(0, file_duration)
-    timestamps = np.asarray(pd.date_range(start=start_time, end=end_time, periods=len(vert_accel)))
+    timestamps = pd.date_range(start=start_time, periods=len(vert_accel), freq=f"{round(1 / freq, 6)}S")
 
     assert len(detect_arr) == len(timestamps)
     failed_step_indices = np.where(detect_arr > 0)[0]
@@ -217,7 +215,6 @@ def export_steps(vert_accel, detect_arr, state_arr, freq, start_time, step_indic
         'mid_swing_accel': vert_accel[mid_swing],
         'heel_strike_accel': vert_accel[heel_strike],
         'step_duration': step_durations,
-        # 'avg_speed': avg_speed
     })
     failed_steps = pd.DataFrame({
         'step_time': failed_step_timestamps,
@@ -304,7 +301,7 @@ def calc_detection_parameters(vert_accel, freq, step_indices, steps_df, pushoff_
     return pushoff_df, swing_phase_time, heel_strike_detect_time, heel_strike_threshold
 
 
-def state_space_accel_steps(vert_accel, freq, start_time, loc="undefined", pushoff_df=None, pushoff_threshold=0.85,
+def state_space_accel_steps(vert_accel, freq, start_time, pushoff_df=None, pushoff_threshold=0.85,
                             pushoff_time=0.4, swing_down_detect_time=0.1, swing_up_detect_time=0.1,
                             heel_strike_detect_time=0.5, heel_strike_threshold=-5, foot_down_time=0.05, success=True,
                             update_pars=True, return_default=False):
@@ -347,7 +344,7 @@ def state_space_accel_steps(vert_accel, freq, start_time, loc="undefined", pusho
 
     if update_pars:
 
-        # TODO: check for enough steps and check for None before updating parameters and re-running
+        # check for enough steps and check for None before updating parameters and re-running
         if len(step_indices) >= 20:
 
             # update detection parameters
@@ -387,7 +384,7 @@ if __name__ == "__main__":
     from pathlib import Path
     import matplotlib.pyplot as plt
 
-    from . import Device
+    from src.nimbalwear import Device
 
     show_plots=True
 
@@ -396,28 +393,21 @@ if __name__ == "__main__":
     ankle = Device()
     ankle.import_edf(ankle_path)
 
-    ## get signal idxs
+    # get signal idxs
     y_idx = ankle.get_signal_index('Accelerometer y')
 
-    ##get signal frequencies needed for step detection
+    # get signal frequencies needed for step detection
     fs = ankle.signal_headers[y_idx]['sample_rate']
 
     vertical_acc = ankle.signals[y_idx]
 
-    data_start_time = ankle.header['start_datetime']  # if start is None else start
-
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    pushoff_df = pd.read_csv(os.path.join(dir_path, 'data', 'pushoff_df.csv'))
-
-    # state_arr, detect_arr, step_indices, step_lengths = detect_steps(vert_accel=vertical_acc, freq=fs,
-    #                                                                  pushoff_df=pushoff_df, start_time=data_start_time)
+    data_start_time = ankle.header['start_datetime']
 
     steps_df, default_steps_df = state_space_accel_steps(vert_accel=vertical_acc, freq=fs, start_time=data_start_time,
                                                          update_pars=True, return_default=True)
 
-    file_duration = len(vertical_acc) / fs
-    end_time = data_start_time + timedelta(0, file_duration)
-    timestamps = np.asarray(pd.date_range(start=data_start_time, end=end_time, periods=len(vertical_acc)))
+
+    timestamps = pd.date_range(start=data_start_time, periods=len(vertical_acc), freq=f"{round(1 / fs, 6)}S")
 
     if show_plots:
         plt.plot(timestamps, vertical_acc)
