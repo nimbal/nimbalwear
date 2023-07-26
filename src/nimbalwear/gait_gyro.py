@@ -143,7 +143,7 @@ def define_bouts(steps, freq, max_break=2, min_steps=2, remove_unbouted=True):
     return new_steps[['step_num', 'bout_num', 'step_idx']], gait_bouts
 
 
-def fraccaro_gyro_steps(gyro, freq, start_time=None, min_steps=2, max_break=2, remove_unbouted=True):
+def fraccaro_gyro_steps(gyro, freq, start_time=None, min_steps=2, max_break=2, return_bouts=True, remove_unbouted=True):
     """
     Detects the steps within the gyroscope data. Based on this paper:
     Fraccaro, P., Coyle, L., Doyle, J., & O'Sullivan, D. (2014). Real-world gyroscope-based gait event detection and
@@ -151,22 +151,27 @@ def fraccaro_gyro_steps(gyro, freq, start_time=None, min_steps=2, max_break=2, r
     """
 
     # detect_steps
-    steps_df = detect_steps(gyro, freq)
+    steps = detect_steps(gyro, freq)
 
     # get bouted steps
-    steps_df, bouts_df = define_bouts(steps_df, freq, max_break=max_break, min_steps=min_steps,
-                                      remove_unbouted=remove_unbouted)
+    if return_bouts:
+        steps, bouts = define_bouts(steps, freq, max_break=max_break, min_steps=min_steps,
+                                          remove_unbouted=remove_unbouted)
 
     if start_time is not None:
 
         timestamps = pd.date_range(start=start_time, periods=len(gyro), freq=f"{1/freq}S")
 
-        steps_df.insert(loc=2, column='step_time', value=timestamps[steps_df['step_idx']])
+        steps.insert(loc=2, column='step_time', value=timestamps[steps['step_idx']])
 
-        bouts_df.insert(loc=1, column='start_time', value=timestamps[bouts_df['start_idx']])
-        bouts_df.insert(loc=2, column='end_time', value=timestamps[bouts_df['end_idx']])
+        if return_bouts:
+            bouts.insert(loc=1, column='start_time', value=timestamps[bouts['start_idx']])
+            bouts.insert(loc=2, column='end_time', value=timestamps[bouts['end_idx']])
 
-    return steps_df, bouts_df
+    if return_bouts:
+        return steps, bouts
+    else:
+        return steps
 
 
 if __name__ == "__main__":
@@ -193,8 +198,8 @@ if __name__ == "__main__":
 
     data_start_time = ankle.header['start_datetime']  # if start is None else start
 
-    gyro_steps_df, gyro_bouts_df = fraccaro_gyro_steps(gyro=gyro_z, freq=fs, start_time=data_start_time, min_steps=3,
-                                                       max_break=2, remove_unbouted=False)
+    gyro_steps_df = fraccaro_gyro_steps(gyro=gyro_z, freq=fs, start_time=data_start_time, min_steps=3,
+                                                       max_break=2, return_bouts=False, remove_unbouted=False)
 
     # steps_df = detect_steps(ra_data=sag_gyro, la_data=sag_gyro, data_type='gyroscope', left_right='bilateral', loc='ankle', data=None, start_time=data_start_time, start=0, end=-1, freq=fs)
     #
