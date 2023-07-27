@@ -661,14 +661,16 @@ class Study:
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
+        if self.pipeline_settings['modules']['prep']['adj_start']:
+            coll = self.adj_start(coll, quiet=quiet, log=log)
+
         if self.pipeline_settings['modules']['prep']['autocal']:
             coll = self.autocal(coll, quiet=quiet, log=log)
 
         if self.pipeline_settings['modules']['prep']['sync']:
             coll = self.sync(coll, quiet=quiet, log=log)
 
-        if self.pipeline_settings['modules']['prep']['adj_start']:
-            coll = self.adj_start(coll, quiet=quiet, log=log)
+
 
         coll = self.save_devices(coll=coll, dir=self.dirs['device_edf_standard'], quiet=self.quiet, log=self.log)
 
