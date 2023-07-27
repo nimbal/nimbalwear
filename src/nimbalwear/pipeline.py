@@ -973,7 +973,7 @@ class Study:
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         # duration is stored in json in iso 8601 format
-        duration_iso = self.pipeline_settings['modules']['convert']['adj_start']
+        duration_iso = self.pipeline_settings['modules']['prep']['adj_start']
 
         # default to add if no operator specified
         op = operator.add
