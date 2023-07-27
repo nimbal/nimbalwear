@@ -1,5 +1,4 @@
 import os
-from datetime import timedelta
 
 import pandas as pd
 import numpy as np
@@ -205,7 +204,7 @@ def export_steps(vert_accel, detect_arr, state_arr, freq, start_time, step_indic
     assert len(step_indices) == len(heel_strike)
 
     successful_steps = pd.DataFrame({
-        'step_timestamp': step_timestamps,
+        'step_time': step_timestamps,
         'step_index': np.array(step_indices),
         'step_state': 'success',
         'swing_start_time': timestamps[swing_start],
@@ -227,6 +226,8 @@ def export_steps(vert_accel, detect_arr, state_arr, freq, start_time, step_indic
         df = pd.concat([successful_steps, failed_steps], sort=True)
         df = df.sort_values(by='step_index')
         df = df.reset_index(drop=True)
+
+    df.insert(loc=0, column="step_num", value=pd.Series(range(1, df.shape[0] + 1)))
 
     return df
 
@@ -377,39 +378,3 @@ def state_space_accel_steps(vert_accel, freq, start_time, pushoff_df=None, pusho
         return steps_df, default_steps_df
     else:
         return steps_df
-
-
-if __name__ == "__main__":
-
-    from pathlib import Path
-    import matplotlib.pyplot as plt
-
-    from src.nimbalwear import Device
-
-    show_plots=True
-
-    # GNAC testing
-    ankle_path = Path("W:/NiMBaLWEAR/OND06/processed/standard_device_edf/GNAC/OND06_1027_01_GNAC_LAnkle.edf")
-    ankle = Device()
-    ankle.import_edf(ankle_path)
-
-    # get signal idxs
-    y_idx = ankle.get_signal_index('Accelerometer y')
-
-    # get signal frequencies needed for step detection
-    fs = ankle.signal_headers[y_idx]['sample_rate']
-
-    vertical_acc = ankle.signals[y_idx]
-
-    data_start_time = ankle.header['start_datetime']
-
-    steps_df, default_steps_df = state_space_accel_steps(vert_accel=vertical_acc, freq=fs, start_time=data_start_time,
-                                                         update_pars=True, return_default=True)
-
-
-    timestamps = pd.date_range(start=data_start_time, periods=len(vertical_acc), freq=f"{round(1 / fs, 6)}S")
-
-    if show_plots:
-        plt.plot(timestamps, vertical_acc)
-        plt.scatter(steps_df['step_timestamp'], [0] * steps_df.shape[0])
-        plt.scatter(default_steps_df['step_timestamp'], [0.1] * default_steps_df.shape[0])
