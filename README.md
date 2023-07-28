@@ -32,6 +32,9 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v
+- reorganized gait module code
+
 v0.20.1
 - adjust start time moved to before sync
 
