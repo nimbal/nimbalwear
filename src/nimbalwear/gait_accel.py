@@ -37,7 +37,7 @@ def push_off_detection(vert_accel, pushoff_avg, freq, pushoff_threshold=0.85):
     return pushoff_ind
 
 
-def mid_swing_peak_detect(data, pushoff_ind, freq, swing_phase_time=0.3):
+def mid_swing_peak_detect(data, pushoff_ind, freq, swing_phase_time=0.2):
     """
     Detects a peak within the swing_detect window length - swing peak
     """
@@ -95,7 +95,7 @@ def heel_strike_detect(data, window_ind, freq, heel_strike_detect_time=0.5):
 
 
 def detect_steps(vert_accel, freq, pushoff_df, pushoff_threshold=0.85, pushoff_time=0.4,
-                 swing_phase_time=0.3, heel_strike_detect_time=0.5,
+                 swing_phase_time=0.2, heel_strike_detect_time=0.5,
                  heel_strike_threshold=-5, foot_down_time=0.05):
 
     # TODO: adjust freq of pushoff_df ??
@@ -205,7 +205,7 @@ def export_steps(vert_accel, detect_arr, state_arr, freq, start_time, step_indic
 
     successful_steps = pd.DataFrame({
         'step_time': step_timestamps,
-        'step_index': np.array(step_indices),
+        'step_idx': np.array(step_indices),
         'step_state': 'success',
         'swing_start_time': timestamps[swing_start],
         'mid_swing_time': timestamps[mid_swing],
@@ -217,14 +217,14 @@ def export_steps(vert_accel, detect_arr, state_arr, freq, start_time, step_indic
     })
     failed_steps = pd.DataFrame({
         'step_time': failed_step_timestamps,
-        'step_index': np.array(failed_step_indices),
+        'step_idx': np.array(failed_step_indices),
         'step_state': failed_step_state
     })
     if success:
         df = successful_steps
     else:
         df = pd.concat([successful_steps, failed_steps], sort=True)
-        df = df.sort_values(by='step_index')
+        df = df.sort_values(by='step_idx')
         df = df.reset_index(drop=True)
 
     df.insert(loc=0, column="step_num", value=pd.Series(range(1, df.shape[0] + 1)))
@@ -264,7 +264,7 @@ def calc_step_parameters(vert_accel, steps_df, freq, pushoff_time=0.4, heel_stri
     toe_offs = steps_df.loc[steps_df['step_state'] == 'success', 'swing_start_time']
     mid_swings = steps_df.loc[steps_df['step_state'] == 'success', 'mid_swing_time']
     heel_strikes = steps_df.loc[steps_df['step_state'] == 'success', 'heel_strike_time']
-    step_indices = steps_df.loc[steps_df['step_state'] == 'success', 'step_index']
+    step_indices = steps_df.loc[steps_df['step_state'] == 'success', 'step_idx']
 
     mid_swing_indices = step_indices + (pushoff_time + (mid_swings - toe_offs).dt.total_seconds()) * freq
 
@@ -297,7 +297,6 @@ def calc_detection_parameters(vert_accel, freq, step_indices, steps_df, pushoff_
     swing_phase_time = max(swing_phase_time, 0.1)
     heel_strike_detect_time = 0.5 + swing_up_mean + 2 * swing_up_std
     heel_strike_threshold = -3 - heel_strike_mean / (2 * heel_strike_std)
-    # TODO: confirm this should be heel_strike_std, was heel_strike_threshold
 
     return pushoff_df, swing_phase_time, heel_strike_detect_time, heel_strike_threshold
 
@@ -324,7 +323,7 @@ def state_space_accel_steps(vert_accel, freq, start_time, pushoff_df=None, pusho
     steps_df -> dataframe with indexes of steps detected (beginning of step) from ssc algorithm
     """
 
-    swing_phase_time = swing_down_detect_time + swing_up_detect_time * 2  # TODO: confirm order-of-operations
+    swing_phase_time = swing_down_detect_time + swing_up_detect_time
 
     # set initial pushoff df - if none load default
     if pushoff_df is None:  # importing static pushoff_df

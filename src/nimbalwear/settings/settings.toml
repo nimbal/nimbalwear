@@ -158,6 +158,7 @@ save = true
 
 [modules.gait]
 step_detect_type = "gyro"
-#axis
+vert_accel = "Accelerometer x"
+sag_gyro = "Gyroscope z"
 save = true
 
