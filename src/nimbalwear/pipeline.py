@@ -37,7 +37,7 @@ from isodate import parse_duration
 from .data import Device
 from .nonwear import vert_nonwear, nonwear_stats
 from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
-from .gait import AccelReader, WalkingBouts, get_gait_bouts, create_timestamps, gait_stats
+from .gait import detect_steps, define_bouts, gait_stats
 from .activity import activity_wrist_avm, activity_stats
 from .utils import convert_json_to_toml, update_settings
 
@@ -411,78 +411,6 @@ class Study:
 
         return True
 
-        # convert to edf
-        if single_stage in [None, 'convert']:
-            coll = self.convert(coll=coll, quiet=self.quiet, log=self.log)
-
-
-        # process nonwear for all devices
-        if single_stage in [None, 'nonwear']:
-            coll = self.nonwear(coll=coll, quiet=self.quiet, log=self.log)
-
-        if single_stage in ['crop', 'sleep', 'activity']:
-            coll = self.read_nonwear(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
-
-        if single_stage in ['activity']:
-            coll = self.read_sleep(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
-
-        if single_stage in ['activity']:
-            coll = self.read_gait(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
-
-        # crop final nonwear
-        if single_stage in [None, 'crop']:
-            coll = self.crop(coll=coll, quiet=self.quiet, log=self.log)
-
-        # save sensor edf files
-        if single_stage in [None, 'save_sensors']:
-            coll = self.save_sensors(coll=coll, quiet=self.quiet, log=self.log)
-
-        # process posture
-
-        # process gait
-        if single_stage in [None, 'gait']:
-            coll = self.gait(coll=coll, quiet=self.quiet, log=self.log, )
-
-        # process sleep
-        if single_stage in [None, 'sleep']:
-            coll = self.sleep(coll=coll, quiet=self.quiet, log=self.log)
-
-        # process activity levels
-        if single_stage in [None, 'activity']:
-            coll = self.activity(coll=coll, quiet=self.quiet, log=self.log)
-
-        return True
-
-    def required_devices(self, coll, single_stage, quiet=False, log=True):
-        """ Select only required devices for single stage processing.
-
-        :param coll:
-        :param single_stage:
-        :param quiet:
-        :param log:
-        :return:
-
-        """
-
-        device_index = []
-
-        if single_stage == 'activity':
-            activity_device_index = self.select_activity_device(coll=coll, quiet=quiet, log=log)
-            device_index += activity_device_index
-        elif single_stage == 'gait':
-            r_gait_device_index, l_gait_device_index = self.select_gait_device(coll=coll)
-            device_index += r_gait_device_index + l_gait_device_index
-        elif single_stage == 'sleep':
-            sleep_device_index, sleep_dominant = self.select_sleep_device(coll=coll)
-            device_index += sleep_device_index
-
-        device_index = list(set(device_index))
-
-        coll.device_info = coll.device_info.iloc[device_index]
-        coll.device_info.reset_index(inplace=True, drop=True)
-
-        return coll
-
     def read(self, coll, stages, quiet=False, log=True):
 
         message("---- Reading device data --------", level='info', display=(not quiet), log=log,
@@ -661,14 +589,16 @@ class Study:
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
+        if self.pipeline_settings['modules']['prep']['adj_start']:
+            coll = self.adj_start(coll, quiet=quiet, log=log)
+
         if self.pipeline_settings['modules']['prep']['autocal']:
             coll = self.autocal(coll, quiet=quiet, log=log)
 
         if self.pipeline_settings['modules']['prep']['sync']:
             coll = self.sync(coll, quiet=quiet, log=log)
 
-        if self.pipeline_settings['modules']['prep']['adj_start']:
-            coll = self.adj_start(coll, quiet=quiet, log=log)
+
 
         coll = self.save_devices(coll=coll, dir=self.dirs['device_edf_standard'], quiet=self.quiet, log=self.log)
 
@@ -971,7 +901,7 @@ class Study:
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         # duration is stored in json in iso 8601 format
-        duration_iso = self.pipeline_settings['modules']['convert']['adj_start']
+        duration_iso = self.pipeline_settings['modules']['prep']['adj_start']
 
         # default to add if no operator specified
         op = operator.add
@@ -1564,202 +1494,137 @@ class Study:
         # TODO: axis needs to be set based on orientation of device
 
         step_detect_type = self.pipeline_settings['modules']['gait']['step_detect_type']
-        axis = self.pipeline_settings['modules']['gait'].get('axis', None)
+        vert_accel_label = self.pipeline_settings['modules']['gait']['vert_accel']
+        sag_gyro_label = self.pipeline_settings['modules']['gait']['sag_gyro']
         save = self.pipeline_settings['modules']['gait']['save']
 
         message(f"Detecting steps and walking bouts using {step_detect_type} data...", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
-        r_gait_device_index, l_gait_device_index = self.select_gait_device(coll=coll)
+        r_device_idx, l_device_idx = self.select_gait_device(coll=coll)
 
-        if not (l_gait_device_index or r_gait_device_index):
+        if not (l_device_idx or r_device_idx):
             raise NWException(f'{coll.subject_id}_{coll.coll_id}: No left or right ankle device found in device list')
 
+        # TODO: what to do for periods where only one is worn even though both are present
+        # TODO: adjust min steps if two or one legs?
+
+        # set indices and handles case if ankle data is missing
+        l_device_idx = l_device_idx[0] if l_device_idx else None
+        r_device_idx = r_device_idx[0] if r_device_idx else None
 
         if step_detect_type == 'accel':
-
-            #######################
-            # ACCEL GAIT DETECT
-            #######################
-
-            # set indices and handles case if ankle data is missing
-            l_gait_device_index = l_gait_device_index if l_gait_device_index else r_gait_device_index
-            r_gait_device_index = r_gait_device_index if r_gait_device_index else l_gait_device_index
-
-            l_gait_device_index = l_gait_device_index[0]
-            r_gait_device_index = r_gait_device_index[0]
-
-            # check to see that device_types match - comment because not necessary?
-            # assert self.device_info.loc[l_gait_device_index, 'device_type'] == self.device_info.loc[r_gait_device_index, 'device_type']
-
-            # checks to see if files exist
-            if not (coll.devices[l_gait_device_index] and coll.devices[r_gait_device_index]):
-                raise NWException(f'{coll.subject_id}_{coll.coll_id}: Either left or right ankle device data is missing')
-
-            # convert inputs to objects as inputs
-            l_accel_x_sig = coll.devices[l_gait_device_index].get_signal_index('Accelerometer x')
-            l_accel_y_sig = coll.devices[l_gait_device_index].get_signal_index('Accelerometer y')
-            l_accel_z_sig = coll.devices[l_gait_device_index].get_signal_index('Accelerometer z')
-
-            l_obj = AccelReader.sig_init(raw_x=coll.devices[l_gait_device_index].signals[l_accel_x_sig],
-                raw_y=coll.devices[l_gait_device_index].signals[l_accel_y_sig],
-                raw_z=coll.devices[l_gait_device_index].signals[l_accel_z_sig],
-                startdate = coll.devices[l_gait_device_index].header['start_datetime'],
-                freq=coll.devices[l_gait_device_index].signal_headers[l_accel_x_sig]['sample_rate'])
-
-            r_accel_x_sig = coll.devices[r_gait_device_index].get_signal_index('Accelerometer x')
-            r_accel_y_sig = coll.devices[r_gait_device_index].get_signal_index('Accelerometer y')
-            r_accel_z_sig = coll.devices[r_gait_device_index].get_signal_index('Accelerometer z')
-
-            r_obj = AccelReader.sig_init(raw_x=coll.devices[r_gait_device_index].signals[r_accel_x_sig],
-                raw_y=coll.devices[r_gait_device_index].signals[r_accel_y_sig],
-                raw_z=coll.devices[r_gait_device_index].signals[r_accel_z_sig],
-                startdate = coll.devices[r_gait_device_index].header['start_datetime'],
-                freq=coll.devices[r_gait_device_index].signal_headers[r_accel_x_sig]['sample_rate'])
-
-            # run gait algorithm to find bouts
-            # TODO: Add progress bars instead of print statements??
-            wb = WalkingBouts(l_obj, r_obj, left_kwargs={'axis': axis}, right_kwargs={'axis': axis})
-
-            # save bout times
-            coll.gait_bouts = wb.export_bouts()
-
-            # save step times
-            coll.gait_step_times = wb.export_steps()
-
-            # compensate for export_steps returning blank DataFrame if no steps
-            # TODO: Fix in nwgait to return columns
-            if coll.gait_step_times.empty:
-                coll.gait_step_times = pd.DataFrame(columns=['step_num', 'gait_bout_num', 'foot', 'avg_speed',
-                                                        'heel_strike_accel', 'heel_strike_time', 'mid_swing_accel',
-                                                        'mid_swing_time', 'step_length', 'step_state', 'step_time',
-                                                        'swing_start_accel', 'swing_start_time'])
-
-            coll.gait_bouts = self.identify_df(coll, coll.gait_bouts)
-            coll.gait_step_times = self.identify_df(coll, coll.gait_step_times)
-
-            message(f"Detected {coll.gait_bouts.shape[0]} gait bouts", level='info', display=(not quiet), log=log,
-                    logger_name=self.log_name)
-
-            message(f"Detected {coll.gait_step_times.shape[0]} steps",
-                    level='info', display=(not quiet), log=log, logger_name=self.log_name)
-
-            message("Summarizing daily gait analytics...", level='info', display=(not quiet), log=log,
-                    logger_name=self.log_name)
-
-            coll.gait_daily = gait_stats(coll.gait_bouts)
-            coll.gait_daily = self.identify_df(coll, coll.gait_daily)
-
-            # adjusting gait parameters
-            coll.gait_bouts.rename(columns={'start_dp': 'start_idx',
-                                            'end_dp': 'end_idx'},
-                                    inplace=True)
-
-            coll.gait_step_times.rename(columns={'step_index': 'step_idx'}, inplace=True)
-
-
+            l_sig_label = r_sig_label = vert_accel_label
         elif step_detect_type == 'gyro':
-
-            #####################
-            # Gyro Gait Detect
-            #####################
-
-            # TODO: currently works only for single leg - limitation of algorithm perhaps ???
-
-            device_idx = r_gait_device_index if r_gait_device_index else l_gait_device_index
-            device_idx = device_idx[0]
-
-            gyro_z_idx = coll.devices[device_idx].get_signal_index("Gyroscope z")
-
-            # creating timestamps && timestamp info if needed-----
-            # start_stamp = file.header["start_datetime"]
-            times, idxs = create_timestamps(data_start_time=coll.devices[device_idx].header["start_datetime"],
-                                            data_len=len(coll.devices[device_idx].signals[gyro_z_idx]),
-                                            fs=coll.devices[device_idx].signal_headers[gyro_z_idx]['sample_rate'])
-
-            sgp = get_gait_bouts(data=coll.devices[device_idx].signals[gyro_z_idx],
-                                 sample_freq=coll.devices[device_idx].signal_headers[gyro_z_idx]['sample_rate'],
-                                 timestamps=times, break_sec=2, bout_steps=3, start_ind=idxs[0], end_ind=idxs[1])
-
-            coll.gait_step_times, coll.gait_bouts, peak_heights = sgp
-
-            # nnot sure if this is necessary in this version
-            # TODO: Fix in nwgait to return columns
-            if coll.gait_step_times.empty:
-                coll.gait_step_times = pd.DataFrame(columns=['Step', 'Step_index', 'Bout_number', 'Peak_times'])
-
-            coll.gait_bouts = self.identify_df(coll, coll.gait_bouts)
-            coll.gait_step_times = self.identify_df(coll, coll.gait_step_times)
-
-            message(f"Detected {coll.gait_bouts.shape[0]} gait bouts", level='info', display=(not quiet), log=log,
-                    logger_name=self.log_name)
-
-            message(f"Detected {coll.gait_step_times.shape[0] * 2} steps",
-                    level='info', display=(not quiet), log=log, logger_name=self.log_name)
-
-            message("Summarizing daily gait analytics...", level='info', display=(not quiet), log=log,
-                    logger_name=self.log_name)
-
-            # adjusting gait parameters
-            coll.gait_bouts.rename(columns={'Bout_number': 'gait_bout_num',
-                                                 'Step_count': 'step_count',
-                                                 'Start_time': 'start_time',
-                                                 'End_time': 'end_time',
-                                                 'Start_idx': 'start_idx',
-                                                 'End_idx': 'end_idx'},
-                                        inplace=True)
-
-            coll.gait_step_times.rename(columns={'Step': 'step_num',
-                                                 'Step_index': 'step_idx',
-                                                 'Bout_number': 'gait_bout_num',
-                                                 'Peak_times': 'step_time'},
-                                        inplace=True)
-
-            coll.gait_daily = gait_stats(coll.gait_bouts, single_leg=True)
-            coll.gait_daily = self.identify_df(coll, coll.gait_daily)
-
-
-
-
+            l_sig_label = r_sig_label = sag_gyro_label
         else:
             message(f"Invalid step_detect_type: {step_detect_type}", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
-
             return coll
+
+        if l_device_idx is not None:
+            l_sig_idx = coll.devices[l_device_idx].get_signal_index(l_sig_label)
+            l_data = coll.devices[l_device_idx].signals[l_sig_idx]
+            l_start_time = coll.devices[l_device_idx].header['start_datetime']
+            l_fs = coll.devices[l_device_idx].signal_headers[l_sig_idx]['sample_rate']
+        else:
+            l_data = None
+            l_start_time = None
+            l_fs = None
+
+        if r_device_idx is not None:
+            r_sig_idx = coll.devices[r_device_idx].get_signal_index(r_sig_label)
+            r_data = coll.devices[r_device_idx].signals[r_sig_idx]
+            r_start_time = coll.devices[r_device_idx].header['start_datetime']
+            r_fs = coll.devices[r_device_idx].signal_headers[r_sig_idx]['sample_rate']
+        else:
+            r_data = None
+            r_start_time = None
+            r_fs = None
+
+        single_leg = True
+
+        # if two devices
+        if (l_data is not None) and (r_data is not None):
+
+            # check that sample rates match
+            if l_fs == r_fs:
+                    fs=l_fs
+            else:
+                raise NWException(f'{coll.subject_id}_{coll.coll_id}: Left and right ankle sample rates do not match.')
+
+            # crop data to common start and end time
+            start_time = max([l_start_time, r_start_time])
+
+            l_sample_start = int((l_start_time - start_time).total_seconds() * fs)
+            l_data = l_data[l_sample_start:]
+
+            r_sample_start = int((r_start_time - start_time).total_seconds() * fs)
+            r_data = r_data[r_sample_start:]
+
+            end_sample = min([len(l_data), len(r_data)])
+
+            l_data = l_data[:end_sample]
+            r_data = r_data[:end_sample]
+
+            single_leg = False
+
+        elif l_data is not None:
+            fs = l_fs
+            start_time = l_start_time
+        elif r_data is not None:
+            fs = r_fs
+            start_time = r_start_time
+
+        steps = detect_steps(left_data=l_data, right_data=r_data, loc='ankle', data_type=step_detect_type,
+                             start_time=start_time, freq=fs, orient_signal=True, low_pass=12)
+
+        steps, bouts = define_bouts(steps=steps, freq=fs, start_time=start_time, max_break=2, min_steps=3,
+                                    remove_unbouted=False)
+
+        coll.gait_steps = steps
+        coll.gait_bouts = bouts
+
+        coll.gait_bouts = self.identify_df(coll, coll.gait_bouts)
+        coll.gait_steps = self.identify_df(coll, coll.gait_steps)
+
+        message(f"Detected {coll.gait_bouts.shape[0]} gait bouts", level='info', display=(not quiet), log=log,
+                logger_name=self.log_name)
+
+        message(f"Detected {coll.gait_steps.shape[0]} steps",
+                level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        message("Summarizing daily gait analytics...", level='info', display=(not quiet), log=log,
+                logger_name=self.log_name)
+
+        coll.gait_daily = gait_stats(coll.gait_bouts, stat_type='daily', single_leg=single_leg)
+        coll.gait_daily = self.identify_df(coll, coll.gait_daily)
 
 
         bout_cols = ['study_code', 'subject_id', 'coll_id', 'gait_bout_num', 'start_time', 'end_time',
                      'step_count']
         coll.gait_bouts = coll.gait_bouts[bout_cols]
 
-
-        step_cols = ['study_code','subject_id','coll_id','step_num', 'gait_bout_num', 'step_idx', 'step_time']
-        coll.gait_step_times = coll.gait_step_times[step_cols]
+        step_cols = ['study_code','subject_id','coll_id','step_num', 'gait_bout_num', 'step_time', 'step_idx', 'loc',
+                     'side', 'data_type', 'alg']
+        coll.gait_steps = coll.gait_steps[step_cols]
 
         if save:
             # create all file path variables
-            bouts_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "GAIT_BOUTS"]), "csv"])
-            steps_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "GAIT_STEPS"]), "csv"])
-            # steps_rej_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "GAIT_STEPS_REJ"]),
-            #                                "csv"])
-            daily_gait_csv_name = '.'.join(['_'.join([coll.study_code, coll.subject_id, coll.coll_id, "GAIT_DAILY"]),
-                                            "csv"])
+            bouts_csv_name = f"{coll.study_code}_{coll.subject_id}_{coll.coll_id}_GAIT_BOUTS.csv"
+            steps_csv_name = f"{coll.study_code}_{coll.subject_id}_{coll.coll_id}_GAIT_STEPS.csv"
+            daily_gait_csv_name = f"{coll.study_code}_{coll.subject_id}_{coll.coll_id}_GAIT_DAILY.csv"
 
             bouts_csv_path = self.dirs['gait_bouts'] / bouts_csv_name
             steps_csv_path = self.dirs['gait_steps'] / steps_csv_name
-            # steps_rej_csv_path = self.dirs['gait_steps'] / steps_rej_csv_name
             daily_gait_csv_path = self.dirs['gait_daily'] / daily_gait_csv_name
 
             message(f"Saving {bouts_csv_path}", level='info', display=(not quiet), log=log, logger_name=self.log_name)
             coll.gait_bouts.to_csv(bouts_csv_path, index=False)
 
             message(f"Saving {steps_csv_path}", level='info', display=(not quiet), log=log, logger_name=self.log_name)
-            coll.gait_step_times.to_csv(steps_csv_path, index=False)
-
-            # message(f"Saving {steps_rej_csv_path}", level='info', display=(not quiet), log=log,
-            #         logger_name=self.study_code)
-            # coll.step_times[coll.step_times['step_state'] != 'success'].to_csv(steps_rej_csv_path, index=False)
+            coll.gait_steps.to_csv(steps_csv_path, index=False)
 
             message(f"Saving {daily_gait_csv_path}", level='info', display=(not quiet), log=log,
                     logger_name=self.log_name)
@@ -1771,7 +1636,7 @@ class Study:
 
     def read_gait(self, coll, single_stage, quiet=False, log=True):
 
-        # read nonwear data for all devices
+        # read gait data for all devices
         message("Reading gait data from files...", level='info', display=(not quiet), log=log,
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
