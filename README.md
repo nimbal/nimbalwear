@@ -32,7 +32,7 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
-v
+v0.21.0
 - reorganized gait module code
 
 v0.20.1
