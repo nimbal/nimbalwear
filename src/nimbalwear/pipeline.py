@@ -589,14 +589,16 @@ class Study:
                 logger_name=self.log_name)
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
+        if self.pipeline_settings['modules']['prep']['adj_start']:
+            coll = self.adj_start(coll, quiet=quiet, log=log)
+
         if self.pipeline_settings['modules']['prep']['autocal']:
             coll = self.autocal(coll, quiet=quiet, log=log)
 
         if self.pipeline_settings['modules']['prep']['sync']:
             coll = self.sync(coll, quiet=quiet, log=log)
 
-        if self.pipeline_settings['modules']['prep']['adj_start']:
-            coll = self.adj_start(coll, quiet=quiet, log=log)
+
 
         coll = self.save_devices(coll=coll, dir=self.dirs['device_edf_standard'], quiet=self.quiet, log=self.log)
 
@@ -706,7 +708,7 @@ class Study:
             device_location = row['device_location']
             device_id = row['device_id']
 
-            pre_err, post_err, iter = coll.devices[idx].autocal(quiet=quiet)
+            pre_err, post_err, iter, offset, scale, tempoffset = coll.devices[idx].autocal(quiet=quiet)
 
             if pre_err is None:
                 message(f"Autocalibration for {device_type} {device_location} could not be performed.",
@@ -720,9 +722,11 @@ class Study:
                                   'device_type': device_type,
                                   'device_location': device_location,
                                   'device_id': device_id,
-                                  'pre_err': pre_err,
-                                  'post_err': post_err,
-                                  'iter': iter}, index=[0])
+                                  'pre_err': pre_err, 'post_err': post_err, 'iter': iter,
+                                  'offset_x': offset[0], 'offset_y': offset[1], 'offset_z': offset[2],
+                                  'scale_x': scale[0], 'scale_y': scale[1], 'scale_z': scale[2],
+                                  'tempoffset_x': tempoffset[0], 'tempoffset_y': tempoffset[1], 'tempoffset_z': tempoffset[2],
+                                  }, index=[0])
 
             message(f"Autocalibrated {device_type} {device_location}: Calibration error reduced from {pre_err} to {post_err} after {iter} iterations.",
                     level='info', display=(not quiet), log=log, logger_name=self.log_name)
@@ -897,7 +901,7 @@ class Study:
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         # duration is stored in json in iso 8601 format
-        duration_iso = self.pipeline_settings['modules']['convert']['adj_start']
+        duration_iso = self.pipeline_settings['modules']['prep']['adj_start']
 
         # default to add if no operator specified
         op = operator.add

@@ -193,4 +193,4 @@ def autocal(x, y, z, accel_fs, temp=None, temp_fs=None, use_temp=True, epoch_sec
             plt.plot(calib_vm, linewidth=0.25, color='dodgerblue')
             plt.show()
 
-    return x, y, z, pre_error, post_error, n_iter
+    return x, y, z, pre_error, post_error, n_iter, offset, scale, tempoffset

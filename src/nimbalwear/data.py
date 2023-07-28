@@ -392,13 +392,13 @@ class Device:
                           accel_fs=self.signal_headers[x_i]['sample_rate'], temp=temp, temp_fs=temp_fs,
                           use_temp=use_temp, epoch_secs=epoch_secs, detect_only=detect_only, plot=plot, quiet=quiet)
 
-        x, y, z, pre_error, post_error, iterations = cal_var
+        x, y, z, pre_error, post_error, iterations, offset, scale, tempoffset = cal_var
 
         self.signals[x_i] = x
         self.signals[y_i] = y
         self.signals[z_i] = z
 
-        return pre_error, post_error, iterations
+        return pre_error, post_error, iterations, offset, scale, tempoffset
 
     def sync(self, ref, sig_labels=('Accelerometer x', 'Accelerometer y', 'Accelerometer z'), sync_type='flip',
              sync_at_config=True, search_radius=None, signal_ds=1, rest_min=2, rest_max=15, rest_sens=0.12, flip_max=2,
