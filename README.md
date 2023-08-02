@@ -32,7 +32,7 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
-v0.21.2
+v0.21.1
 - fixed MANIFEST.in bug
 
 v0.21.0
