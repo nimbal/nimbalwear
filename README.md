@@ -32,6 +32,9 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v0.21.2
+- bug fix: indexing issue caused states to sometimes be skipped 
+
 v0.21.1
 - fixed MANIFEST.in bug
 
