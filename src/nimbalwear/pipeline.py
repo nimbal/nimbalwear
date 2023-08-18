@@ -1557,10 +1557,10 @@ class Study:
             # crop data to common start and end time
             start_time = max([l_start_time, r_start_time])
 
-            l_sample_start = int((l_start_time - start_time).total_seconds() * fs)
+            l_sample_start = int((start_time - l_start_time).total_seconds() * fs)
             l_data = l_data[l_sample_start:]
 
-            r_sample_start = int((r_start_time - start_time).total_seconds() * fs)
+            r_sample_start = int((start_time - r_start_time).total_seconds() * fs)
             r_data = r_data[r_sample_start:]
 
             end_sample = min([len(l_data), len(r_data)])
