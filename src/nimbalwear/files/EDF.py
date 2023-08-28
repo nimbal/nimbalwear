@@ -61,7 +61,7 @@ class EDFFile:
 
         # transfer appropriate variables into header dict
         header = {'patientcode': patient_id[0],
-                  'gender': patient_id[1],
+                  'sex': patient_id[1],
                   'birthdate': birthdate,
                   'patientname': patient_id[3],
                   'patient_additional': ' '.join(patient_id[4:]) if len(patient_id) > 4 else '',
@@ -113,11 +113,6 @@ class EDFFile:
         self.signals = [edf_reader.readSignal(sig_num) for sig_num in range(edf_reader.signals_in_file)]
         edf_reader.close()
 
-        # # if signal is ndarray convert to list
-        # for sig in range(len(self.signals)):
-        #     if isinstance(self.signals[sig], np.ndarray):
-        #         self.signals[sig] = self.signals[sig].tolist()
-
     def write(self, out_file, sig_nums_out=None, quiet=False):
 
         out_file = Path(out_file)
@@ -161,25 +156,12 @@ class EDFFile:
             signals = [signals[sig_num] for sig_num in sig_nums_out]
             signal_headers = [signal_headers[sig_num] for sig_num in sig_nums_out]
 
-        sample_rates = [float(signal_header['sample_rate']) for signal_header in signal_headers]
-
-        # need to adjust datarecord_duration and "sample_rates" are not an integer
-        sample_rate_mults = [int(1 / (x - math.floor(x))) for x in sample_rates if not x.is_integer()]
-
-        adj = np.lcm.reduce(sample_rate_mults) if sample_rate_mults else 1
-
-        datarecord_duration = int(100000 * adj)
-
-        # loop through signals
+        # replace sample_rate key with sample_frequency for all signal headers
         for sig in range(len(signal_headers)):
-            # adjust sample rate to samples per datarecord
-            # (problem with pyedflib interpretation of 'sample_rate')
-            old_sample_rate = signal_headers[sig]['sample_rate']
-            signal_headers[sig]['sample_rate'] = old_sample_rate * adj
+            signal_headers[sig]['sample_frequency'] = signal_headers[sig].pop('sample_rate')
 
         # write edf
         edf_writer = pyedflib.EdfWriter(str(out_file), len(signals))
-        edf_writer.setDatarecordDuration(datarecord_duration)
         edf_writer.setHeader(self.header)
         edf_writer.setSignalHeaders(signal_headers)
         edf_writer.writeSamples(signals)
@@ -256,7 +238,7 @@ def edf_header_summary(edf_path='', csv_path='', quiet=False):
 
     header = {}
 
-    header_key_order = ['patientcode', 'gender', 'birthdate', 'patientname', 'patient_additional', 'startdate',
+    header_key_order = ['patientcode', 'sex', 'birthdate', 'patientname', 'patient_additional', 'startdate',
                         'duration', 'admincode', 'technician', 'equipment', 'recording_additional']
 
     for key in header_key_order:

@@ -99,7 +99,7 @@ class Device:
                        'subject_id': edf_file.header['patientcode'],
                        'coll_id': coll_id,
                        'name': edf_file.header['patientname'],
-                       'sex': edf_file.header['gender'],  # 0=F, 1=M, 2=X
+                       'sex': edf_file.header['sex'],  # 0=F, 1=M, 2=X
                        'birthdate': edf_file.header['birthdate'],
                        'patient_additional': ' '.join(p_add[2:]) if len(p_add) > 2 else '',
                        'start_datetime': edf_file.header['startdate'],
@@ -145,7 +145,7 @@ class Device:
 
         # check that startdate is a datetime - indicates header has been read in
         if not isinstance(self.header['start_datetime'], dt.datetime):
-            print(error_str + "start_datetimme is not a datetime object - header may not have been imported correctly.")
+            print(error_str + "start_datetime is not a datetime object - header may not have been imported correctly.")
             return False
 
         # ensure valid sig nums used as arguments
@@ -164,7 +164,7 @@ class Device:
         edf_file = EDFFile(file_path)
 
         edf_file.header = {'patientcode': self.header['subject_id'],
-                           'gender': self.header['sex'],
+                           'sex': self.header['sex'],
                            'birthdate': self.header['birthdate'],
                            'patientname': self.header['name'],
                            'patient_additional': ' '.join([self.header['coll_id'], self.header['device_location']]),
@@ -483,7 +483,7 @@ class Device:
                        'subject_id': subject_id,
                        'coll_id': coll_id,
                        'name': in_file.header['patientname'],
-                       'sex': in_file.header['gender'],
+                       'sex': in_file.header['sex'],
                        'birthdate': in_file.header['birthdate'],
                        'patient_additional': '',
                        'start_datetime': in_file.header['startdate'],
