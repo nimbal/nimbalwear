@@ -149,7 +149,7 @@ def detect_steps(vert_accel, freq, pushoff_df, pushoff_threshold=0.85, pushoff_t
         if len(accel_threshold_list) == 0:
             detects['heel_strike'].append(i - 1)
             continue
-        accel_ind = accel_threshold_list[0] + mid_swing_i
+        accel_ind = accel_threshold_list[0] + mid_swing_i + 1
         end_i = accel_ind + int(foot_down_time * freq)
 
         state_arr[i - pushoff_len:i] = 1
