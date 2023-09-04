@@ -1207,8 +1207,8 @@ class Study:
 
             # read nonwear csv file
             nonwear_bouts = pd.read_csv(nonwear_csv_path, dtype=str)
-            nonwear_bouts['start_time'] = pd.to_datetime(nonwear_bouts['start_time'], format='%Y-%m-%d %H:%M:%S')
-            nonwear_bouts['end_time'] = pd.to_datetime(nonwear_bouts['end_time'], format='%Y-%m-%d %H:%M:%S')
+            nonwear_bouts['start_time'] = pd.to_datetime(nonwear_bouts['start_time'], yearfirst=True)
+            nonwear_bouts['end_time'] = pd.to_datetime(nonwear_bouts['end_time'], yearfirst=True)
 
             # append to collection attribute
             coll.nonwear_bouts = pd.concat([coll.nonwear_bouts, nonwear_bouts], ignore_index=True)
