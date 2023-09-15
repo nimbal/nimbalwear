@@ -32,6 +32,11 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v0.21.3
+- update vertdetach version
+- update compatibility with pyedflib v1.0.34 (sex header field and sample_frequency)
+- bug fix: datetime conversion when reading nonwear csv
+
 v0.21.2
 - bug fix: indexing issue caused states to sometimes be skipped
 - bug fix: start date calculation for multiple gait devices
