@@ -252,8 +252,8 @@ def detect_sync_flips_accel(ref_accel, tgt_accel, ref_freq, tgt_freq, offset=0, 
                         else:
                             rej_i.append(rem_t.Index)
 
-    # reject (drop) all flagged syncs
-    syncs = syncs.drop(labels=rej_i)
+            # reject (drop) all flagged syncs
+            syncs = syncs.drop(labels=rej_i)
 
     if syncs is None:
         syncs = pd.DataFrame(columns=sync_cols)
