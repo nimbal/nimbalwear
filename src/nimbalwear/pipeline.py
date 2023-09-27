@@ -2305,6 +2305,22 @@ class Collection:
 
         self.devices = []
 
+        self.nonwear_bouts = pd.DataFrame()
+        self.daily_nonwear = pd.DataFrame()
+
+        self.gait_steps = pd.DataFrame()
+        self.gait_bouts = pd.DataFrame()
+        self.gait_daily = pd.DataFrame()
+
+        self.sptw = pd.DataFrame()
+        self.sleep_bouts = pd.DataFrame()
+        self.daily_sleep = pd.DataFrame()
+
+        self.activity_epochs = pd.DataFrame()
+        self.activity_bouts = pd.DataFrame()
+        self.activity_daily = pd.DataFrame()
+        self.avm_second = pd.DataFrame()
+
 
 def message(msg, level='info', display=True, log=True, logger_name=None):
 
