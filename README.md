@@ -32,6 +32,10 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v0.21.4
+- bug fix: error when dataframes not created if data does not exist
+- bug fix: error creating nonwear bouts dataframe if no nonwear detected
+
 v0.21.3
 - update vertdetach version
 - update compatibility with pyedflib v1.0.34 (sex header field and sample_frequency)
