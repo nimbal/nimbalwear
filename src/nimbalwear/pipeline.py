@@ -1342,37 +1342,38 @@ class Study:
                                                             'temp_dec_roc', 'temp_inc_roc', 'duration'], )
                             daily_nonwear = nonwear_stats(db, quiet=quiet)
 
+
                     else:
                         message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: Could not crop due to lack of wear time",
                                 level='warning', display=(not quiet), log=log, logger_name=self.log_name)
 
+                        # save settings used to derive device bouts and add to nonwear dataframe
+                        accel_std_thresh_mg = device_bouts.iloc[0]['accel_std_thresh_mg']
+                        low_temperature_cutoff = device_bouts.iloc[0]['low_temperature_cutoff']
+                        high_temperature_cutoff = device_bouts.iloc[0]['high_temperature_cutoff']
+                        temp_dec_roc = device_bouts.iloc[0]['temp_dec_roc']
+                        temp_inc_roc = device_bouts.iloc[0]['temp_inc_roc']
+
+                        daily_nonwear.insert(loc=0, column='study_code', value=study_code)
+                        daily_nonwear.insert(loc=1, column='subject_id', value=subject_id)
+                        daily_nonwear.insert(loc=2, column='coll_id', value=coll_id)
+                        daily_nonwear.insert(loc=3, column='device_type', value=device_type)
+                        daily_nonwear.insert(loc=4, column='device_location', value=device_location)
+                        daily_nonwear.insert(loc=5, column='accel_std_thresh_mg', value=accel_std_thresh_mg)
+                        daily_nonwear.insert(loc=6, column='low_temperature_cutoff', value=low_temperature_cutoff)
+                        daily_nonwear.insert(loc=7, column='high_temperature_cutoff', value=high_temperature_cutoff)
+                        daily_nonwear.insert(loc=8, column='temp_dec_roc', value=temp_dec_roc)
+                        daily_nonwear.insert(loc=9, column='temp_inc_roc', value=temp_inc_roc)
+
+                        # update nonwear collection attribrutes
+                        coll.daily_nonwear = pd.concat([coll.daily_nonwear, daily_nonwear], ignore_index=True)
+                        device_bouts = device_bouts.drop(columns=['duration'])
+                        coll.nonwear_bouts = pd.concat([coll.nonwear_bouts, device_bouts], ignore_index=True)
+                        coll.devices[i] = device
+
                 else:
                     message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for device",
                             level='warning', display=(not quiet), log=log, logger_name=self.log_name)
-
-                # save settings used to derive device bouts and add to nonwear dataframe
-                accel_std_thresh_mg = device_bouts.iloc[0]['accel_std_thresh_mg']
-                low_temperature_cutoff = device_bouts.iloc[0]['low_temperature_cutoff']
-                high_temperature_cutoff = device_bouts.iloc[0]['high_temperature_cutoff']
-                temp_dec_roc = device_bouts.iloc[0]['temp_dec_roc']
-                temp_inc_roc = device_bouts.iloc[0]['temp_inc_roc']
-
-                daily_nonwear.insert(loc=0, column='study_code', value=study_code)
-                daily_nonwear.insert(loc=1, column='subject_id', value=subject_id)
-                daily_nonwear.insert(loc=2, column='coll_id', value=coll_id)
-                daily_nonwear.insert(loc=3, column='device_type', value=device_type)
-                daily_nonwear.insert(loc=4, column='device_location', value=device_location)
-                daily_nonwear.insert(loc=5, column='accel_std_thresh_mg', value=accel_std_thresh_mg)
-                daily_nonwear.insert(loc=6, column='low_temperature_cutoff', value=low_temperature_cutoff)
-                daily_nonwear.insert(loc=7, column='high_temperature_cutoff', value=high_temperature_cutoff)
-                daily_nonwear.insert(loc=8, column='temp_dec_roc', value=temp_dec_roc)
-                daily_nonwear.insert(loc=9, column='temp_inc_roc', value=temp_inc_roc)
-
-                # update nonwear collection attribrutes
-                coll.daily_nonwear = pd.concat([coll.daily_nonwear, daily_nonwear], ignore_index=True)
-                device_bouts = device_bouts.drop(columns=['duration'])
-                coll.nonwear_bouts = pd.concat([coll.nonwear_bouts, device_bouts], ignore_index=True)
-                coll.devices[i] = device
 
             else:
                 message(f"{subject_id}_{coll_id}_{device_type}_{device_location}: No nonwear data for collection",
