@@ -32,6 +32,9 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v0.19.9
+-bug fix: error creating nonwear bouts dataframe if no nonwear detected
+
 v0.19.8
 - bug fix: properly handles Axivity devices with no gyro collected
 
