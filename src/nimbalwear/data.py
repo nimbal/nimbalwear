@@ -16,6 +16,7 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
+import matplotlib.dates as mdates
 from scipy.spatial.transform import Rotation
 
 from .files import EDFFile, GENEActivFile, NoninFile, CWAFile
@@ -213,6 +214,35 @@ class Device:
         index = None if index == len(self.signal_headers) else index
 
         return index
+
+    def get_timestamps(self, sig: int | str, ts_type: str = 'timestamp'):
+        """Generate timestamps for a signal.
+
+        Parameters
+        ----------
+        sig : int or str
+            Can be signal index or label
+        ts_type : str
+            Can be 'timestamp', 'datetime', 'mdate', 'Unix'
+        """
+
+        if type(sig) == str:
+            sig = self.get_signal_index(sig)
+
+        start = self.header['start_datetime']
+        freq = f"{1 / self.signal_headers[sig]['sample_rate']}S"
+        per = self.signals[sig].shape[0]
+
+        ts = pd.date_range(start, freq=freq, periods=per)
+
+        if ts_type == 'datetime':
+            ts = ts.to_pydatetime()
+        if ts_type == 'mdate':
+            ts = mdates.date2num(ts)
+        elif ts_type.lower() == 'unix':
+            ts = (ts - pd.Timestamp("1970-01-01")) / pd.Timedelta("1s")
+
+        return ts
 
     def get_day_idxs(self, day_offset):
 
