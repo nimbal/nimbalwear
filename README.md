@@ -19,7 +19,7 @@ console:
 To install a specific release, insert `M.m` after the repository name to install from the branch associated with that 
 minor release. For example:
 
-`pip install git+https://github.com/nimbal/nimbalwear@0.18`
+`pip install git+https://github.com/nimbal/nimbalwear@0.21`
 
 # Package Dependency
 
@@ -32,7 +32,11 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v0.21.5
+- bug fix: remove all Nonin file capabilities to resolve textract/six issues with Python 3.12
+
 v0.21.4
+- add get_timestamps method to Device object
 - bug fix: error when dataframes not created if data does not exist
 - bug fix: error creating nonwear bouts dataframe if no nonwear detected
 - bug fix: dropping rejected syncs if none detected

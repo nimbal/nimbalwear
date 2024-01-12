@@ -9,7 +9,6 @@ pyedflib>=0.1.34
 scikit-learn>=1.1.1
 flatten-dict>=0.4.2
 fpdf>=1.7.2
-textract>=1.6.5
 toml>=0.10.2
 msoffcrypto-tool>=5.0.0
 vertdetach@git+https://github.com/nimbal/vertdetach@1.0
