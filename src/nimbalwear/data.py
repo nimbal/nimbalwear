@@ -19,7 +19,7 @@ import pandas as pd
 import matplotlib.dates as mdates
 from scipy.spatial.transform import Rotation
 
-from .files import EDFFile, GENEActivFile, NoninFile, CWAFile
+from .files import EDFFile, GENEActivFile, CWAFile
 from .utils import sync_devices, autocal
 
 
