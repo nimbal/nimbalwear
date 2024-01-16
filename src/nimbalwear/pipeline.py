@@ -35,7 +35,7 @@ import pandas as pd
 from isodate import parse_duration
 
 from .data import Device
-from .nonwear import vert_nonwear, nonwear_stats
+from .nonwear import detach_nonwear, nonwear_stats
 from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
 from .gait import detect_steps, define_bouts, gait_stats
 from .activity import activity_wrist_avm, activity_stats
@@ -1030,14 +1030,14 @@ class Study:
             temperature_fs = device.signal_headers[temperature_idx]['sample_rate']
 
             # detect non-wear using DETACH algorithm
-            nonwear_bouts, nonwear_array = vert_nonwear(x_values=accel_x, y_values=accel_y, z_values=accel_z,
-                                                        temperature_values=temperature, accel_freq=accel_fs,
-                                                        temperature_freq=temperature_fs,
-                                                        std_thresh_mg=accel_std_thresh_mg,
-                                                        low_temperature_cutoff=low_temperature_cutoff,
-                                                        high_temperature_cutoff=high_temperature_cutoff,
-                                                        temp_dec_roc=temp_dec_roc, temp_inc_roc=temp_inc_roc,
-                                                        quiet=quiet)
+            nonwear_bouts, nonwear_array = detach_nonwear(x_values=accel_x, y_values=accel_y, z_values=accel_z,
+                                                          temperature_values=temperature, accel_freq=accel_fs,
+                                                          temperature_freq=temperature_fs,
+                                                          std_thresh_mg=accel_std_thresh_mg,
+                                                          low_temperature_cutoff=low_temperature_cutoff,
+                                                          high_temperature_cutoff=high_temperature_cutoff,
+                                                          temp_dec_roc=temp_dec_roc, temp_inc_roc=temp_inc_roc,
+                                                          quiet=quiet)
             algorithm_name = 'DETACH'
 
             # label non-wear bouts as non-wear events

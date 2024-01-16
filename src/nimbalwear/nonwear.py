@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 
-from vertdetach import vertdetach
+from nimbaldetach import nimbaldetach
 
 
 # ======================================== FUNCTIONS========================================
@@ -263,17 +263,17 @@ def zhou_nonwear(x_values, y_values, z_values, temperature_values, accelerometer
 
     return non_wear_vector
 
-detach_nonwear = vertdetach
-vert_nonwear = vertdetach
+detach_nonwear = nimbaldetach
+vert_nonwear = nimbaldetach
 
-def detect_nonwear(alg='vert', **kwargs):
+def detect_nonwear(alg='detach', **kwargs):
     """
 
     Detects accelerometer non-wear periods using a choice of different algorithms.
 
 
     Args:
-        alg:       non-wear detection algorithm to use ('vert', 'vanhees', 'zhou', default is 'vert')
+        alg:       non-wear detection algorithm to use ('detach', 'vanhees', 'zhou', default is 'vert')
         **kwargs:
 
     Returns:
@@ -285,8 +285,8 @@ def detect_nonwear(alg='vert', **kwargs):
     elif alg == 'zhou':
         print('Type not yet implemented')
         return
-    elif alg == 'vert':
-        nonwear_times, nonwear_array = vert_nonwear(**kwargs)
+    elif alg == 'detach':
+        nonwear_times, nonwear_array = detach_nonwear(**kwargs)
     else:
         print('Invalid type')
         return
