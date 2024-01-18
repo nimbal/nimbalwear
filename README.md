@@ -2,9 +2,6 @@
 
 nimbalwear is an open source toolkit for processing data from wearable sensors.
 
-This package is pre-release and should not be distributed outside the NiMBaLWear team. Additional functionality and 
-documentation will be provided in subsequent releases.
-
 # Contents
 
 - Under construction
