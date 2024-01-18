@@ -33,6 +33,7 @@ To include a specific release, replace `[version]` with the branch associated wi
 # Changes by version
 
 v0.21.5
+- add collection report
 - change vertdetach references to nimbaldetach
 - bug fix: remove all Nonin file capabilities to resolve textract/six issues with Python 3.12
 

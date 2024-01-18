@@ -2,7 +2,6 @@ import os
 import csv
 import time
 
-
 class SibelFile:
 
     def __init__(self, file_path):

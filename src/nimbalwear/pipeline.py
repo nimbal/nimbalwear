@@ -40,6 +40,7 @@ from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
 from .gait import detect_steps, define_bouts, gait_stats
 from .activity import activity_wrist_avm, activity_stats
 from .utils import convert_json_to_toml, update_settings
+from .reports import collection_report as cr
 
 from .__version__ import __version__
 
@@ -86,7 +87,7 @@ class Study:
 
 
     """
-    def __init__(self, study_dir, settings_path=None):
+    def __init__(self, study_dir, settings_path=None, supp_pwd=None):
         """Read settings, devices, and collections file to construct Pipeline instance.
 
         Parameters
@@ -101,6 +102,7 @@ class Study:
 
         self.quiet = False
         self.log = True
+        self.supp_pwd = supp_pwd
 
         # initialize folder structure
         self.study_dir = Path(study_dir)
@@ -397,14 +399,16 @@ class Study:
 
         stage_switch = {'convert': lambda: self.convert(coll=coll, quiet=self.quiet, log=self.log),
                         'prep': lambda: self.prep(coll=coll, quiet=self.quiet, log=self.log),
-                        'analytics': lambda: self.analytics(coll=coll, quiet=self.quiet, log=self.log), }
-
+                        'analytics': lambda: self.analytics(coll=coll, quiet=self.quiet, log=self.log),
+                        'reports': lambda: self.reports(coll=coll, quiet=self.quiet, log=self.log),}
 
         # if single_stage in ['activity', 'gait', 'sleep']:
         #     coll = self.required_devices(coll=coll, single_stage=single_stage, quiet=self.quiet, log=self.log)
 
-        # read data from all devices in collection
-        coll = self.read(coll=coll, stages=stages, quiet=self.quiet, log=self.log)
+        read_stages = ['convert', 'prep', 'analytics']
+        if any([rs in stages for rs in read_stages]):
+            # read data from all devices in collection
+            coll = self.read(coll=coll, stages=stages, quiet=self.quiet, log=self.log)
 
         for stage in stages:
             coll = stage_switch.get(stage, lambda: 'Invalid')()
@@ -688,6 +692,18 @@ class Study:
         # process activity levels
         if self.pipeline_settings['modules']['analytics']['activity']:
             coll = self.activity(coll=coll, quiet=self.quiet, log=self.log)
+
+        return coll
+
+    def reports(self, coll, quiet=False, log=True):
+
+        message("---- Reports stage --------", level='info', display=(not self.quiet), log=self.log,
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        # create collection report
+        if self.pipeline_settings['modules']['reports']['collection_report']:
+            coll = self.collection_report(coll=coll, quiet=self.quiet, log=self.log, )
 
         return coll
 
@@ -2012,6 +2028,27 @@ class Study:
             coll.avm_second.to_csv(avm_csv_path, index=False)
 
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        return coll
+
+    def collection_report(self, coll, quiet=False, log=True):
+
+        message("Creating collection report...", level='info', display=(not quiet), log=log,
+                logger_name=self.log_name)
+        message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
+
+        include_supp = self.pipeline_settings['modules']['collection_report']['include_supp']
+        include_custom = self.pipeline_settings['modules']['collection_report']['include_custom']
+        daily_plot = self.pipeline_settings['modules']['collection_report']['daily_plot']
+        fig_size = tuple(self.pipeline_settings['modules']['collection_report']['fig_size'])
+        top_y = tuple(self.pipeline_settings['modules']['collection_report']['top_y'])
+        bottom_y = tuple(self.pipeline_settings['modules']['collection_report']['bottom_y'])
+        supp_path = self.pipeline_settings['modules']['collection_report'].get('supp_path', None)
+
+
+        cr(study_dir=self.study_dir, subject_id=coll.subject_id, coll_id=coll.coll_id, supp_pwd=self.supp_pwd,
+           include_supp=include_supp, include_custom=include_custom, daily_plot=daily_plot, fig_size=fig_size,
+           top_y=top_y, bottom_y=bottom_y, supp_path=supp_path)
 
         return coll
 

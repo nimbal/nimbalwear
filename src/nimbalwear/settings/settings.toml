@@ -28,7 +28,7 @@ reports_collection = "reports/collection"
 reports_feedback = "reports/feedback"
 
 [pipeline]
-stages = [ "convert", "prep", "analytics",]
+stages = [ "convert", "prep", "analytics", "reports"]
 
 [pipeline.sensors]
 
@@ -87,6 +87,9 @@ save_sensors = false
 gait = true
 sleep = true
 activity = true
+
+[modules.reports]
+collection_report = true
 
 [modules.autocal]
 save = true
@@ -162,3 +165,11 @@ vert_accel = "Accelerometer x"
 sag_gyro = "Gyroscope z"
 save = true
 
+[modules.collection_report]
+include_supp = true
+include_custom = true
+daily_plot = true
+fig_size = [18, 12]
+top_y = [0.25, 1.0]
+bottom_y = [0.0, 0.2]
+#supp_path
