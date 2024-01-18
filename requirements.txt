@@ -12,3 +12,4 @@ fpdf>=1.7.2
 toml>=0.10.2
 msoffcrypto-tool>=5.0.0
 nimbaldetach>=1.0.3
+openpyxl
