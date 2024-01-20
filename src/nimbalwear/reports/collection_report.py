@@ -152,6 +152,9 @@ def collection_report(study_dir, subject_id, coll_id, supp_pwd=None, include_sup
         for i in dl_v['aliases']:
             loc_label_map[i] = dl_k
 
+    coll_device_list_df['dev_loc_label'] = [loc_label_map[r['device_location'].upper()]
+                                            for i, r in coll_device_list_df.iterrows()]
+
     # initialize data
     coll_start = {}
     coll_end = {}
@@ -164,7 +167,7 @@ def collection_report(study_dir, subject_id, coll_id, supp_pwd=None, include_sup
 
         # nonwear
         device_location = r['device_location']
-        dev_loc_label = loc_label_map[device_location.upper()]
+        dev_loc_label = r['dev_loc_label']
         device_type = r['device_type']
         nonwear_csv_filename = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}_NONWEAR.csv"
         nonwear_std_csv_path = dirs['nonwear_bouts_standard'] / nonwear_csv_filename
@@ -216,8 +219,8 @@ def collection_report(study_dir, subject_id, coll_id, supp_pwd=None, include_sup
                                     'details', 'notes', ]]
 
     # add no_collect event for when device was not collecting
-    min_coll_start = min([coll_start[k] for k in settings_toml['pipeline']['device_locations'].keys()])
-    max_coll_end = max([coll_end[k] for k in settings_toml['pipeline']['device_locations'].keys()])
+    min_coll_start = min(coll_start.values())
+    max_coll_end = max(coll_end.values())
 
     first_day_start = pd.Timestamp.combine(min_coll_start.date(), datetime.min.time())
     last_day_end = pd.Timestamp.combine(max_coll_end.date(), datetime.max.time())
@@ -225,14 +228,15 @@ def collection_report(study_dir, subject_id, coll_id, supp_pwd=None, include_sup
     no_collect = pd.DataFrame(columns=['study_code', 'subject_id', 'coll_id', 'event', 'id', 'start_time', 'end_time',
                                        'details', 'notes', ])
 
-    for k in settings_toml['pipeline']['device_locations'].keys():
+    for i, r in coll_device_list_df.iterrows():
+        dev_loc_label = r['dev_loc_label']
         dev_no_collect = {'study_code': [study_code, study_code],
                           'subject_id': [subject_id, subject_id],
                           'coll_id': [coll_id, coll_id],
                           'id': [1, 2],
-                          'event': [f"{k}_no_collect", f"{k}_no_collect"],
-                          'start_time': [first_day_start, coll_end[k]],
-                          'end_time': [coll_start[k], last_day_end],
+                          'event': [f"{dev_loc_label}_no_collect", f"{dev_loc_label}_no_collect"],
+                          'start_time': [first_day_start, coll_end[dev_loc_label]],
+                          'end_time': [coll_start[dev_loc_label], last_day_end],
                           'details': ["", ""],
                           'notes': ["", ""]}
         dev_no_collect = pd.DataFrame.from_dict(dev_no_collect)
