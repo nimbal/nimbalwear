@@ -29,6 +29,9 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v0.21.6
+- bug fix: resolve error in collection report when not all possible device locations collected
+
 v0.21.5
 - add collection report
 - change vertdetach references to nimbaldetach
