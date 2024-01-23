@@ -204,19 +204,24 @@ def collection_report(study_dir, subject_id, coll_id, supp_pwd=None, include_sup
     sync_html = sync.to_html(index=False)
 
     # sync events
-    sync_events = sync[sync['ref_sig_label'] != 'Config'].copy()
+    if not sync.empty:
+        sync_events = sync[sync['ref_sig_label'] != 'Config'].copy()
 
-    sync_min_dur = pd.Timedelta('00:06:00')
-    sync_events['duration'] = sync_events['end_time'] - sync_events['start_time']
-    sync_events['pad'] = (sync_min_dur - sync_events['duration']) / 2
-    sync_events['start_time'] = sync_events['start_time'] - sync_events['pad']
-    sync_events['end_time'] = sync_events['end_time'] + sync_events['pad']
-    sync_events['event'] = [f"{r['device_location'].lower()}_sync" for i, r in sync_events.iterrows()]
-    sync_events.rename(columns={'sync_id': 'id'}, inplace=True)
-    sync_events['details'] = ""
-    sync_events['notes'] = ""
-    sync_events = sync_events[['study_code', 'subject_id', 'coll_id', 'event', 'id', 'start_time', 'end_time',
-                                    'details', 'notes', ]]
+        sync_min_dur = pd.Timedelta('00:06:00')
+        sync_events['duration'] = sync_events['end_time'] - sync_events['start_time']
+        sync_events['pad'] = (sync_min_dur - sync_events['duration']) / 2
+        sync_events['start_time'] = sync_events['start_time'] - sync_events['pad']
+        sync_events['end_time'] = sync_events['end_time'] + sync_events['pad']
+        sync_events['event'] = [f"{r['device_location'].lower()}_sync" for i, r in sync_events.iterrows()]
+        sync_events.rename(columns={'sync_id': 'id'}, inplace=True)
+        sync_events['details'] = ""
+        sync_events['notes'] = ""
+        sync_events = sync_events[['study_code', 'subject_id', 'coll_id', 'event', 'id', 'start_time', 'end_time',
+                                        'details', 'notes', ]]
+
+    else:
+        sync_events = pd.DataFrame(columns=['study_code', 'subject_id', 'coll_id', 'event', 'id', 'start_time',
+                                            'end_time',  'details', 'notes', ])
 
     # add no_collect event for when device was not collecting
     min_coll_start = min(coll_start.values())
