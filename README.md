@@ -29,9 +29,6 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
-test
-- test pull changes to nimbalwear-dev
-
 v0.21.7
 - bug fix: resolve error in collection report if no sync events
 
