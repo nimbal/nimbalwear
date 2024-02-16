@@ -31,6 +31,7 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 v0.21.7
 - bug fix: resolve error in collection report if no sync events
+- bug fix: resolve sync event naming issue based on device location in collection report
 
 v0.21.6
 - bug fix: resolve error in collection report when not all possible device locations collected
