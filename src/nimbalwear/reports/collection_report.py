@@ -197,7 +197,6 @@ def collection_report(study_dir, subject_id, coll_id, supp_pwd=None, include_sup
             device_sync = pd.read_csv(sync_csv_path, dtype=str)
             device_sync['start_time'] = pd.to_datetime(device_sync['start_time'], yearfirst=True)
             device_sync['end_time'] = pd.to_datetime(device_sync['end_time'], yearfirst=True)
-
             sync = pd.concat([sync, device_sync])
             sync.reset_index(inplace=True, drop=True)
 
@@ -212,7 +211,8 @@ def collection_report(study_dir, subject_id, coll_id, supp_pwd=None, include_sup
         sync_events['pad'] = (sync_min_dur - sync_events['duration']) / 2
         sync_events['start_time'] = sync_events['start_time'] - sync_events['pad']
         sync_events['end_time'] = sync_events['end_time'] + sync_events['pad']
-        sync_events['event'] = [f"{r['device_location'].lower()}_sync" for i, r in sync_events.iterrows()]
+        #sync_events['event'] = [f"{r['device_location'].lower()}_sync" for i, r in sync_events.iterrows()]
+        sync_events['event'] = [f"{loc_label_map[r['device_location'].upper()]}_sync" for i, r in sync_events.iterrows()]
         sync_events.rename(columns={'sync_id': 'id'}, inplace=True)
         sync_events['details'] = ""
         sync_events['notes'] = ""
