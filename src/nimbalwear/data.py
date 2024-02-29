@@ -226,7 +226,7 @@ class Device:
             Can be 'timestamp', 'datetime', 'mdate', 'Unix'
         """
 
-        if type(sig) == str:
+        if type(sig) is str:
             sig = self.get_signal_index(sig)
 
         start = self.header['start_datetime']
@@ -473,7 +473,7 @@ class Device:
             True if successful, False otherwise.
         """
 
-        #TODO: if header doesn't look like Bittium read as EDF or add checks here
+        # TODO: if header doesn't look like Bittium read as EDF or add checks here
 
         file_path = Path(file_path)
 
@@ -495,7 +495,7 @@ class Device:
 
         # get serial id and device type
 
-        if ('SER=' in in_file.header['equipment']) &  ('DEVTYPE=' in in_file.header['equipment']):
+        if ('SER=' in in_file.header['equipment']) & ('DEVTYPE=' in in_file.header['equipment']):
             serial_id = in_file.header['equipment'].split('SER=', 1)[1].split('_', 1)[0]
             device_type = in_file.header['equipment'].split('DEVTYPE=', 1)[1].split('_', 1)[0]
             if device_type == 'Faros360':
@@ -507,7 +507,6 @@ class Device:
         else:
             serial_id = ''
             device_type = ''
-
 
         self.header = {'study_code': study_code,
                        'subject_id': subject_id,
@@ -752,7 +751,7 @@ class Device:
                        'device_location': body_location,
                        'recording_additional': ''}
 
-        #TODO: these physical min and max values will not work if signal not in file - needs to be fixed
+        # TODO: these physical min and max values will not work if signal not in file - needs to be fixed
 
         # update signal headers to match nwdata
         new_signal_headers = {'gx': {'label': "Gyroscope x",

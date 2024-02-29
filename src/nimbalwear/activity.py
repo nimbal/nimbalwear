@@ -37,7 +37,7 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
                        sptw=pd.DataFrame(), sleep_bouts=pd.DataFrame(), quiet=False):
 
     """
-    Transforms Powell cutpoints to avm based on their 15 second epochs at 30 Hz, probably most
+    Transforms Powell cutpoints to avm based on their 15-second epochs at 30 Hz, probably most
     accurate at similar values.
 
     returns avm (in mg) and intensity for each epoch
@@ -69,7 +69,6 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
     if not quiet:
         print("Calculating average vector magnitude for each epoch...")
 
-    #epoch_starts = range(0, len(vm) + 1 - epoch_samples, epoch_samples)
     avm = vm[:int(len(vm) / epoch_samples) * epoch_samples].reshape(-1, epoch_samples).sum(axis=1) / epoch_samples
     avm_sec = vm[:int(len(vm) / sec_samples) * sec_samples].reshape(-1, sec_samples).sum(axis=1) / sec_samples
     avm_sec = np.around(avm_sec * 1000, 2)
@@ -119,7 +118,6 @@ def activity_wrist_avm(x, y, z, sample_rate, start_datetime, lowpass=20, epoch_l
                                  & (activity_epochs['start_time'] < row['end_time'])
                                  & (activity_epochs['end_time'] > row['start_time'])), 'intensity'] = 'sedentary_gait'
 
-
     # create bouts
     epoch_intensity = activity_epochs['intensity']
 
@@ -159,12 +157,13 @@ def sum_total_activity(epoch_intensity, epoch_length, quiet=False):
     moderate = epoch_intensity_counts['moderate'] / epoch_per_min if 'moderate' in epoch_intensity_counts.keys() else 0
     vigorous = epoch_intensity_counts['vigorous'] / epoch_per_min if 'vigorous' in epoch_intensity_counts.keys() else 0
 
-    return pd.DataFrame({'none': none, 'sedentary': sedentary, 'light': light, 'moderate': moderate, 'vigorous': vigorous})
+    return pd.DataFrame({'none': none, 'sedentary': sedentary, 'light': light, 'moderate': moderate,
+                         'vigorous': vigorous})
 
 
-def activity_stats(activity_epochs, type='daily', quiet=False):
+def activity_stats(activity_epochs, stat_type='daily', quiet=False):
 
-    #TODO: make generic event stats (activity_stats and nonwear stats identical)
+    # TODO: make generic event stats (activity_stats and nonwear stats identical)
 
     """Calculates summary for each date in collection.
 
@@ -178,16 +177,15 @@ def activity_stats(activity_epochs, type='daily', quiet=False):
 
     activity_epochs.drop('avm', axis=1, inplace=True, errors='ignore')
 
-    activity_stats = None
+    stats = None
 
-    if type == 'daily':
+    if stat_type == 'daily':
 
         if not quiet:
             print("Summarizing daily activity...")
 
-        activity_stats = pd.DataFrame(columns=['day_num', 'date', 'none', 'sedentary', 'sedentary_gait', 'light',
-                                               'moderate', 'vigorous'])
-
+        stats = pd.DataFrame(columns=['day_num', 'date', 'none', 'sedentary', 'sedentary_gait', 'light', 'moderate',
+                                      'vigorous'])
 
         new_epochs = []
         for idx, row in activity_epochs.iterrows():
@@ -198,12 +196,11 @@ def activity_stats(activity_epochs, type='daily', quiet=False):
                 activity_epochs.at[idx, 'end_time'] = midnight
                 activity_epochs.at[idx, 'duration'] = round((midnight - row['start_time']).total_seconds())
 
-
         for new_epoch in new_epochs:
             new_row = pd.DataFrame([new_epoch], columns=activity_epochs.columns)
             activity_epochs = pd.concat([activity_epochs, new_row], ignore_index=True)
 
-        #activity_epochs.sort_values(by='start_time', inplace=True, ignore_index=True)
+        # activity_epochs.sort_values(by='start_time', inplace=True, ignore_index=True)
 
         day_num = 1
 
@@ -214,45 +211,15 @@ def activity_stats(activity_epochs, type='daily', quiet=False):
             for intensity, intensity_group in date_group.groupby('intensity'):
                 counts[intensity] = round(sum(intensity_group['duration']) / 60, 2)
 
-            day_activity_stats = pd.DataFrame([[day_num, date, counts['none'], counts['sedentary'],
-                                                counts['sedentary_gait'],counts['light'], counts['moderate'],
-                                                counts['vigorous']]], columns=activity_stats.columns)
+            day_stats = pd.DataFrame([[day_num, date, counts['none'], counts['sedentary'], counts['sedentary_gait'],
+                                       counts['light'], counts['moderate'], counts['vigorous']]],
+                                     columns=stats.columns)
 
-            activity_stats = pd.concat([activity_stats, day_activity_stats], ignore_index=True)
+            stats = pd.concat([stats, day_stats], ignore_index=True)
 
             day_num += 1
 
     else:
         print('Invalid type selected.')
 
-    return activity_stats
-
-
-# def calculate_wrist_activity(file_path, epoch_length, dominant=False, quiet=False):
-#
-#     # NOT FULLY FUNCTIONAL
-#
-#     # read file
-#
-#     wrist_device = nwdata.NWData()
-#     wrist_device.import_edf(file_path)
-#
-#     # search for appropriate signals
-#
-#     avm, epoch_intensity = calc_wrist_powell(x=wrist_device.signals[0],
-#                                              y=wrist_device.signals[1],
-#                                              z=wrist_device.signals[2],
-#                                              sample_rate=wrist_device.signal_headers[0]['sample_rate'],
-#                                              epoch_length=epoch_length,
-#                                              dominant=dominant,
-#                                              quiet=quiet)
-#
-#     total_activity = sum_total_activity(epoch_intensity=epoch_intensity, epoch_length=epoch_length, quiet=quiet)
-#     daily_activity = sum_daily_activity(epoch_intensity, epoch_length=epoch_length,
-#                                         start_datetime=wrist_device.header['startdate'], quiet=quiet)
-#
-#     # can add write to file option
-#
-#     # can add identifiers from file header if wanted before returning summaries
-#
-#     return avm, epoch_intensity, total_activity, daily_activity
+    return stats

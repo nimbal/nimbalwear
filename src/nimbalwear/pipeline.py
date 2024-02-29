@@ -25,8 +25,9 @@ from pathlib import Path
 import logging
 import traceback
 from functools import wraps
-import json
 import operator
+import subprocess
+from shutil import copyfile
 
 import toml
 from tqdm import tqdm
@@ -39,11 +40,13 @@ from .nonwear import detach_nonwear, nonwear_stats
 from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
 from .gait import detect_steps, define_bouts, gait_stats
 from .activity import activity_wrist_avm, activity_stats
-from .utils import convert_json_to_toml, update_settings
+from .utils import update_dict
 from .reports import collection_report as cr
 
 from .__version__ import __version__
 
+COLLECTION_COLS = ['study_code', 'subject_id', 'coll_id', 'dominant_hand', 'age', 'var_1', 'var_2', 'var_3']
+DEVICE_COLS = ['study_code', 'subject_id', 'coll_id', 'device_type', 'device_id', 'device_location', 'file_name']
 
 class Study:
     """"Represents a study on which the pipeline can be run.
@@ -59,27 +62,19 @@ class Study:
     study_code : str
         Unique study identifier.
     settings_path : Path or str
-        Path to the file containing settings for the pipeline.
+        Path to the file containing custom settings.
+    default_study_settings_path : Path or str
+        Patht to the file contatining default settings for this study.
     dirs : dict
         Dictionary of directories within the study_dir used by the pipeline to store data.
-    stages : list
-        List of stages in the pipeline.
-    sensors : dict
-        Dictionary of sensor type and the signal labels they contain.
-    device_locations : dict
-        Dictionary of device locations and aliases for each.
-    module_settings
-        Dictionary of modules with settings for each.
     device_info_path : Path or str
         Path to file containing information about each device in each collection in the study.
     collection_info_path : Path or str
         Path to file containing information about each collection in the study.
     status_path : Path or str
         Path to file containing information about the pipeline status of each collection.
-    settings_str : str
+    study_settings_str : str
         String version of settings toml file, for use in logs.
-    data_dicts : dict
-        Dictionary of data dictionaries to be written to each data folder.
     device_info : DataFrame
         Information about each device in each collection in the study.
     collection_info : DataFrame
@@ -87,7 +82,8 @@ class Study:
 
 
     """
-    def __init__(self, study_dir, settings_path=None, supp_pwd=None):
+
+    def __init__(self, study_dir, settings_path=None, create=False):
         """Read settings, devices, and collections file to construct Pipeline instance.
 
         Parameters
@@ -102,92 +98,223 @@ class Study:
 
         self.quiet = False
         self.log = True
-        self.supp_pwd = supp_pwd
 
-        # initialize folder structure
-        self.study_dir = Path(study_dir)
+        self.study_dir = study_dir = Path(study_dir)
+        self.study_code = study_dir.stem
+        self.settings_path = Path(settings_path) if settings_path is not None else settings_path
 
-        # get study code
-        self.study_code = self.study_dir.name
+        if create:
+            self._create_study()
 
-        # get settings paths
+        self._load_study()
+
+        return
+
+    def _create_study(self):
+
+        study_dir = self.study_dir
+
+        isdirexists = study_dir.is_dir()
+
+        if isdirexists:
+            print(f"{study_dir} cannot be created because it already exists.")
+            return
+
+        print(f"Creating {study_dir}...")
+        study_dir.mkdir(parents=True, exist_ok=True)
+        dotnimbalwear_path = study_dir / ".nimbalwear"
+        open(dotnimbalwear_path, 'a').close()  # creates empty file
+        if os.name == "nt":
+            subprocess.run(["attrib", "+H", dotnimbalwear_path], check=True)  # hides file if os is windows
+
+        return
+
+    def _load_study(self):
+
+        study_dir = self.study_dir
+
+        isdirstudy = (study_dir / ".nimbalwear").is_file()
+
+        if not isdirstudy:
+            raise FileNotFoundError(f"{study_dir} cannot be loaded because it does not contain a nimbalwear study.")
+
+        print(f"Loading study from {study_dir}...")
+
+        self._load_settings()
+
+        self._update_dirs()
+
+        self._init_structure()
+
+        return
+
+    def _load_settings(self):
+
+        study_dir= self.study_dir
+        study_code = self.study_code
+        settings_path = self.settings_path
+
+        # LOAD DEFAULT SETTINGS
         default_settings_path = Path(__file__).parent.absolute() / 'settings/settings.toml'
-
-        # convert settings_path to Path if not None
-        settings_path = Path(settings_path) if settings_path is not None else settings_path
-
-        # if settings path is None or doesn't exist then set settings_path to default settings file
-        if (settings_path is None) or (not settings_path.is_file()):
-            settings_path = self.study_dir / 'study/settings/settings.toml'
-            settings_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # if default settings file doesn't exist in this study then add it
-            if not settings_path.is_file():
-                shutil.copy(default_settings_path, settings_path)
-
+        print("Loading nimbalwear default settings...")
         with open(default_settings_path, 'r') as f:
-            default_settings_dict = toml.load(f)
+            default_settings = toml.load(f)
+        self.study_settings = default_settings.copy()
 
-        self.study_settings = default_settings_dict.copy()
+        # LOAD STUDY SETTINGS
+        self.default_study_settings_path = default_study_settings_path = study_dir / 'study/settings/settings.toml'
+        if not default_study_settings_path.is_file():
+            print(f"No {study_code} default settings exist. " +
+                  "Copying nimbalwear default settings to {default_study_settings_path}...")
+            default_study_settings_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(default_settings_path, default_study_settings_path)
+        else:
+            print(f"Updating {study_code} default settings...")
 
-        # if a json file is passed in read it as is but convert it to toml for next time
-        # - this provides and option for backward compatibility to run the pipeline with the existing json file
-        # the first time after upgrading to version 0.19 that uses toml
-        if settings_path.suffix == ".json":
-            study_settings_dict = convert_json_to_toml(settings_path, settings_path.with_suffix(".toml"))
-        else: # read toml file
+        with open(default_study_settings_path, 'r') as f:
+            default_study_settings = toml.load(f)
+
+        self.default_study_settings = default_study_settings
+        self._update_settings(default_study_settings)
+
+        # LOAD CUSTOM SETTINGS
+
+        # set settings_path to None if it does not exist
+        if (settings_path is not None) and (not settings_path.is_file()):
+            print(f"Cannot update custom settings: {settings_path} does not exist.")
+            settings_path = None
+
+        if settings_path is not None:
+            print("Updating custom settings...")
             with open(settings_path, 'r') as f:
-                study_settings_dict = toml.load(f)
+                custom_settings = toml.load(f)
+            self._update_settings(custom_settings)
 
-        self.study_settings = update_settings(self.study_settings, study_settings_dict)
+        return
+
+    def _update_settings(self, new_settings):
+
+        self.study_settings = update_dict(self.study_settings, new_settings)
         self.study_settings_str = toml.dumps(self.study_settings)
-        self.study_settings_path = settings_path
-        self.settings_path_list = [str(settings_path)]
+
+        return
+
+    def _update_dirs(self):
+
+        study_dir = self.study_dir
+        study_settings = self.study_settings
 
         # parse specific settings into Pipeline attributes
-        self.dirs = self.study_settings['study']['dirs']
-        self.dirs = {key: self.study_dir / value for key, value in self.dirs.items()}
+        dirs = study_settings['study']['dirs']
+        self.dirs = {key: study_dir / value for key, value in dirs.items()}
 
-        # self.stages = self.settings['pipeline']['stages']
-        # self.sensors = self.settings['pipeline']['sensors']
-        # self.device_locations = self.settings['pipeline']['device_locations']
-        # self.module_settings = self.settings['modules']
+        abs_dirs = study_settings['study'].get('abs_dirs', {})
+        self.dirs.update({key: Path(value) for key, value in abs_dirs.items()})
 
-        # pipeline data file paths
-        self.device_info_path = self.dirs['study'] / 'devices.csv'
-        self.collection_info_path = self.dirs['study'] / 'collections.csv'
-        self.status_path = self.dirs['study'] / 'status.csv'
+        return
 
-        # dump settings to str that can be printed in log
+    def _init_structure(self):
 
-
-        # with open(Path(__file__).parent.absolute() / 'settings/data_dicts.json', 'r') as f:
-        #     self.data_dicts = json.load(f)
-
-        # TODO: check for required files (raw data, device_list)
-
-        # read device list
-        self.device_info = pd.read_csv(self.device_info_path, dtype=str).fillna('')
-
-        # read subject level info
-        if self.collection_info_path.exists():
-            self.collection_info = pd.read_csv(self.collection_info_path, dtype=str).fillna('')
-        else:
-            self.collection_info = None
-
-        # TODO: Check devices.csv and subjects.csv integrity
-        # - ensure study code same for all rows (required) and matches study_dir (warning)
-        # - unique combo of study, subject, coll, device type, device location (blanks allowed if still unique)
-        # - ensure no missing file names
+        dirs = self.dirs
 
         # initialize folder structure
-        for key, value in self.dirs.items():
+        for key, value in dirs.items():
             Path(value).mkdir(parents=True, exist_ok=True)
-            # add data dictionary
-            # if key in self.data_dicts:
-            #     df = pd.DataFrame(self.data_dicts[key])
-            #     p = value / f'{key}_dict.csv'
-            #     df.to_csv(p, index=False)
+
+        # OPEN COLLECTION AND DEVICE FILES
+
+        # pipeline data file paths
+        self.device_info_path = device_info_path = dirs['study'] / 'devices.csv'
+        self.collection_info_path = collection_info_path = dirs['study'] / 'collections.csv'
+        self.status_path = dirs['study'] / 'status.csv'
+
+        # read data files if they exist or create blanks
+        if collection_info_path.is_file():
+            print("Reading collection info...")
+            collection_info = pd.read_csv(collection_info_path, dtype=str).fillna('')
+        else:
+            print(f"No collection info exists. Creating {collection_info_path}")
+            collection_info = pd.DataFrame(columns=COLLECTION_COLS)
+            collection_info.to_csv(collection_info_path, index=False)
+        self.collection_info = collection_info
+
+        if device_info_path.is_file():
+            print("Reading device info...")
+            device_info = pd.read_csv(device_info_path, dtype=str).fillna('')
+        else:
+            print(f"No device info exists. Creating {device_info_path}")
+            device_info = pd.DataFrame(columns=DEVICE_COLS)
+            device_info.to_csv(device_info_path, index=False)
+        self.device_info = device_info
+
+        return
+
+    def sync_raw(self, raw_source_dir=None, update_source=False, update_default=False):
+
+        dirs = self.dirs
+
+        if raw_source_dir is None:
+            raw_source_dir = dirs.get('raw_source', None)
+        else:
+            if update_default:
+                self._update_default_raw_source(raw_source_dir)
+            if update_source:
+                self._update_raw_source(raw_source_dir)
+
+            raw_source_dir = Path(raw_source_dir)
+
+        if raw_source_dir is None:
+            print("Could not sync raw data: No known source.")
+            return
+        elif not raw_source_dir.is_dir():
+            print(f"Could not sync raw data: {raw_source_dir} does not exist.")
+            return
+
+        source_files = [f.name for f in raw_source_dir.iterdir() if f.is_file() and not f.stem.startswith('.')]
+
+        dest_dir = dirs['device_raw']
+        dest_files = [f.name for f in dest_dir.iterdir()]
+
+        source_files = [f for f in source_files if f not in dest_files]
+
+        print(f"Syncing raw data: Copying {len(source_files)} filesfrom {raw_source_dir} to {dest_dir}...")
+
+        for f in source_files:
+            src = raw_source_dir / f
+            dst = dest_dir / f
+
+            print(f"Copying {f}...")
+
+            copyfile(src, dst)
+
+        return
+
+    def _update_default_raw_source(self, raw_source_dir):
+
+        # set and write raw_source to default_study_settings
+        abs_dirs = self.default_study_settings['study'].get('abs_dirs', {})
+        abs_dirs['raw_source'] = raw_source_dir
+        self.default_study_settings['study']['abs_dirs'] = abs_dirs
+        self._write_study_settings()
+        print(f"Default raw data source set to {raw_source_dir}.")
+
+        return
+
+    def _update_raw_source(self, raw_source_dir):
+
+        # set and write raw_source to default_study_settings
+
+        new_settings = {'study': {'abs_dirs': {'raw_source': raw_source_dir}}}
+        self._update_settings(new_settings)
+        self._update_dirs()
+        print(f"Raw data source set to {raw_source_dir}.")
+
+        return
+
+    def _write_study_settings(self):
+
+        with open(self.default_study_settings_path, 'w') as f:
+            toml.dump(self.default_study_settings, f)
 
         return
 
@@ -235,7 +362,8 @@ class Study:
 
         return coll_status_wrapper
 
-    def run_pipeline(self, collections=None, stages=None, settings_path=None, quiet=False, log=True, log_level=logging.INFO):
+    def run_pipeline(self, collections=None, stages=None, settings_path=None, supp_pwd= None, quiet=False, log=True,
+                     log_level=logging.INFO):
         """
 
         :param collections: list of tuples (subject_id, coll_id), default is None which will run all collections
@@ -307,8 +435,7 @@ class Study:
 
                     with open(settings_path, 'r') as f:
                         pipeline_settings_dict = toml.load(f)
-                    self.pipeline_settings = update_settings(self.pipeline_settings, pipeline_settings_dict)
-                    self.settings_path_list.append(settings_path)
+                    self.pipeline_settings = update_dict(self.pipeline_settings, pipeline_settings_dict)
 
                 else:
                     message(f"Custom settings file {settings_path} does not exist.", level='warning',
@@ -317,8 +444,8 @@ class Study:
 
             elif settings_path == 'auto':
                 # look for custom settings file based on subject_id and coll_id
-                study_settings_dir = self.study_settings_path.parent
-                study_settings_name = self.study_settings_path.name
+                study_settings_dir = self.default_study_settings_path.parent
+                study_settings_name = self.default_study_settings_path.name
                 coll_settings_path = study_settings_dir / f"{self.study_code}_{subject_id}_{coll_id}_{study_settings_name}"
 
                 # if file exists update settings
@@ -326,8 +453,7 @@ class Study:
 
                     with open(coll_settings_path, 'r') as f:
                         coll_settings_dict = toml.load(f)
-                    self.pipeline_settings = update_settings(self.pipeline_settings, coll_settings_dict)
-                    self.settings_path_list.append(str(coll_settings_path))
+                    self.pipeline_settings = update_dict(self.pipeline_settings, coll_settings_dict)
 
             if stages is None:
                 stages = self.pipeline_settings['pipeline']['stages']
@@ -347,10 +473,6 @@ class Study:
             with open(settings_dump_path, "w") as f:
                 f.write(f"Study {self.study_code}, Subject {subject_id}, Collection {coll_id}, Time {start_time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
                 f.write(self.pipeline_settings_str)
-
-            # message(f"Settings: {self.settings_path_list}\n\n {self.pipeline_settings_str}", level='info', display=(not self.quiet),
-            #         log=self.log, logger_name=self.log_name)
-            # message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
 
             try:
                 # get devices for this collection from device_list
@@ -372,6 +494,7 @@ class Study:
 
                 coll.device_info = coll_device_list_df
                 coll.collection_info = coll_subject_dict
+                coll.supp_pwd = supp_pwd
 
                 self.process_collection(coll=coll, stages=stages)
 
@@ -555,34 +678,6 @@ class Study:
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         coll = self.save_devices(coll=coll, dir=self.dirs['device_edf_raw'], quiet=self.quiet, log=self.log)
-
-        # message("Converting device data to EDF...", level='info', display=(not quiet), log=log,
-        #         logger_name=self.log_name)
-        # message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
-        #
-        # # save all device data to edf
-        # for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
-        #                        desc='Converting device data to EDF'):
-        #
-        #     study_code = row['study_code']
-        #     subject_id = row['subject_id']
-        #     coll_id = row['coll_id']
-        #     device_type = row['device_type']
-        #     device_location = row['device_location']
-        #     device_edf_name = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}.edf"
-        #
-        #     # create all file path variables
-        #     device_edf_path = self.dirs['device_edf_raw'] / device_edf_name
-        #
-        #     # check that all folders exist for data output files
-        #     device_edf_path.parent.mkdir(parents=True, exist_ok=True)
-        #
-        #     message(f"Saving {device_edf_path}", level='info', display=(not quiet), log=log, logger_name=self.log_name)
-        #
-        #     # write device data as edf
-        #     coll.devices[index].export_edf(file_path=device_edf_path, quiet=quiet)
-        #
-        #     message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
@@ -2046,7 +2141,7 @@ class Study:
         supp_path = self.pipeline_settings['modules']['collection_report'].get('supp_path', None)
 
 
-        cr(study_dir=self.study_dir, subject_id=coll.subject_id, coll_id=coll.coll_id, supp_pwd=self.supp_pwd,
+        cr(study_dir=self.study_dir, subject_id=coll.subject_id, coll_id=coll.coll_id, supp_pwd=coll.supp_pwd,
            include_supp=include_supp, include_custom=include_custom, daily_plot=daily_plot, fig_size=fig_size,
            top_y=top_y, bottom_y=bottom_y, supp_path=supp_path)
 
