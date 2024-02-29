@@ -25,7 +25,6 @@ from pathlib import Path
 import logging
 import traceback
 from functools import wraps
-import json
 import operator
 
 import toml
@@ -44,6 +43,8 @@ from .reports import collection_report as cr
 
 from .__version__ import __version__
 
+COLLECTION_COLS = ['study_code', 'subject_id', 'coll_id', 'dominant_hand', 'age', 'var_1', 'var_2', 'var_3']
+DEVICE_COLS = ['study_code', 'subject_id', 'coll_id', 'device_type', 'device_id', 'device_location', 'file_name']
 
 class Study:
     """"Represents a study on which the pipeline can be run.
@@ -87,7 +88,7 @@ class Study:
 
 
     """
-    def __init__(self, study_dir, settings_path=None, supp_pwd=None):
+    def __init__(self, study_dir, settings_path=None, supp_pwd=None, create=False):
         """Read settings, devices, and collections file to construct Pipeline instance.
 
         Parameters
@@ -106,6 +107,15 @@ class Study:
 
         # initialize folder structure
         self.study_dir = Path(study_dir)
+
+        # study_dir does not exist - create or return with message
+        if not self.study_dir.is_dir():
+            if create:
+                self.study_dir.mkdir(parents=True, exist_ok=True)
+                print(f"Creating {study_dir}.")
+            else:
+                print(f"{study_dir} does not exist.")
+                return
 
         # get study code
         self.study_code = self.study_dir.name
@@ -148,6 +158,15 @@ class Study:
         self.dirs = self.study_settings['study']['dirs']
         self.dirs = {key: self.study_dir / value for key, value in self.dirs.items()}
 
+        # initialize folder structure
+        for key, value in self.dirs.items():
+            Path(value).mkdir(parents=True, exist_ok=True)
+            # add data dictionary
+            # if key in self.data_dicts:
+            #     df = pd.DataFrame(self.data_dicts[key])
+            #     p = value / f'{key}_dict.csv'
+            #     df.to_csv(p, index=False)
+
         # self.stages = self.settings['pipeline']['stages']
         # self.sensors = self.settings['pipeline']['sensors']
         # self.device_locations = self.settings['pipeline']['device_locations']
@@ -158,6 +177,19 @@ class Study:
         self.collection_info_path = self.dirs['study'] / 'collections.csv'
         self.status_path = self.dirs['study'] / 'status.csv'
 
+        # read data files if they exist or create blanks
+        if self.collection_info_path.is_file():
+            self.collection_info = pd.read_csv(self.collection_info_path, dtype=str).fillna('')
+        else:
+            self.collection_info = pd.DataFrame(columns=COLLECTION_COLS)
+            self.collection_info.to_csv(self.collection_info_path, index=False)
+
+        if self.device_info_path.is_file():
+            self.device_info = pd.read_csv(self.device_info_path, dtype=str).fillna('')
+        else:
+            self.device_info = pd.DataFrame(columns=DEVICE_COLS)
+            self.device_info.to_csv(self.device_info_path, index=False)
+
         # dump settings to str that can be printed in log
 
 
@@ -166,28 +198,12 @@ class Study:
 
         # TODO: check for required files (raw data, device_list)
 
-        # read device list
-        self.device_info = pd.read_csv(self.device_info_path, dtype=str).fillna('')
-
-        # read subject level info
-        if self.collection_info_path.exists():
-            self.collection_info = pd.read_csv(self.collection_info_path, dtype=str).fillna('')
-        else:
-            self.collection_info = None
-
         # TODO: Check devices.csv and subjects.csv integrity
         # - ensure study code same for all rows (required) and matches study_dir (warning)
         # - unique combo of study, subject, coll, device type, device location (blanks allowed if still unique)
         # - ensure no missing file names
 
-        # initialize folder structure
-        for key, value in self.dirs.items():
-            Path(value).mkdir(parents=True, exist_ok=True)
-            # add data dictionary
-            # if key in self.data_dicts:
-            #     df = pd.DataFrame(self.data_dicts[key])
-            #     p = value / f'{key}_dict.csv'
-            #     df.to_csv(p, index=False)
+
 
         return
 
