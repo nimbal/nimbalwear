@@ -32,6 +32,7 @@ To include a specific release, replace `[version]` with the branch associated wi
 v0.21.7
 - bug fix: resolve error in collection report if no sync events
 - bug fix: resolve sync event naming issue based on device location in collection report
+- bug fix: fix logic for including supp_info files with or without password protection
 - update to require numba v0.59.0 or higher for Python 3.12 compatibility
 
 v0.21.6

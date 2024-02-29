@@ -84,8 +84,6 @@ def collection_report(study_dir, subject_id, coll_id, supp_pwd=None, include_sup
     devices_csv_path = dirs['study'] / 'devices.csv'
     device_info = pd.read_csv(devices_csv_path, dtype=str)
 
-
-
     print(f"\nSubject: {subject_id}...")
 
     ####################
@@ -106,20 +104,24 @@ def collection_report(study_dir, subject_id, coll_id, supp_pwd=None, include_sup
     # TODO: determine openpyxl package dependency?
 
     # Read clinical insights
-    if include_supp and supp_pwd:
+    if include_supp:
+
         print("Formatting supplementary info...")
         if supp_path == None:
             supp_path = dirs['study'] / 'supplementary_info.xlsx'
         else:
             supp_path = Path(supp_path)
-        supp = read_excel_pwd(supp_path, supp_pwd, dtype=str)
+
+        if supp_pwd:
+            supp = read_excel_pwd(supp_path, supp_pwd, dtype=str)
+        else:
+            supp = pd.read_excel(supp_path, dtype=str)
 
         supp.set_index(keys=['subject_id', 'coll_id'], inplace=True)
-        include_supp = ((subject_id, coll_id) in supp.index)
 
-    if include_supp:
-        supp = supp.loc[(subject_id, coll_id)].to_frame()
-        supp_html = supp.to_html(header=False, index_names=False)
+        if ((subject_id, coll_id) in supp.index):
+            supp = supp.loc[(subject_id, coll_id)].to_frame()
+            supp_html = supp.to_html(header=False, index_names=False)
 
     ######################
     # GET EVENT INFO
