@@ -39,7 +39,7 @@ from .nonwear import detach_nonwear, nonwear_stats
 from .sleep import detect_sptw, detect_sleep_bouts, sptw_stats
 from .gait import detect_steps, define_bouts, gait_stats
 from .activity import activity_wrist_avm, activity_stats
-from .utils import update_settings
+from .utils import update_dict
 from .reports import collection_report as cr
 
 from .__version__ import __version__
@@ -90,7 +90,7 @@ class Study:
 
     """
 
-    def __init__(self, study_dir, settings_path=None, create=False, raw_source_dir=None, sync_raw=False, supp_pwd=None, ):
+    def __init__(self, study_dir, settings_path=None, create=False, supp_pwd=None, ):
         """Read settings, devices, and collections file to construct Pipeline instance.
 
         Parameters
@@ -108,64 +108,72 @@ class Study:
         self.supp_pwd = supp_pwd
 
         self.study_dir = study_dir = Path(study_dir)
-
-        # # OPEN OR CREATE STUDY
-        isdirexists = study_dir.is_dir()
-        isdirstudy = (study_dir / ".nimbalwear").is_file()
+        self.study_code = study_dir.stem
+        self.study_settings_path = Path(settings_path) if settings_path is not None else settings_path
 
         if create:
-            if not isdirexists:
-                print(f"Creating {study_dir}...")
-                study_dir.mkdir(parents=True, exist_ok=True)
-                dotnimbalwear_path = study_dir / ".nimbalwear"
-                open(dotnimbalwear_path, 'a').close()  # creates empty file
-                if os.name == "nt":
-                    subprocess.run(["attrib", "+H", dotnimbalwear_path], check=True)  # hides file if os is windows
-            elif isdirexists and not isdirstudy:
-                raise FileExistsError(f"{study_dir} cannot be loaded or created because it already exists but does" +
-                                      " not contain a nimbalwear study.")
-            else:
-                print(f"{study_dir} cannot be created because it already contains a nimbalwear study.")
-        else:
-            if not isdirexists:
-                raise FileNotFoundError(f"{study_dir} cannot be loaded because it does not exist.")
-            elif not isdirstudy:
-                raise TypeError(f"{study_dir} exists but cannot be loaded because it does not contain a nimbalwear study.")
-            else:
-                print(f"Loading study from {study_dir}...")
+            self._create_study()
 
-        # get study code
-        self.study_code = study_code = self.study_dir.name
+        self._load_study()
 
-        # # study_dir does not exist - create or return with message
-        # if not self.study_dir.is_dir():
-        #     if create:
-        #         self.study_dir.mkdir(parents=True, exist_ok=True)
-        #         print(f"Creating {study_dir}.")
-        #     else:
-        #         print(f"{study_dir} does not exist.")
-        #         return
-        # else:
-        #     print("Cannot")
+        return
 
-        # SETTINGS
+    def _create_study(self):
 
-        # get settings paths
-        default_settings_path = Path(__file__).parent.absolute() / 'settings/settings.toml'
-        default_study_settings_path = study_dir / 'study/settings/settings.toml'
-        settings_path = Path(settings_path) if settings_path is not None else settings_path
+        study_dir = self.study_dir
+
+        isdirexists = study_dir.is_dir()
+
+        if isdirexists:
+            print(f"{study_dir} cannot be created because it already exists.")
+            return
+
+        print(f"Creating {study_dir}...")
+        study_dir.mkdir(parents=True, exist_ok=True)
+        dotnimbalwear_path = study_dir / ".nimbalwear"
+        open(dotnimbalwear_path, 'a').close()  # creates empty file
+        if os.name == "nt":
+            subprocess.run(["attrib", "+H", dotnimbalwear_path], check=True)  # hides file if os is windows
+
+        return
+
+    def _load_study(self):
+
+        study_dir = self.study_dir
+
+        isdirstudy = (study_dir / ".nimbalwear").is_file()
+
+        if not isdirstudy:
+            raise FileNotFoundError(f"{study_dir} cannot be loaded because it does not contain a nimbalwear study.")
+
+        print(f"Loading study from {study_dir}...")
+
+        self._load_settings()
+
+        self._update_dirs()
+
+        self._init_structure()
+
+        return
+
+    def _load_settings(self):
+
+        study_dir= self.study_dir
+        study_code = self.study_code
+        settings_path = self.study_settings_path
 
         # LOAD DEFAULT SETTINGS
-
+        default_settings_path = Path(__file__).parent.absolute() / 'settings/settings.toml'
         print("Loading nimbalwear default settings...")
         with open(default_settings_path, 'r') as f:
             default_settings = toml.load(f)
-        study_settings = default_settings.copy()
+        self.study_settings = default_settings.copy()
 
         # LOAD STUDY SETTINGS
-
+        self.default_study_settings_path = default_study_settings_path = study_dir / 'study/settings/settings.toml'
         if not default_study_settings_path.is_file():
-            print(f"No {study_code} default settings exist. Copying nimbalwear default settings to {default_study_settings_path}...")
+            print(f"No {study_code} default settings exist. " +
+                  "Copying nimbalwear default settings to {default_study_settings_path}...")
             default_study_settings_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(default_settings_path, default_study_settings_path)
         else:
@@ -174,69 +182,61 @@ class Study:
         with open(default_study_settings_path, 'r') as f:
             default_study_settings = toml.load(f)
 
-        # set and write raw_source to default_study_settings
-        if raw_source_dir is not None:
-            default_study_settings['study']['dirs']['raw_source'] = raw_source_dir
-            with open(default_study_settings_path, 'w') as f:
-                toml.dump(default_study_settings, f)
-
-        study_settings = update_settings(study_settings, default_study_settings)
+        self.default_study_settings = default_study_settings
+        self._update_settings(default_study_settings)
 
         # LOAD CUSTOM SETTINGS
 
         # set settings_path to None if it does not exist
         if (settings_path is not None) and (not settings_path.is_file()):
-           print(f"Cannot update custom settings: {settings_path} does not exist.")
-           settings_path = None
-
-        # # if settings path is None then set settings_path to default settings file
-        # if settings_path is None:
-        #     settings_path = study_dir / 'study/settings/settings.toml'
-        #     settings_path.parent.mkdir(parents=True, exist_ok=True)
-        #
-        #     # if default settings file doesn't exist in this study then add it
-        #     if not settings_path.is_file():
-        #         print("No default study settings exist. Copying default settings to study folder.")
-        #         shutil.copy(default_settings_path, settings_path)
-        #
-        # with open(default_settings_path, 'r') as f:
-        #     default_settings_dict = toml.load(f)
-        #
-        # self.study_settings = default_settings_dict.copy()
+            print(f"Cannot update custom settings: {settings_path} does not exist.")
+            settings_path = None
 
         if settings_path is not None:
             print("Updating custom settings...")
             with open(settings_path, 'r') as f:
                 custom_settings = toml.load(f)
-            study_settings = update_settings(study_settings, custom_settings)
+            self._update_settings(custom_settings)
 
-        # LOAD DIRS, CHECK, AND CREATE PATHS
+        self.settings_path_list = [str(settings_path)]
+
+        return
+
+    def _update_settings(self, new_settings):
+
+        self.study_settings = update_dict(self.study_settings, new_settings)
+        self.study_settings_str = toml.dumps(self.study_settings)
+
+        return
+
+    def _update_dirs(self):
+
+        study_dir = self.study_dir
+        study_settings = self.study_settings
 
         # parse specific settings into Pipeline attributes
         dirs = study_settings['study']['dirs']
-        self.dirs = dirs = {key: study_dir / value for key, value in dirs.items()}
+        self.dirs = {key: study_dir / value for key, value in dirs.items()}
+
+        abs_dirs = study_settings['study'].get('abs_dirs', {})
+        self.dirs.update({key: Path(value) for key, value in abs_dirs.items()})
+
+        return
+
+    def _init_structure(self):
+
+        dirs = self.dirs
 
         # initialize folder structure
         for key, value in dirs.items():
-            if key not in ['raw_source']:
-                Path(value).mkdir(parents=True, exist_ok=True)
-            # add data dictionary
-            # if key in self.data_dicts:
-            #     df = pd.DataFrame(self.data_dicts[key])
-            #     p = value / f'{key}_dict.csv'
-            #     df.to_csv(p, index=False)
-
-        # self.stages = self.settings['pipeline']['stages']
-        # self.sensors = self.settings['pipeline']['sensors']
-        # self.device_locations = self.settings['pipeline']['device_locations']
-        # self.module_settings = self.settings['modules']
+            Path(value).mkdir(parents=True, exist_ok=True)
 
         # OPEN COLLECTION AND DEVICE FILES
 
         # pipeline data file paths
         self.device_info_path = device_info_path = dirs['study'] / 'devices.csv'
         self.collection_info_path = collection_info_path = dirs['study'] / 'collections.csv'
-        self.status_path = status_path = dirs['study'] / 'status.csv'
+        self.status_path = dirs['study'] / 'status.csv'
 
         # read data files if they exist or create blanks
         if collection_info_path.is_file():
@@ -257,34 +257,58 @@ class Study:
             device_info.to_csv(device_info_path, index=False)
         self.device_info = device_info
 
-        # SYNC RAW DATA
+        return
 
-        raw_source_dir = dirs.get('raw_source', None)
+    def sync_raw(self, raw_source_dir=None, update_source=False, update_default=False):
 
-        if sync_raw:
-            if raw_source_dir is None:
-                print("Could not sync raw data: No known source.")
-            elif not raw_source_dir.is_dir():
-                print(f"Could not sync raw data: {raw_source_dir} does not exist.")
-            else:
-                # sync raw
-                print(f"Syncing raw data from {raw_source_dir}...")
+        dirs = self.dirs
 
-        # dump settings to str that can be printed in log
-        self.study_settings = study_settings
-        self.study_settings_str = toml.dumps(study_settings)
-        self.study_settings_path = settings_path
-        self.settings_path_list = [str(settings_path)]
+        if raw_source_dir is None:
+            raw_source_dir = dirs.get('raw_source', None)
+        else:
+            if update_default:
+                self._update_default_raw_source(raw_source_dir)
+            if update_source:
+                self._update_raw_source(raw_source_dir)
 
-        # with open(Path(__file__).parent.absolute() / 'settings/data_dicts.json', 'r') as f:
-        #     self.data_dicts = json.load(f)
+            raw_source_dir = Path(raw_source_dir)
 
-        # TODO: check for required files (raw data, device_list)
+        if raw_source_dir is None:
+            print("Could not sync raw data: No known source.")
+        elif not raw_source_dir.is_dir():
+            print(f"Could not sync raw data: {raw_source_dir} does not exist.")
+        else:
+            # sync raw
+            print(f"Syncing raw data from {raw_source_dir}...")
 
-        # TODO: Check devices.csv and subjects.csv integrity
-        # - ensure study code same for all rows (required) and matches study_dir (warning)
-        # - unique combo of study, subject, coll, device type, device location (blanks allowed if still unique)
-        # - ensure no missing file names
+        return
+
+    def _update_default_raw_source(self, raw_source_dir):
+
+        # set and write raw_source to default_study_settings
+        abs_dirs = self.default_study_settings['study'].get('abs_dirs', {})
+        abs_dirs['raw_source'] = raw_source_dir
+        self.default_study_settings['study']['abs_dirs'] = abs_dirs
+        self._write_study_settings()
+        print(f"Default raw data source set to {raw_source_dir}.")
+
+        return
+
+    def _update_raw_source(self, raw_source_dir):
+
+        # set and write raw_source to default_study_settings
+
+        new_settings = {'study': {'abs_dirs': {'raw_source': raw_source_dir}}}
+        self._update_settings(new_settings)
+        self._update_dirs()
+        print(f"Raw data source set to {raw_source_dir}.")
+
+        return
+
+    def _write_study_settings(self):
+
+        with open(self.default_study_settings_path, 'w') as f:
+            toml.dump(self.default_study_settings, f)
 
         return
 

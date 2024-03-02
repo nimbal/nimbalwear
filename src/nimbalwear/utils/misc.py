@@ -1,10 +1,10 @@
 from flatten_dict import flatten, unflatten
 
-def update_settings(old_settings, new_settings):
+def update_dict(old_dict, new_dict):
     # flatten, update, unflatten settings dict
-    flat_old_settings = flatten(old_settings, reducer='dot')
-    flat_new_settings = flatten(new_settings, reducer='dot')
-    flat_old_settings.update(flat_new_settings)
-    settings = unflatten(flat_old_settings, splitter='dot')
+    flat_old_dict = flatten(old_dict, reducer='dot')
+    flat_new_dict = flatten(new_dict, reducer='dot')
+    flat_old_dict.update(flat_new_dict)
+    updated_old_dict = unflatten(flat_old_dict, splitter='dot')
 
-    return settings
+    return updated_old_dict
