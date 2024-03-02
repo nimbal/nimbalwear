@@ -42,6 +42,7 @@ def convert_json_to_toml(json_path, toml_path):
 
     return contents
 
+
 def read_excel_pwd(file_path, password, **kwargs):
 
     file = OfficeFile(open(file_path, "rb"))
