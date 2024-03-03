@@ -62,27 +62,19 @@ class Study:
     study_code : str
         Unique study identifier.
     settings_path : Path or str
-        Path to the file containing settings for the pipeline.
+        Path to the file containing custom settings.
+    default_study_settings_path : Path or str
+        Patht to the file contatining default settings for this study.
     dirs : dict
         Dictionary of directories within the study_dir used by the pipeline to store data.
-    stages : list
-        List of stages in the pipeline.
-    sensors : dict
-        Dictionary of sensor type and the signal labels they contain.
-    device_locations : dict
-        Dictionary of device locations and aliases for each.
-    module_settings
-        Dictionary of modules with settings for each.
     device_info_path : Path or str
         Path to file containing information about each device in each collection in the study.
     collection_info_path : Path or str
         Path to file containing information about each collection in the study.
     status_path : Path or str
         Path to file containing information about the pipeline status of each collection.
-    settings_str : str
+    study_settings_str : str
         String version of settings toml file, for use in logs.
-    data_dicts : dict
-        Dictionary of data dictionaries to be written to each data folder.
     device_info : DataFrame
         Information about each device in each collection in the study.
     collection_info : DataFrame
@@ -110,7 +102,7 @@ class Study:
 
         self.study_dir = study_dir = Path(study_dir)
         self.study_code = study_dir.stem
-        self.study_settings_path = Path(settings_path) if settings_path is not None else settings_path
+        self.settings_path = Path(settings_path) if settings_path is not None else settings_path
 
         if create:
             self._create_study()
@@ -161,7 +153,7 @@ class Study:
 
         study_dir= self.study_dir
         study_code = self.study_code
-        settings_path = self.study_settings_path
+        settings_path = self.settings_path
 
         # LOAD DEFAULT SETTINGS
         default_settings_path = Path(__file__).parent.absolute() / 'settings/settings.toml'
@@ -686,34 +678,6 @@ class Study:
         message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         coll = self.save_devices(coll=coll, dir=self.dirs['device_edf_raw'], quiet=self.quiet, log=self.log)
-
-        # message("Converting device data to EDF...", level='info', display=(not quiet), log=log,
-        #         logger_name=self.log_name)
-        # message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
-        #
-        # # save all device data to edf
-        # for index, row in tqdm(coll.device_info.iterrows(), total=coll.device_info.shape[0], leave=False,
-        #                        desc='Converting device data to EDF'):
-        #
-        #     study_code = row['study_code']
-        #     subject_id = row['subject_id']
-        #     coll_id = row['coll_id']
-        #     device_type = row['device_type']
-        #     device_location = row['device_location']
-        #     device_edf_name = f"{study_code}_{subject_id}_{coll_id}_{device_type}_{device_location}.edf"
-        #
-        #     # create all file path variables
-        #     device_edf_path = self.dirs['device_edf_raw'] / device_edf_name
-        #
-        #     # check that all folders exist for data output files
-        #     device_edf_path.parent.mkdir(parents=True, exist_ok=True)
-        #
-        #     message(f"Saving {device_edf_path}", level='info', display=(not quiet), log=log, logger_name=self.log_name)
-        #
-        #     # write device data as edf
-        #     coll.devices[index].export_edf(file_path=device_edf_path, quiet=quiet)
-        #
-        #     message("", level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         return coll
 
