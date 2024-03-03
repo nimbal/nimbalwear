@@ -30,10 +30,13 @@ To include a specific release, replace `[version]` with the branch associated wi
 # Changes by version
 
 v0.21.7
-- bug fix: resolve error in collection report if no sync events
-- bug fix: resolve sync event naming issue based on device location in collection report
-- bug fix: fix logic for including supp_info files with or without password protection
-- update to require numba v0.59.0 or higher for Python 3.12 compatibility
+- bug fix: resolved error in collection report if no sync events
+- bug fix: resolved sync event naming issue based on device location in collection report
+- bug fix: fixed logic for including supp_info files with or without password protection
+- updated to require numba v0.59.0 or higher for Python 3.12 compatibility
+- added "create" parameter to Study to give option to create new study folder
+- added Study.sync_raw() method to sync files from raw_source_dir folder
+- moved supp_pwd parameter from Study.\_\_init\_\_() to Study.run_pipeline()  
 
 v0.21.6
 - bug fix: resolve error in collection report when not all possible device locations collected
