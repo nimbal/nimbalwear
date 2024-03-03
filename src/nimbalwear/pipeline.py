@@ -83,7 +83,7 @@ class Study:
 
     """
 
-    def __init__(self, study_dir, settings_path=None, create=False, supp_pwd=None, ):
+    def __init__(self, study_dir, settings_path=None, create=False):
         """Read settings, devices, and collections file to construct Pipeline instance.
 
         Parameters
@@ -98,7 +98,6 @@ class Study:
 
         self.quiet = False
         self.log = True
-        self.supp_pwd = supp_pwd
 
         self.study_dir = study_dir = Path(study_dir)
         self.study_code = study_dir.stem
@@ -363,7 +362,7 @@ class Study:
 
         return coll_status_wrapper
 
-    def run_pipeline(self, collections=None, stages=None, settings_path=None, quiet=False, log=True,
+    def run_pipeline(self, collections=None, stages=None, settings_path=None, supp_pwd= None, quiet=False, log=True,
                      log_level=logging.INFO):
         """
 
@@ -495,6 +494,7 @@ class Study:
 
                 coll.device_info = coll_device_list_df
                 coll.collection_info = coll_subject_dict
+                coll.supp_pwd = supp_pwd
 
                 self.process_collection(coll=coll, stages=stages)
 
@@ -2141,7 +2141,7 @@ class Study:
         supp_path = self.pipeline_settings['modules']['collection_report'].get('supp_path', None)
 
 
-        cr(study_dir=self.study_dir, subject_id=coll.subject_id, coll_id=coll.coll_id, supp_pwd=self.supp_pwd,
+        cr(study_dir=self.study_dir, subject_id=coll.subject_id, coll_id=coll.coll_id, supp_pwd=coll.supp_pwd,
            include_supp=include_supp, include_custom=include_custom, daily_plot=daily_plot, fig_size=fig_size,
            top_y=top_y, bottom_y=bottom_y, supp_path=supp_path)
 
