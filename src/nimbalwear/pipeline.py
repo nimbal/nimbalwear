@@ -27,6 +27,7 @@ import traceback
 from functools import wraps
 import operator
 import subprocess
+from shutil import copyfile
 
 import toml
 from tqdm import tqdm
@@ -198,8 +199,6 @@ class Study:
                 custom_settings = toml.load(f)
             self._update_settings(custom_settings)
 
-        self.settings_path_list = [str(settings_path)]
-
         return
 
     def _update_settings(self, new_settings):
@@ -275,11 +274,27 @@ class Study:
 
         if raw_source_dir is None:
             print("Could not sync raw data: No known source.")
+            return
         elif not raw_source_dir.is_dir():
             print(f"Could not sync raw data: {raw_source_dir} does not exist.")
-        else:
-            # sync raw
-            print(f"Syncing raw data from {raw_source_dir}...")
+            return
+
+        source_files = [f.name for f in raw_source_dir.iterdir() if f.is_file() and not f.stem.startswith('.')]
+
+        dest_dir = dirs['device_raw']
+        dest_files = [f.name for f in dest_dir.iterdir()]
+
+        source_files = [f for f in source_files if f not in dest_files]
+
+        print(f"Syncing raw data: Copying {len(source_files)} filesfrom {raw_source_dir} to {dest_dir}...")
+
+        for f in source_files:
+            src = raw_source_dir / f
+            dst = dest_dir / f
+
+            print(f"Copying {f}...")
+
+            copyfile(src, dst)
 
         return
 
@@ -429,8 +444,7 @@ class Study:
 
                     with open(settings_path, 'r') as f:
                         pipeline_settings_dict = toml.load(f)
-                    self.pipeline_settings = update_settings(self.pipeline_settings, pipeline_settings_dict)
-                    self.settings_path_list.append(settings_path)
+                    self.pipeline_settings = update_dict(self.pipeline_settings, pipeline_settings_dict)
 
                 else:
                     message(f"Custom settings file {settings_path} does not exist.", level='warning',
@@ -448,8 +462,7 @@ class Study:
 
                     with open(coll_settings_path, 'r') as f:
                         coll_settings_dict = toml.load(f)
-                    self.pipeline_settings = update_settings(self.pipeline_settings, coll_settings_dict)
-                    self.settings_path_list.append(str(coll_settings_path))
+                    self.pipeline_settings = update_dict(self.pipeline_settings, coll_settings_dict)
 
             if stages is None:
                 stages = self.pipeline_settings['pipeline']['stages']
@@ -469,10 +482,6 @@ class Study:
             with open(settings_dump_path, "w") as f:
                 f.write(f"Study {self.study_code}, Subject {subject_id}, Collection {coll_id}, Time {start_time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
                 f.write(self.pipeline_settings_str)
-
-            # message(f"Settings: {self.settings_path_list}\n\n {self.pipeline_settings_str}", level='info', display=(not self.quiet),
-            #         log=self.log, logger_name=self.log_name)
-            # message("", level='info', display=(not self.quiet), log=self.log, logger_name=self.log_name)
 
             try:
                 # get devices for this collection from device_list
