@@ -444,8 +444,8 @@ class Study:
 
             elif settings_path == 'auto':
                 # look for custom settings file based on subject_id and coll_id
-                study_settings_dir = self.study_settings_path.parent
-                study_settings_name = self.study_settings_path.name
+                study_settings_dir = self.default_study_settings_path.parent
+                study_settings_name = self.default_study_settings_path.name
                 coll_settings_path = study_settings_dir / f"{self.study_code}_{subject_id}_{coll_id}_{study_settings_name}"
 
                 # if file exists update settings
