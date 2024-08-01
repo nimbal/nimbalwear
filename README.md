@@ -30,6 +30,7 @@ To include a specific release, replace `[version]` with the branch associated wi
 # Changes by version
 
 v0.21.8
+- update numpy requirements < 2
 - bug fix: resolved start_time inaccuracy for Axivity devices when using fractional timestamps
 
 v0.21.7
