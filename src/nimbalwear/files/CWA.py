@@ -342,13 +342,20 @@ class CWAFile:
             if device_fractional & 0x8000:
 
                 # if top bit of device_fractional set calculate start_time using decimal time_stamp of last sample
-                time_fractional = (device_fractional & 0x7fff) / 32767
+                time_fractional = (device_fractional & 0x7fff) / 0x8000
                 timestamp = timestamp + timedelta(seconds=time_fractional)
-                start_time = timestamp - timedelta(seconds=(sample_count - 1) / int(frequency))
 
-            else:
-                # if top bit of device_fractional not set calculate start_time using timestamp and timestamp_offset
-                start_time = timestamp - timedelta(seconds=(timestamp_offset - 1) / int(frequency))
+                offset_shift = ((device_fractional & 0x7fff) * int(frequency)) >> 15
+                timestamp_offset += offset_shift
+
+
+                #start_time = timestamp - timedelta(seconds=(sample_count - 1) / int(frequency))
+
+            # else:
+            #     # if top bit of device_fractional not set calculate start_time using timestamp and timestamp_offset
+            #     start_time = timestamp - timedelta(seconds=(timestamp_offset - 1) / int(frequency))
+
+            start_time = timestamp - timedelta(seconds=(timestamp_offset - 1) / int(frequency))
 
             # calculate bytes per sample
             num_axes = (num_axes_bps >> 4) & 0x0f
@@ -378,9 +385,8 @@ class CWAFile:
             # battery
             battery = (battery + 512.0) * 6000 / 1024 / 1000.0
 
-
-
         return start_time, num_axes, sample_count, packing_format, accel_scale, gyro_scale, light, temperature, battery
+
 
     def write(self, file_type='edf', out_file='', edf_header={}, edf_signal_headers=[], deid=False, quiet=False):
 

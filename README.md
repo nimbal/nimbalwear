@@ -29,6 +29,9 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v0.21.8
+- bug fix: resolved start_time inaccuracy for Axivity devices when using fractional timestamps
+
 v0.21.7
 - bug fix: resolved error in collection report if no sync events
 - bug fix: resolved sync event naming issue based on device location in collection report
