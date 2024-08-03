@@ -30,7 +30,7 @@ To include a specific release, replace `[version]` with the branch associated wi
 # Changes by version
 
 v0.21.8
-- update numpy requirements < 2
+- update version dependencies for numpy < 2, matplotlib < 3.9 
 - bug fix: resolved start_time inaccuracy for Axivity devices when using fractional timestamps
 
 v0.21.7
