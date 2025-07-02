@@ -253,10 +253,10 @@ def detect_sptw(x_values, y_values, z_values, sample_rate, start_datetime, nonwe
     sptw = pd.DataFrame.from_dict(sptw)
 
     # classify overnight based on overnight times
-    sptw['overnight'] = ((sptw['start_time'] < (pd.to_datetime(sptw['relative_date']) + timedelta(days=1, hours=overnight_end)))
-                         & (sptw['end_time'] > (pd.to_datetime(sptw['relative_date']) + timedelta(hours=overnight_start))))
-
-
+    sptw['overnight'] = False
+    if len(sptw.index) > 0:
+        sptw['overnight'] = ((sptw['start_time'] < (pd.to_datetime(sptw['relative_date']) + timedelta(days=1, hours=overnight_end)))
+                             & (sptw['end_time'] > (pd.to_datetime(sptw['relative_date']) + timedelta(hours=overnight_start))))
 
     return sptw, z_angle, z_angle_diff, z_sample_rate
 
