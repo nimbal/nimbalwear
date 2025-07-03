@@ -29,6 +29,9 @@ To include a specific release, replace `[version]` with the branch associated wi
 
 # Changes by version
 
+v0.21.9
+- bug fix: resolved errors when no sleep is detected
+
 v0.21.8
 - update version dependencies for numpy < 2, matplotlib < 3.9 
 - bug fix: resolved start_time inaccuracy for Axivity devices when using fractional timestamps
