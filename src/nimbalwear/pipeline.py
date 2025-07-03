@@ -1847,11 +1847,17 @@ class Study:
         coll.sleep_bouts = pd.concat([sleep_t5a5, sleep_t8a4])
 
         daily_sleep_t5a5 = sptw_stats(coll.sptw, sleep_t5a5, type='daily', sptw_inc=['long', 'all', 'sleep', 'overnight_sleep'])
-        message(f"Summarized {daily_sleep_t5a5['sptw_inc'].value_counts()['long']} days of sleep analytics (t5a5)...",
+        sleep_days = 0
+        if 'long' in daily_sleep_t5a5['sptw_inc']:
+            sleep_days = daily_sleep_t5a5['sptw_inc'].value_counts()['long']
+        message(f"Summarized {sleep_days} days of sleep (t5a5)...",
                 level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         daily_sleep_t8a4 = sptw_stats(coll.sptw, sleep_t8a4, type='daily', sptw_inc=['long', 'all', 'sleep', 'overnight_sleep'])
-        message(f"Summarized {daily_sleep_t8a4['sptw_inc'].value_counts()['long']} days of sleep analytics (t8a4)...",
+        sleep_days = 0
+        if 'long' in daily_sleep_t8a4['sptw_inc']:
+            sleep_days = daily_sleep_t8a4['sptw_inc'].value_counts()['long']
+        message(f"Summarized {sleep_days} days of sleep analytics (t8a4)...",
                 level='info', display=(not quiet), log=log, logger_name=self.log_name)
 
         daily_sleep_t5a5.insert(loc=2, column='bout_detect', value='t5a5')
